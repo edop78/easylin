@@ -4,7 +4,7 @@ import api from '../../api/client';
 import { 
   Container, Play, Square, RotateCw, Trash2, RefreshCw, 
   Image, HardDrive, Network, ScrollText, Cog, ShoppingCart, 
-  Download, ExternalLink, Globe, Trash, CheckCircle, AlertCircle, Copy, Plus, Github
+  Download, ExternalLink, Globe, Trash, CheckCircle, AlertCircle, Copy, Plus, Github, Lock
 } from 'lucide-react';
 import ConfirmModal from '../../components/Common/ConfirmModal';
 
@@ -44,7 +44,6 @@ export default function Docker() {
   const [msg, setMsg] = useState(null);
   const [confirm, setConfirm] = useState({ open: false, title: '', message: '', action: null });
   
-  // Manual install form state
   const [customApp, setCustomApp] = useState({ type: 'image', image: '', name: '', ports: '' });
 
   useEffect(() => {
@@ -253,10 +252,18 @@ export default function Docker() {
                       <button className="btn btn-sm btn-icon btn-ghost" onClick={() => containerAction(c.id, 'stop')} title="Stop"><Square size={13} /></button>
                       <button className="btn btn-sm btn-icon btn-ghost" onClick={() => containerAction(c.id, 'restart')} title="Restart"><RotateCw size={13} /></button>
                       <button className="btn btn-sm btn-icon btn-ghost" onClick={() => viewLogs(c.id, c.name)} title="Logs"><ScrollText size={13} /></button>
-                      <button className="btn btn-sm btn-icon btn-ghost" onClick={() => setConfirm({
-                        open: true, title: 'Remove Container', message: `Delete container ${c.name}?`, 
-                        action: () => containerAction(c.id, 'remove')
-                      })} title="Remove" style={{ color: 'var(--accent-red)' }}><Trash2 size={13} /></button>
+                      <button 
+                        className="btn btn-sm btn-icon btn-ghost" 
+                        disabled={c.state === 'running'}
+                        onClick={() => setConfirm({
+                          open: true, title: 'Remove Container', message: `Delete container ${c.name}?`, 
+                          action: () => containerAction(c.id, 'remove')
+                        })} 
+                        title={c.state === 'running' ? "Stop container first" : "Remove"}
+                        style={{ color: c.state === 'running' ? 'var(--text-muted)' : 'var(--accent-red)' }}
+                      >
+                        {c.state === 'running' ? <Lock size={13} /> : <Trash2 size={13} />}
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -265,17 +272,26 @@ export default function Docker() {
           </table>
         ) : tab === 'images' ? (
           <table className="data-table">
-            <thead><tr><th>Repository</th><th>Size</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Repository</th><th>Size</th><th>In Use</th><th>Actions</th></tr></thead>
             <tbody>
               {(imagesData?.images || []).map((img) => (
                 <tr key={img.id}>
                   <td style={{ color: 'var(--text-primary)' }}>{img.tags?.[0] || img.id}</td>
                   <td>{formatSize(img.size)}</td>
+                  <td>{img.in_use ? <span className="badge badge-warning">Yes</span> : <span className="badge">No</span>}</td>
                   <td>
-                    <button className="btn btn-sm btn-icon btn-ghost" onClick={() => setConfirm({
-                      open: true, title: 'Remove Image', message: 'Delete this image from the server?', 
-                      action: () => removeImage(img.id)
-                    })} title="Remove" style={{ color: 'var(--accent-red)' }}><Trash2 size={14} /></button>
+                    <button 
+                      className="btn btn-sm btn-icon btn-ghost" 
+                      disabled={img.in_use}
+                      onClick={() => setConfirm({
+                        open: true, title: 'Remove Image', message: 'Delete this image from the server?', 
+                        action: () => removeImage(img.id)
+                      })} 
+                      title={img.in_use ? "Image in use by a container" : "Remove"}
+                      style={{ color: img.in_use ? 'var(--text-muted)' : 'var(--accent-red)' }}
+                    >
+                      {img.in_use ? <Lock size={14} /> : <Trash2 size={14} />}
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -283,7 +299,7 @@ export default function Docker() {
           </table>
         ) : tab === 'market' ? (
           <div style={{ padding: 'var(--space-md)' }}>
-            {/* Custom Deploy Card */}
+            {/* Custom Deploy Card (unchanged logic, just ensuring consistency) */}
             <div className="card" style={{ 
               marginBottom: 'var(--space-xl)', 
               background: 'linear-gradient(145deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.01) 100%)',
@@ -301,56 +317,15 @@ export default function Docker() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', backgroundColor: 'rgba(255,255,255,0.03)', padding: '4px', borderRadius: '10px', gap: '4px' }}>
-                  <button 
-                    className={`btn btn-sm ${customApp.type === 'image' ? 'btn-primary' : 'btn-ghost'}`} 
-                    onClick={() => setCustomApp({...customApp, type: 'image'})}
-                    style={{ fontSize: '11px', padding: '6px 16px', borderRadius: '8px' }}
-                  >
-                    <Globe size={14} /> Docker Hub
-                  </button>
-                  <button 
-                    className={`btn btn-sm ${customApp.type === 'github' ? 'btn-primary' : 'btn-ghost'}`} 
-                    onClick={() => setCustomApp({...customApp, type: 'github'})}
-                    style={{ fontSize: '11px', padding: '6px 16px', borderRadius: '8px' }}
-                  >
-                    <Github size={14} /> GitHub Repo
-                  </button>
+                  <button className={`btn btn-sm ${customApp.type === 'image' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setCustomApp({...customApp, type: 'image'})} style={{ fontSize: '11px', padding: '6px 16px', borderRadius: '8px' }}><Globe size={14} /> Docker Hub</button>
+                  <button className={`btn btn-sm ${customApp.type === 'github' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setCustomApp({...customApp, type: 'github'})} style={{ fontSize: '11px', padding: '6px 16px', borderRadius: '8px' }}><Github size={14} /> GitHub Repo</button>
                 </div>
               </div>
-
               <form onSubmit={handleManualInstall} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-lg)', alignItems: 'end' }}>
-                <div className="form-group">
-                  <label>{customApp.type === 'github' ? 'Repository URL' : 'Image Name'}</label>
-                  <input 
-                    className="input" 
-                    placeholder={customApp.type === 'github' ? 'https://github.com/user/repo' : 'e.g. nginx:latest'} 
-                    value={customApp.image} 
-                    onChange={e => setCustomApp({...customApp, image: e.target.value})}
-                    required 
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Container Name (Optional)</label>
-                  <input 
-                    className="input" 
-                    placeholder="e.g. my-app" 
-                    value={customApp.name} 
-                    onChange={e => setCustomApp({...customApp, name: e.target.value})}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Ports Mapping</label>
-                  <input 
-                    className="input" 
-                    placeholder="e.g. 8080:80" 
-                    value={customApp.ports} 
-                    onChange={e => setCustomApp({...customApp, ports: e.target.value})}
-                  />
-                </div>
-                <button className="btn btn-primary" type="submit" disabled={installing === 'custom'} style={{ height: '46px', fontWeight: 600 }}>
-                  {installing === 'custom' ? <RotateCw size={18} className="spin" /> : <Download size={18} />}
-                  {customApp.type === 'github' ? 'Build & Deploy' : 'Deploy Now'}
-                </button>
+                <div className="form-group"><label>{customApp.type === 'github' ? 'Repository URL' : 'Image Name'}</label><input className="input" placeholder={customApp.type === 'github' ? 'https://github.com/user/repo' : 'e.g. nginx:latest'} value={customApp.image} onChange={e => setCustomApp({...customApp, image: e.target.value})} required /></div>
+                <div className="form-group"><label>Container Name (Optional)</label><input className="input" placeholder="e.g. my-app" value={customApp.name} onChange={e => setCustomApp({...customApp, name: e.target.value})} /></div>
+                <div className="form-group"><label>Ports Mapping</label><input className="input" placeholder="e.g. 8080:80" value={customApp.ports} onChange={e => setCustomApp({...customApp, ports: e.target.value})} /></div>
+                <button className="btn btn-primary" type="submit" disabled={installing === 'custom'} style={{ height: '46px', fontWeight: 600 }}>{installing === 'custom' ? <RotateCw size={18} className="spin" /> : <Download size={18} />} {customApp.type === 'github' ? 'Build & Deploy' : 'Deploy Now'}</button>
               </form>
             </div>
 
@@ -358,76 +333,17 @@ export default function Docker() {
               {MARKET_APPS.map(app => {
                 const installed = isAppInstalled(app.containerName);
                 const containerId = getAppContainerId(app.containerName);
-                
                 return (
-                  <div key={app.id} className="app-card" style={{ 
-                    border: '1px solid var(--border-color)', 
-                    borderRadius: '12px', 
-                    padding: 'var(--space-lg)',
-                    backgroundColor: 'rgba(255,255,255,0.02)',
-                    position: 'relative'
-                  }}>
-                    {installed && (
-                      <div style={{ position: 'absolute', top: '12px', right: '12px' }}>
-                        <span className="badge badge-success">Installed</span>
-                      </div>
-                    )}
-                    
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 'var(--space-md)' }}>
-                      <div style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-blue)', padding: '10px', borderRadius: '10px' }}>
-                        <app.icon size={24} />
-                      </div>
-                    </div>
-                    
+                  <div key={app.id} className="app-card" style={{ border: '1px solid var(--border-color)', borderRadius: '12px', padding: 'var(--space-lg)', backgroundColor: 'rgba(255,255,255,0.02)', position: 'relative' }}>
+                    {installed && <div style={{ position: 'absolute', top: '12px', right: '12px' }}><span className="badge badge-success">Installed</span></div>}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 'var(--space-md)' }}><div style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-blue)', padding: '10px', borderRadius: '10px' }}><app.icon size={24} /></div></div>
                     <h3 style={{ marginBottom: '4px', fontSize: '1.1rem' }}>{app.name}</h3>
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 'var(--space-md)', lineHeight: 1.4 }}>{app.desc}</p>
-                    
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: 'var(--space-lg)' }}>
-                      {app.tags.map(tag => (
-                        <span key={tag} style={{ fontSize: '10px', backgroundColor: 'var(--border-color)', padding: '2px 8px', borderRadius: '10px' }}>{tag}</span>
-                      ))}
-                    </div>
-
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: 'var(--space-lg)' }}>{app.tags.map(tag => <span key={tag} style={{ fontSize: '10px', backgroundColor: 'var(--border-color)', padding: '2px 8px', borderRadius: '10px' }}>{tag}</span>)}</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {!installed ? (
-                        <button 
-                          className="btn btn-primary" 
-                          style={{ width: '100%' }}
-                          disabled={installing === app.id}
-                          onClick={() => setConfirm({
-                            open: true,
-                            title: `Install ${app.name}`,
-                            message: `This will pull ${app.image} and create a new container. Continue?`,
-                            action: () => installApp(app.id)
-                          })}
-                        >
-                          {installing === app.id ? <RefreshCw size={16} className="spin" /> : <Download size={16} />}
-                          {installing === app.id ? 'Install App' : 'Install App'}
-                        </button>
-                      ) : (
-                        <>
-                          <a 
-                            href={`http://${window.location.hostname}:${app.uiPort}`} 
-                            target="_blank" 
-                            rel="noreferrer" 
-                            className="btn btn-primary"
-                            style={{ width: '100%', textDecoration: 'none', justifyContent: 'center' }}
-                          >
-                            <ExternalLink size={16} /> Open Web UI
-                          </a>
-                          <button 
-                            className="btn btn-ghost" 
-                            style={{ width: '100%', color: 'var(--accent-red)' }}
-                            onClick={() => setConfirm({
-                              open: true,
-                              title: `Uninstall ${app.name}`,
-                              message: `Are you sure you want to remove the ${app.name} container? All data in volumes will be preserved.`,
-                              action: () => containerAction(containerId, 'remove')
-                            })}
-                          >
-                            <Trash size={16} /> Uninstall
-                          </button>
-                        </>
+                      {!installed ? <button className="btn btn-primary" style={{ width: '100%' }} disabled={installing === app.id} onClick={() => setConfirm({ open: true, title: `Install ${app.name}`, message: `This will pull ${app.image} and create a new container. Continue?`, action: () => installApp(app.id) })}>{installing === app.id ? <RefreshCw size={16} className="spin" /> : <Download size={16} />} Install App</button> : (
+                        <><a href={`http://${window.location.hostname}:${app.uiPort}`} target="_blank" rel="noreferrer" className="btn btn-primary" style={{ width: '100%', textDecoration: 'none', justifyContent: 'center' }}><ExternalLink size={16} /> Open Web UI</a>
+                        <button className="btn btn-ghost" style={{ width: '100%', color: 'var(--accent-red)' }} onClick={() => setConfirm({ open: true, title: `Uninstall ${app.name}`, message: `Are you sure you want to remove the ${app.name} container? All data in volumes will be preserved.`, action: () => containerAction(containerId, 'remove') })}><Trash size={16} /> Uninstall</button></>
                       )}
                     </div>
                   </div>
@@ -437,13 +353,23 @@ export default function Docker() {
           </div>
         ) : tab === 'volumes' ? (
           <table className="data-table">
-            <thead><tr><th>Name</th><th>Driver</th><th>Mountpoint</th></tr></thead>
+            <thead><tr><th>Name</th><th>Driver</th><th>In Use</th><th>Actions</th></tr></thead>
             <tbody>
               {(volumesData?.volumes || []).map((v) => (
                 <tr key={v.name}>
                   <td style={{ color: 'var(--text-primary)' }}>{v.name}</td>
                   <td>{v.driver}</td>
-                  <td className="mono">{v.mountpoint}</td>
+                  <td>{v.in_use ? <span className="badge badge-warning">Yes</span> : <span className="badge">No</span>}</td>
+                  <td>
+                    <button 
+                      className="btn btn-sm btn-icon btn-ghost" 
+                      disabled={v.in_use}
+                      title={v.in_use ? "Volume in use by a container" : "Remove"}
+                      style={{ color: v.in_use ? 'var(--text-muted)' : 'var(--accent-red)' }}
+                    >
+                      {v.in_use ? <Lock size={14} /> : <Trash2 size={14} />}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

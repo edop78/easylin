@@ -56,6 +56,7 @@ def list_containers():
                 "id": c.short_id,
                 "name": c.name,
                 "image": str(c.image.tags[0]) if c.image.tags else str(c.image.short_id),
+                "image_id": c.image.id,
                 "status": c.status,
                 "state": c.attrs["State"]["Status"],
                 "ports": c.ports,
@@ -81,10 +82,123 @@ def container_action(container_id, action):
     try:
         container = client.containers.get(container_id)
         if action == "remove":
-            container.remove(force=True)
+            # Safety check: don't remove running container without force
+            if container.status == "running":
+                return jsonify({"error": "Cannot remove a running container. Stop it first."}), 400
+            container.remove()
         else:
             getattr(container, action)()
         return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@docker_bp.route("/containers/run", methods=["POST"])
+@jwt_required()
+def run_container():
+    """Run a custom container manually or from GitHub."""
+    client = get_client()
+    if not client:
+        return jsonify({"error": "Cannot connect to Docker daemon"}), 503
+
+    data = request.get_json()
+    install_type = data.get("type", "image")
+    image_or_repo = data.get("image")
+    name = data.get("name")
+    ports_raw = data.get("ports", "")
+    
+    if not image_or_repo:
+        return jsonify({"error": "Image name or Repository URL is required"}), 400
+
+    ports_dict = {}
+    if ports_raw:
+        try:
+            for p in ports_raw.split(","):
+                host_port, container_port = p.strip().split(":")
+                ports_dict[f"{container_port}/tcp"] = int(host_port)
+        except Exception:
+            return jsonify({"error": "Invalid ports format. Use host:container"}), 400
+
+    try:
+        final_image = image_or_repo
+        if install_type == "github":
+            tag = name if name else "custom-app-build"
+            client.images.build(path=image_or_repo, tag=tag, rm=True)
+            final_image = tag
+        elif install_type == "image":
+            client.images.pull(image_or_repo)
+
+        container = client.containers.run(
+            final_image,
+            name=name if name else None,
+            ports=ports_dict,
+            detach=True,
+            restart_policy={"Name": "unless-stopped"}
+        )
+        return jsonify({
+            "success": True, 
+            "container_id": container.short_id,
+            "message": f"Container {container.name} started successfully"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@docker_bp.route("/images", methods=["GET"])
+@jwt_required()
+def list_images():
+    """List Docker images and check if they are in use."""
+    client = get_client()
+    if not client:
+        return jsonify({"error": "Cannot connect to Docker daemon"}), 503
+
+    try:
+        images = client.images.list()
+        containers = client.containers.list(all=True)
+        used_image_ids = {c.image.id for c in containers}
+        
+        result = []
+        for img in images:
+            result.append({
+                "id": img.short_id,
+                "full_id": img.id,
+                "tags": img.tags,
+                "size": img.attrs.get("Size", 0),
+                "in_use": img.id in used_image_ids
+            })
+        return jsonify({"images": result})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@docker_bp.route("/volumes", methods=["GET"])
+@jwt_required()
+def list_volumes():
+    """List Docker volumes and check if they are in use."""
+    client = get_client()
+    if not client:
+        return jsonify({"error": "Cannot connect to Docker daemon"}), 503
+
+    try:
+        volumes = client.volumes.list()
+        containers = client.containers.list(all=True)
+        
+        used_volumes = set()
+        for c in containers:
+            mounts = c.attrs.get("Mounts", [])
+            for m in mounts:
+                if m.get("Type") == "volume":
+                    used_volumes.add(m.get("Name"))
+
+        result = []
+        for v in volumes:
+            result.append({
+                "name": v.name,
+                "driver": v.attrs.get("Driver", ""),
+                "mountpoint": v.attrs.get("Mountpoint", ""),
+                "in_use": v.name in used_volumes
+            })
+        return jsonify({"volumes": result})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -106,69 +220,10 @@ def container_logs(container_id):
         return jsonify({"error": str(e)}), 500
 
 
-@docker_bp.route("/containers/run", methods=["POST"])
-@jwt_required()
-def run_container():
-    """Run a custom container manually or from GitHub."""
-    client = get_client()
-    if not client:
-        return jsonify({"error": "Cannot connect to Docker daemon"}), 503
-
-    data = request.get_json()
-    install_type = data.get("type", "image") # "image" or "github"
-    image_or_repo = data.get("image") # can be image name or git URL
-    name = data.get("name")
-    ports_raw = data.get("ports", "")
-    
-    if not image_or_repo:
-        return jsonify({"error": "Image name or Repository URL is required"}), 400
-
-    # Parse ports
-    ports_dict = {}
-    if ports_raw:
-        try:
-            for p in ports_raw.split(","):
-                host_port, container_port = p.strip().split(":")
-                ports_dict[f"{container_port}/tcp"] = int(host_port)
-        except Exception:
-            return jsonify({"error": "Invalid ports format. Use host:container"}), 400
-
-    try:
-        final_image = image_or_repo
-
-        # Build if GitHub
-        if install_type == "github":
-            tag = name if name else "custom-app-build"
-            # Docker build from URL (supports git urls)
-            # path is the git repo URL
-            client.images.build(path=image_or_repo, tag=tag, rm=True)
-            final_image = tag
-
-        elif install_type == "image":
-            # Pull image
-            client.images.pull(image_or_repo)
-
-        # Run container
-        container = client.containers.run(
-            final_image,
-            name=name if name else None,
-            ports=ports_dict,
-            detach=True,
-            restart_policy={"Name": "unless-stopped"}
-        )
-        return jsonify({
-            "success": True, 
-            "container_id": container.short_id,
-            "message": f"Container {container.name} started successfully"
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
 @docker_bp.route("/market/install", methods=["POST"])
 @jwt_required()
 def market_install():
-    """Install a predefined app from the marketplace."""
+    """Install a predefined app."""
     client = get_client()
     if not client:
         return jsonify({"error": "Cannot connect to Docker daemon"}), 503
@@ -176,7 +231,6 @@ def market_install():
     data = request.get_json()
     app_id = data.get("app_id")
 
-    # App definitions
     apps = {
         "nginx-proxy-manager": {
             "name": "nginx-proxy-manager",
@@ -195,14 +249,12 @@ def market_install():
         return jsonify({"error": "Unknown app"}), 400
 
     try:
-        # Check if already exists
         try:
             client.containers.get(app_config["name"])
             return jsonify({"error": f"Container {app_config['name']} already exists"}), 409
         except Exception:
             pass
 
-        # Pull and create
         client.images.pull(app_config["image"])
         container = client.containers.run(
             app_config["image"],
@@ -212,34 +264,7 @@ def market_install():
             restart_policy=app_config["restart_policy"],
             detach=True
         )
-        return jsonify({
-            "success": True, 
-            "container_id": container.short_id,
-            "message": f"{app_config['name']} installed and started"
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@docker_bp.route("/images", methods=["GET"])
-@jwt_required()
-def list_images():
-    """List Docker images."""
-    client = get_client()
-    if not client:
-        return jsonify({"error": "Cannot connect to Docker daemon"}), 503
-
-    try:
-        images = client.images.list()
-        result = []
-        for img in images:
-            result.append({
-                "id": img.short_id,
-                "tags": img.tags,
-                "size": img.attrs.get("Size", 0),
-                "created": img.attrs.get("Created", ""),
-            })
-        return jsonify({"images": result})
+        return jsonify({"success": True, "message": f"{app_config['name']} installed"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -247,37 +272,10 @@ def list_images():
 @docker_bp.route("/images/<image_id>", methods=["DELETE"])
 @jwt_required()
 def remove_image(image_id):
-    """Remove a Docker image."""
     client = get_client()
-    if not client:
-        return jsonify({"error": "Cannot connect to Docker daemon"}), 503
-
     try:
-        client.images.remove(image_id, force=True)
+        client.images.remove(image_id)
         return jsonify({"success": True})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@docker_bp.route("/volumes", methods=["GET"])
-@jwt_required()
-def list_volumes():
-    """List Docker volumes."""
-    client = get_client()
-    if not client:
-        return jsonify({"error": "Cannot connect to Docker daemon"}), 503
-
-    try:
-        volumes = client.volumes.list()
-        result = []
-        for v in volumes:
-            result.append({
-                "name": v.name,
-                "driver": v.attrs.get("Driver", ""),
-                "mountpoint": v.attrs.get("Mountpoint", ""),
-                "created": v.attrs.get("CreatedAt", ""),
-            })
-        return jsonify({"volumes": result})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -285,11 +283,9 @@ def list_volumes():
 @docker_bp.route("/networks", methods=["GET"])
 @jwt_required()
 def list_networks():
-    """List Docker networks."""
     client = get_client()
     if not client:
         return jsonify({"error": "Cannot connect to Docker daemon"}), 503
-
     try:
         networks = client.networks.list()
         result = []
