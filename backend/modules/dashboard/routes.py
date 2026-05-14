@@ -40,13 +40,13 @@ def get_metrics():
     services = []
     monitored = ["docker", "ssh", "ufw", "nginx"]
     for s in monitored:
-        res = run_host_command(f"systemctl is-active {s}")
-        status = res.get("stdout", "").strip()
-        
-        # Fallback per SSH (provare sshd se ssh fallisce)
-        if s == "ssh" and status != "active":
-            res_alt = run_host_command("systemctl is-active sshd")
-            status = res_alt.get("stdout", "inactive").strip()
+        if s == "ssh":
+            # Metodo ultra-sicuro per SSH: controlla se il processo sshd esiste
+            res_pgrep = run_host_command("pgrep sshd")
+            status = "active" if res_pgrep.get("returncode") == 0 else "inactive"
+        else:
+            res = run_host_command(f"systemctl is-active {s}")
+            status = res.get("stdout", "").strip()
             
         services.append({
             "name": s.upper() if s not in ['ufw', 'nginx'] else ('Firewall (UFW)' if s == 'ufw' else 'Nginx'),
