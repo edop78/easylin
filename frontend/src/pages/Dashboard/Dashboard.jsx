@@ -1,7 +1,8 @@
 import { useApi } from '../../hooks/useApi';
+import { useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, Activity, Cpu, HardDrive, Zap, 
-  RefreshCw, Container, AlertCircle
+  RefreshCw, Container, AlertCircle, ShieldAlert, CheckCircle2, ArrowRight
 } from 'lucide-react';
 
 function StatCard({ title, value, sub, icon: Icon, color, details, percent }) {
@@ -38,6 +39,7 @@ const formatBytes = (bytes) => {
 
 export default function Dashboard() {
   const { data, loading, error, refetch } = useApi('/dashboard/metrics');
+  const navigate = useNavigate();
 
   if (loading && !data) {
     return (
@@ -68,6 +70,7 @@ export default function Dashboard() {
   const dockerData = data?.docker || { running: 0, total: 0 };
   const net = data?.net || { sent: 0, recv: 0 };
   const load = data?.load || [0, 0, 0];
+  const updates = data?.updates || { total: 0 };
 
   return (
     <div className="page fade-in">
@@ -85,8 +88,8 @@ export default function Dashboard() {
         <StatCard title="Network Traffic" value="Live" sub={`↑ ${formatBytes(net.sent)} / ↓ ${formatBytes(net.recv)}`} icon={Zap} color="amber" />
       </div>
 
-      <div style={{ marginTop: 'var(--space-lg)' }}>
-        <div className="card" style={{ maxWidth: '600px' }}>
+      <div className="grid-2" style={{ marginTop: 'var(--space-lg)', alignItems: 'stretch' }}>
+        <div className="card">
           <div className="card-header"><div className="card-title"><Container size={16} /> Docker Overview</div></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xl)', padding: 'var(--space-md) 0' }}>
             <div style={{ flex: 1, textAlign: 'center', borderRight: '1px solid var(--border-color)' }}>
@@ -101,6 +104,42 @@ export default function Dashboard() {
           <div className="progress-bar">
             <div className="progress-fill green" style={{ width: `${(dockerData.running / (dockerData.total || 1) * 100) || 0}%` }}></div>
           </div>
+        </div>
+
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div className="card-header"><div className="card-title"><RefreshCw size={16} /> System Updates</div></div>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)', padding: 'var(--space-md) 0' }}>
+            {updates.total > 0 ? (
+              <>
+                <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'var(--accent-red)', padding: '12px', borderRadius: '12px' }}>
+                  <ShieldAlert size={28} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{updates.total} Updates</div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Security and system patches available.</div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ backgroundColor: 'rgba(34, 197, 94, 0.1)', color: 'var(--accent-green)', padding: '12px', borderRadius: '12px' }}>
+                  <CheckCircle2 size={28} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>Up to Date</div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Your system is running the latest versions.</div>
+                </div>
+              </>
+            )}
+          </div>
+
+          <button 
+            className={`btn ${updates.total > 0 ? 'btn-primary' : 'btn-ghost'}`} 
+            style={{ width: '100%', marginTop: 'var(--space-md)' }}
+            onClick={() => navigate('/system/maintenance')}
+          >
+            Go to Update Center <ArrowRight size={14} />
+          </button>
         </div>
       </div>
     </div>
