@@ -1,7 +1,8 @@
-import { Link, useLocation, NavLink } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { 
-  LayoutDashboard, Settings, Package, Users, Activity, Container, Network, Shield, Globe, FileText, Terminal, ScrollText, RefreshCw, 
-  Server, Cog, HardDrive, List, Wind
+  LayoutDashboard, Package, Users, Activity, Container, Network, Shield, Globe, FileText, Terminal, ScrollText, RefreshCw, 
+  Server, Cog, Zap, LogOut
 } from 'lucide-react';
 
 const navSections = [
@@ -41,7 +42,7 @@ const navSections = [
 ];
 
 export default function Sidebar() {
-  const location = useLocation();
+  const { user, logout } = useAuth();
 
   return (
     <aside className="sidebar">
@@ -60,7 +61,6 @@ export default function Sidebar() {
               <NavLink
                 key={link.to}
                 to={link.to}
-                // 'end' prevents /system from being active when on /system/maintenance
                 end={link.to === '/system' || link.to === '/'}
                 className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
               >
@@ -74,16 +74,16 @@ export default function Sidebar() {
 
       <div className="sidebar-footer">
         <div className="user-profile">
-          <div className="user-avatar">E</div>
+          <div className="user-avatar">{user?.username?.charAt(0).toUpperCase() || 'U'}</div>
           <div className="user-info">
-            <div className="user-name">Administrator</div>
-            <div className="user-role">Sudo Access</div>
+            <div className="user-name">{user?.username || 'User'}</div>
+            <div className="user-role">Administrator</div>
           </div>
+          <button className="logout-btn" onClick={logout} title="Logout">
+            <LogOut size={16} />
+          </button>
         </div>
       </div>
     </aside>
   );
 }
-
-// Missing import fix
-import { Zap } from 'lucide-react';
