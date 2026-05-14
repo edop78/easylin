@@ -1,14 +1,12 @@
 import { useState } from 'react';
 import { useApi } from '../../hooks/useApi';
 import api from '../../api/client';
-import { Settings, Power, RotateCw, Download, Server, Clock, HardDrive, ShieldAlert, CheckCircle, AlertCircle } from 'lucide-react';
+import { Settings, Power, RotateCw, Server, Clock, HardDrive, CheckCircle, AlertCircle } from 'lucide-react';
 import ConfirmModal from '../../components/Common/ConfirmModal';
 
 export default function System() {
-  const { data, loading, refetch } = useApi('/system/info');
-  const { data: updates, refetch: refetchUpdates } = useApi('/system/updates');
+  const { data, loading } = useApi('/system/info');
   const [msg, setMsg] = useState(null);
-  const [updating, setUpdating] = useState(false);
   const [confirm, setConfirm] = useState({ open: false, title: '', message: '', action: null });
 
   const handleAction = async (action) => {
@@ -17,20 +15,6 @@ export default function System() {
       setMsg({ type: 'success', text: `System ${action} initiated` });
     } catch (err) {
       setMsg({ type: 'error', text: err.message });
-    }
-  };
-
-  const runUpdate = async () => {
-    setUpdating(true);
-    setMsg({ type: 'info', text: 'Running system updates...' });
-    try {
-      const result = await api.post('/system/update');
-      setMsg({ type: result.success ? 'success' : 'error', text: result.success ? 'Updates completed' : result.error });
-      refetchUpdates();
-    } catch (err) {
-      setMsg({ type: 'error', text: err.message });
-    } finally {
-      setUpdating(false);
     }
   };
 
@@ -67,45 +51,40 @@ export default function System() {
           </div>
         </div>
 
-        {/* System Updates */}
+        {/* Hardware Info Card moved here to fill the grid or stay separate */}
         <div className="card">
-          <div className="card-header"><div className="card-title"><Download size={16} /> Software Updates</div></div>
-          {updates?.available > 0 ? (
-            <div>
-              <p style={{ marginBottom: 'var(--space-md)' }}>{updates.available} updates available.</p>
-              <button className="btn btn-primary" onClick={() => setConfirm({ 
-                open: true, title: 'Run Updates', message: 'Install all available updates now? This may take a few minutes.', 
-                action: runUpdate, type: 'info' 
-              })} disabled={updating}>
-                {updating ? <div className="spinner spinner-sm" /> : 'Update Now'}
-              </button>
+          <div className="card-header"><div className="card-title"><Server size={16} /> Hardware & OS Details</div></div>
+          {loading ? <div className="spinner" /> : (
+            <div className="stat-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)' }}>
+              <div className="stat-info">
+                <div className="stat-label"><Clock size={14} /> Hostname</div>
+                <div className="stat-value" style={{ fontSize: '1rem' }}>{data?.hostname}</div>
+              </div>
+              <div className="stat-info">
+                <div className="stat-label"><Server size={14} /> OS</div>
+                <div className="stat-value" style={{ fontSize: '1rem' }}>{data?.os}</div>
+              </div>
             </div>
-          ) : (
-            <p style={{ color: 'var(--text-muted)' }}>System is up to date.</p>
           )}
         </div>
       </div>
 
-      {/* Hardware Info */}
+      {/* Full Details Card */}
       <div className="card" style={{ marginTop: 'var(--space-lg)' }}>
-        <div className="card-header"><div className="card-title"><Server size={16} /> Hardware & OS Details</div></div>
+        <div className="card-header"><div className="card-title"><Settings size={16} /> Technical Info</div></div>
         {loading ? <div className="spinner" /> : (
           <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
             <div className="stat-info">
-              <div className="stat-label"><Clock size={14} /> Hostname</div>
-              <div className="stat-value" style={{ fontSize: '1.1rem' }}>{data?.hostname}</div>
+              <div className="stat-label">Architecture</div>
+              <div className="stat-value">{data?.arch}</div>
             </div>
             <div className="stat-info">
-              <div className="stat-label"><Server size={14} /> OS</div>
-              <div className="stat-value" style={{ fontSize: '1.1rem' }}>{data?.os}</div>
+              <div className="stat-label">Kernel</div>
+              <div className="stat-value">{data?.kernel}</div>
             </div>
             <div className="stat-info">
-              <div className="stat-label"><Settings size={14} /> Kernel</div>
-              <div className="stat-value" style={{ fontSize: '1.1rem' }}>{data?.kernel}</div>
-            </div>
-            <div className="stat-info">
-              <div className="stat-label"><HardDrive size={14} /> Architecture</div>
-              <div className="stat-value" style={{ fontSize: '1.1rem' }}>{data?.arch}</div>
+              <div className="stat-label">Uptime</div>
+              <div className="stat-value">{data?.uptime}</div>
             </div>
           </div>
         )}
