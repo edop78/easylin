@@ -20,7 +20,8 @@ export default function Sidebar() {
         { to: '/system', icon: Server, label: 'System' },
         { to: '/system/maintenance', icon: RefreshCw, label: 'Update & Clean' },
         { to: '/packages', icon: Package, label: 'Packages' },
-        { to: '/users', icon: Users, label: 'Users' }
+        { to: '/users', icon: Users, label: 'Users' },
+        { to: '/services', icon: Cog, label: 'Services' },
       ]
     },
     {
