@@ -25,7 +25,7 @@ const COMMON_APPS = [
 
 export default function Packages() {
   const { data, loading, refetch } = useApi('/packages/');
-  const [tab, setTab] = useState('common'); // Default to Common Apps
+  const [tab, setTab] = useState('common'); // This is the "Available" tab
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState(null);
   const [searching, setSearching] = useState(false);
@@ -34,7 +34,6 @@ export default function Packages() {
   const [confirm, setConfirm] = useState({ open: false, title: '', message: '', action: null });
 
   const installedNames = new Set((data?.packages || []).map(p => p.name));
-  const availableCommon = COMMON_APPS.filter(app => !installedNames.has(app.name));
 
   const searchPackages = async (e) => {
     e.preventDefault();
@@ -78,7 +77,6 @@ export default function Packages() {
         </div>
       )}
 
-      {/* Search Bar always visible */}
       <div className="card" style={{ marginBottom: 'var(--space-lg)' }}>
         <form onSubmit={searchPackages} className="search-bar">
           <Search size={18} />
@@ -87,10 +85,9 @@ export default function Packages() {
         </form>
       </div>
 
-      {/* Tabs */}
       <div className="tabs">
         <button className={`tab ${tab === 'common' ? 'active' : ''}`} onClick={() => setTab('common')}>
-          <Star size={14} /> App Store
+          <Star size={14} /> Available
         </button>
         <button className={`tab ${tab === 'installed' ? 'active' : ''}`} onClick={() => setTab('installed')}>
           <List size={14} /> Installed ({data?.packages?.length || 0})
@@ -107,25 +104,39 @@ export default function Packages() {
           <div className="loading-container"><div className="spinner" /></div>
         ) : tab === 'common' ? (
           <table className="data-table">
-            <thead><tr><th>App</th><th>Description</th><th>Action</th></tr></thead>
+            <thead><tr><th>App</th><th>Description</th><th>Status</th><th>Action</th></tr></thead>
             <tbody>
-              {availableCommon.map((app) => (
-                <tr key={app.name}>
-                  <td><div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{app.name}</div></td>
-                  <td>{app.desc}</td>
-                  <td>
-                    <button className="btn btn-sm btn-primary" onClick={() => setConfirm({
-                      open: true, title: 'Install App', message: `Install ${app.name}?`,
-                      action: () => handleAction(app.name, 'install'), type: 'info', confirmText: 'Install'
-                    })} disabled={actionLoading === `${app.name}-install`}>
-                      <Download size={13} /> Install
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {availableCommon.length === 0 && (
-                <tr><td colSpan="3" className="empty-state">All common apps are already installed!</td></tr>
-              )}
+              {COMMON_APPS.map((app) => {
+                const isInstalled = installedNames.has(app.name);
+                return (
+                  <tr key={app.name}>
+                    <td><div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{app.name}</div></td>
+                    <td>{app.desc}</td>
+                    <td>
+                      <span className={`badge ${isInstalled ? 'badge-success' : 'badge-neutral'}`}>
+                        {isInstalled ? 'Installed' : 'Not Installed'}
+                      </span>
+                    </td>
+                    <td>
+                      {!isInstalled ? (
+                        <button className="btn btn-sm btn-primary" onClick={() => setConfirm({
+                          open: true, title: 'Install App', message: `Install ${app.name}?`,
+                          action: () => handleAction(app.name, 'install'), type: 'info', confirmText: 'Install'
+                        })} disabled={actionLoading === `${app.name}-install`}>
+                          <Download size={13} /> Install
+                        </button>
+                      ) : (
+                        <button className="btn btn-sm btn-ghost" onClick={() => setConfirm({
+                          open: true, title: 'Uninstall App', message: `Are you sure you want to uninstall ${app.name}?`,
+                          action: () => handleAction(app.name, 'remove'), type: 'danger', confirmText: 'Uninstall'
+                        })} style={{ color: 'var(--accent-red)' }} disabled={actionLoading === `${app.name}-remove`}>
+                          <Trash2 size={13} /> Uninstall
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         ) : tab === 'installed' ? (
