@@ -13,7 +13,7 @@ function StatCard({ title, value, sub, icon: Icon, color, details, percent }) {
         <div className="stat-value">{value}</div>
         {percent !== undefined && (
           <div className="progress-bar" style={{ margin: '8px 0' }}>
-            <div className={`progress-fill ${color}`} style={{ width: `${percent}%` }}></div>
+            <div className={`progress-fill ${color}`} style={{ width: `${percent || 0}%` }}></div>
           </div>
         )}
         <div className="stat-sub">
@@ -29,7 +29,7 @@ function StatCard({ title, value, sub, icon: Icon, color, details, percent }) {
 }
 
 const formatBytes = (bytes) => {
-  if (!bytes || bytes === 0) return '0 B';
+  if (!bytes || isNaN(bytes) || bytes === 0) return '0 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -57,7 +57,14 @@ export default function Dashboard() {
       </div>
 
       <div className="stat-grid">
-        <StatCard title="CPU Usage" value={`${cpu}%`} percent={cpu} sub={`Load Avg: ${load[0]?.toFixed(2) || '0.00'}`} icon={Cpu} color="blue" />
+        <StatCard 
+          title="CPU Usage" 
+          value={`${cpu}%`} 
+          percent={cpu} 
+          sub={`Load Avg: ${Number(load[0] || 0).toFixed(2)}`} 
+          icon={Cpu} 
+          color="blue" 
+        />
         <StatCard title="Memory (RAM)" value={`${ram.percent}%`} percent={ram.percent} details={[`U: ${formatBytes(ram.used)}`, `F: ${formatBytes(ram.free)}`, `T: ${formatBytes(ram.total)}`]} icon={Activity} color="purple" />
         <StatCard title="Disk Storage" value={`${disk.percent}%`} percent={disk.percent} details={[`U: ${formatBytes(disk.used)}`, `F: ${formatBytes(disk.free)}`, `T: ${formatBytes(disk.total)}`]} icon={HardDrive} color="cyan" />
         <StatCard title="Network Traffic" value="Live" sub={`↑ ${formatBytes(net.sent)} / ↓ ${formatBytes(net.recv)}`} icon={Zap} color="amber" />
@@ -68,16 +75,16 @@ export default function Dashboard() {
           <div className="card-header"><div className="card-title"><Container size={16} /> Docker Overview</div></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xl)', padding: 'var(--space-md) 0' }}>
             <div style={{ flex: 1, textAlign: 'center', borderRight: '1px solid var(--border-color)' }}>
-              <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--accent-green)' }}>{dockerData.running}</div>
+              <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--accent-green)' }}>{dockerData.running || 0}</div>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Running</div>
             </div>
             <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text-primary)' }}>{dockerData.total}</div>
+              <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text-primary)' }}>{dockerData.total || 0}</div>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Total Containers</div>
             </div>
           </div>
           <div className="progress-bar">
-            <div className="progress-fill green" style={{ width: `${(dockerData.running / (dockerData.total || 1) * 100)}%` }}></div>
+            <div className="progress-fill green" style={{ width: `${(dockerData.running / (dockerData.total || 1) * 100) || 0}%` }}></div>
           </div>
         </div>
 
@@ -87,7 +94,7 @@ export default function Dashboard() {
             {services.map((s) => (
               <div key={s.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{s.name}</span>
-                <span className={`badge ${s.status === 'active' ? 'badge-success' : 'badge-danger'}`} style={{ textTransform: 'capitalize' }}>{s.status}</span>
+                <span className={`badge ${s.status === 'active' ? 'badge-success' : 'badge-danger'}`} style={{ textTransform: 'capitalize' }}>{s.status || 'inactive'}</span>
               </div>
             ))}
           </div>
