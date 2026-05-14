@@ -104,16 +104,49 @@ def shutdown():
     res = run_host_command("shutdown -h now")
     return jsonify(res)
 
+@system_bp.route("/maintenance", methods=["POST"])
+@jwt_required()
+def maintenance_action():
+    """Handle all tasks from the Update & Clean page."""
+    data = request.get_json()
+    command_id = data.get("command")
+    
+    commands = {
+        # Updates
+        "update": "apt-get update",
+        "upgrade": "apt-get upgrade -y",
+        "full-upgrade": "apt-get full-upgrade -y",
+        "dist-upgrade": "apt-get dist-upgrade -y",
+        "fix-broken": "apt-get install -f -y",
+        "fix-dpkg": "dpkg --configure -a",
+        "release-upgrade": "do-release-upgrade -f DistUpgradeViewNonInteractive",
+        "release-upgrade-dev": "do-release-upgrade -d -f DistUpgradeViewNonInteractive",
+        
+        # Cleaning
+        "autoremove": "apt-get autoremove -y",
+        "clean": "apt-get clean",
+        "vacuum-logs": "journalctl --vacuum-time=7d",
+        "purge-configs": "dpkg -l | grep '^rc' | awk '{print $2}' | xargs -r dpkg --purge",
+        "docker-prune": "docker system prune -f"
+    }
+    
+    cmd = commands.get(command_id)
+    if not cmd:
+        return jsonify({"success": False, "stderr": f"Unknown command: {command_id}"}), 400
+        
+    res = run_host_command(cmd)
+    # Ensure result has success field for frontend
+    res["success"] = res.get("returncode") == 0
+    return jsonify(res)
+
 @system_bp.route("/apt-clean", methods=["POST"])
 @jwt_required()
 def apt_clean():
-    # Runs apt clean and autoremove
     res = run_host_command("apt-get clean && apt-get autoremove -y")
     return jsonify(res)
 
 @system_bp.route("/docker-prune", methods=["POST"])
 @jwt_required()
 def docker_prune():
-    # Cleans unused docker resources
     res = run_host_command("docker system prune -f")
     return jsonify(res)

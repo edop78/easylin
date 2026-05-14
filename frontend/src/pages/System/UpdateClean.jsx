@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import api from '../../api/client';
-import { RefreshCw, Download, Trash2, ShieldCheck, AlertCircle, CheckCircle, Info, Wind } from 'lucide-react';
+import { RefreshCw, Download, Trash2, ShieldCheck, AlertCircle, CheckCircle, Info, Wind, Copy } from 'lucide-react';
 
 const MAINTENANCE_TASKS = [
   { id: 'update', cat: 'update', name: 'APT Update', icon: RefreshCw, desc: 'Updates the list of available packages and their versions.', color: 'blue' },
@@ -16,12 +16,14 @@ const MAINTENANCE_TASKS = [
   { id: 'clean', cat: 'clean', name: 'APT Clean', icon: Trash2, desc: 'Clears out the local repository of retrieved package files.', color: 'amber' },
   { id: 'vacuum-logs', cat: 'clean', name: 'Clean Logs', icon: Trash2, desc: 'Deletes system logs older than 7 days to free up space.', color: 'cyan' },
   { id: 'purge-configs', cat: 'clean', name: 'Purge Configs', icon: Trash2, desc: 'Removes residual configuration files from uninstalled packages.', color: 'amber' },
+  { id: 'docker-prune', cat: 'clean', name: 'Docker Prune', icon: Trash2, desc: 'Removes all unused Docker containers, networks, and images.', color: 'blue' },
 ];
 
 export default function UpdateClean() {
   const [tab, setTab] = useState('update');
   const [running, setRunning] = useState(null);
   const [result, setResult] = useState(null);
+  const [copied, setCopied] = useState(false);
 
   const runTask = async (task) => {
     setRunning(task.id);
@@ -34,6 +36,12 @@ export default function UpdateClean() {
     } finally {
       setRunning(null);
     }
+  };
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const filteredTasks = MAINTENANCE_TASKS.filter(t => t.cat === tab);
@@ -79,28 +87,35 @@ export default function UpdateClean() {
               disabled={running !== null}
               style={task.color === 'amber' ? { color: 'var(--accent-amber)', borderColor: 'var(--accent-amber-dim)' } : {}}
             >
-              {running === task.id ? <div className="spinner spinner-sm" /> : 'Run Now'}
+              {running === task.id ? <RefreshCw size={16} className="spin" /> : 'Run Now'}
             </button>
           </div>
         ))}
       </div>
 
-      {/* Result Modal */}
       {result && (
         <div className="modal-overlay" onClick={() => setResult(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)', marginBottom: 'var(--space-md)' }}>
-              {result.success ? (
-                <div style={{ color: 'var(--accent-green)' }}><CheckCircle size={28} /></div>
-              ) : (
-                <div style={{ color: 'var(--accent-red)' }}><AlertCircle size={28} /></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-md)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
+                {result.success ? (
+                  <div style={{ color: 'var(--accent-green)' }}><CheckCircle size={28} /></div>
+                ) : (
+                  <div style={{ color: 'var(--accent-red)' }}><AlertCircle size={28} /></div>
+                )}
+                <h3 className="modal-title" style={{ margin: 0 }}>{result.task} {result.success ? 'Completed' : 'Failed'}</h3>
+              </div>
+              {!result.success && (
+                <button className="btn btn-sm btn-ghost" onClick={() => copyToClipboard(result.stderr || result.stdout)}>
+                  {copied ? <CheckCircle size={14} /> : <Copy size={14} />}
+                  {copied ? 'Copied!' : 'Copy Error'}
+                </button>
               )}
-              <h3 className="modal-title">{result.task} {result.success ? 'Completed' : 'Failed'}</h3>
             </div>
 
             <div style={{ marginBottom: 'var(--space-md)' }}>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Command Output:</div>
-              <pre className="code-block" style={{ maxHeight: '400px', fontSize: '12px' }}>
+              <pre className="code-block" style={{ maxHeight: '400px', fontSize: '12px', overflow: 'auto' }}>
                 {result.stdout || 'No output.'}
                 {result.stderr && `\n\nERRORS:\n${result.stderr}`}
               </pre>

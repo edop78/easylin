@@ -1,9 +1,7 @@
-import { useState } from 'react';
 import { useApi } from '../../hooks/useApi';
-import api from '../../api/client';
 import { 
   LayoutDashboard, Activity, Cpu, HardDrive, Zap, 
-  RefreshCw, Container, AlertCircle, Trash2, CheckCircle, Copy
+  RefreshCw, Container, AlertCircle
 } from 'lucide-react';
 
 function StatCard({ title, value, sub, icon: Icon, color, details, percent }) {
@@ -40,26 +38,6 @@ const formatBytes = (bytes) => {
 
 export default function Dashboard() {
   const { data, loading, error, refetch } = useApi('/dashboard/metrics');
-  const [actionLoading, setActionLoading] = useState(null);
-  const [msg, setMsg] = useState(null);
-
-  const handleMaintenance = async (action) => {
-    setActionLoading(action);
-    setMsg(null);
-    try {
-      await api.post(`/system/${action}`);
-      setMsg({ type: 'success', text: `Action ${action} completed successfully!` });
-    } catch (err) {
-      setMsg({ type: 'error', text: err.message });
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    setMsg({ type: 'success', text: 'Error message copied to clipboard!' });
-  };
 
   if (loading && !data) {
     return (
@@ -100,20 +78,6 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {msg && (
-        <div className={`alert alert-${msg.type}`} style={{ marginBottom: 'var(--space-lg)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {msg.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle size={16} />}
-            <span>{msg.text}</span>
-          </div>
-          {msg.type === 'error' && (
-            <button className="btn btn-sm btn-ghost" onClick={() => copyToClipboard(msg.text)}>
-              <Copy size={14} /> Copy
-            </button>
-          )}
-        </div>
-      )}
-
       <div className="stat-grid">
         <StatCard title="CPU Usage" value={`${cpu}%`} percent={cpu} sub={`Load Avg: ${Number(load[0] || 0).toFixed(2)}`} icon={Cpu} color="blue" />
         <StatCard title="Memory (RAM)" value={`${ram.percent}%`} percent={ram.percent} details={[`U: ${formatBytes(ram.used)}`, `F: ${formatBytes(ram.free)}`, `T: ${formatBytes(ram.total)}`]} icon={Activity} color="purple" />
@@ -121,8 +85,8 @@ export default function Dashboard() {
         <StatCard title="Network Traffic" value="Live" sub={`↑ ${formatBytes(net.sent)} / ↓ ${formatBytes(net.recv)}`} icon={Zap} color="amber" />
       </div>
 
-      <div className="grid-2" style={{ marginTop: 'var(--space-lg)', alignItems: 'start' }}>
-        <div className="card">
+      <div style={{ marginTop: 'var(--space-lg)' }}>
+        <div className="card" style={{ maxWidth: '600px' }}>
           <div className="card-header"><div className="card-title"><Container size={16} /> Docker Overview</div></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xl)', padding: 'var(--space-md) 0' }}>
             <div style={{ flex: 1, textAlign: 'center', borderRight: '1px solid var(--border-color)' }}>
@@ -131,36 +95,11 @@ export default function Dashboard() {
             </div>
             <div style={{ flex: 1, textAlign: 'center' }}>
               <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text-primary)' }}>{dockerData.total || 0}</div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Total</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Total Containers</div>
             </div>
           </div>
           <div className="progress-bar">
             <div className="progress-fill green" style={{ width: `${(dockerData.running / (dockerData.total || 1) * 100) || 0}%` }}></div>
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-header"><div className="card-title"><Trash2 size={16} /> Maintenance</div></div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Clean up your system to free up disk space.</p>
-            <div style={{ display: 'flex', gap: 'var(--space-md)' }}>
-              <button 
-                className="btn btn-ghost" 
-                disabled={actionLoading === 'apt-clean'}
-                onClick={() => handleMaintenance('apt-clean')}
-              >
-                {actionLoading === 'apt-clean' ? <RefreshCw size={14} className="spin" /> : <Trash2 size={14} />}
-                APT Clean
-              </button>
-              <button 
-                className="btn btn-ghost" 
-                disabled={actionLoading === 'docker-prune'}
-                onClick={() => handleMaintenance('docker-prune')}
-              >
-                {actionLoading === 'docker-prune' ? <RefreshCw size={14} className="spin" /> : <Container size={14} />}
-                Docker Prune
-              </button>
-            </div>
           </div>
         </div>
       </div>
