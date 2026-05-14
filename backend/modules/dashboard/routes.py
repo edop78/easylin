@@ -1,14 +1,15 @@
 from flask import Blueprint, jsonify
 from flask_jwt_extended import jwt_required
 import psutil
-import time
+import docker
+from backend.utils.command import run_host_command
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
 @dashboard_bp.route("/metrics")
 @jwt_required()
 def get_metrics():
-    # CPU
+    # CPU & Load
     cpu_percent = psutil.cpu_percent(interval=None)
     load_avg = psutil.getloadavg()
     
@@ -30,6 +31,26 @@ def get_metrics():
         "total": disk_usage.total
     }
     
+    # DOCKER OVERVIEW
+    docker_info = {"running": 0, "total": 0, "error": None}
+    try:
+        client = docker.from_env()
+        containers = client.containers.list(all=True)
+        docker_info["total"] = len(containers)
+        docker_info["running"] = len([c for c in containers if c.status == 'running'])
+    except Exception as e:
+        docker_info["error"] = str(e)
+    
+    # SERVICE STATUS
+    services = []
+    monitored = ["docker", "ssh", "ufw", "nginx"]
+    for s in monitored:
+        res = run_host_command(f"systemctl is-active {s}")
+        services.append({
+            "name": s.upper() if s != 'ufw' else 'Firewall (UFW)',
+            "status": res["stdout"].strip() if res["returncode"] == 0 else "inactive"
+        })
+    
     # NETWORK
     net_io = psutil.net_io_counters()
     net = {
@@ -42,5 +63,7 @@ def get_metrics():
         "load": load_avg,
         "ram": ram,
         "disk": disk,
+        "docker": docker_info,
+        "services": services,
         "net": net
     })

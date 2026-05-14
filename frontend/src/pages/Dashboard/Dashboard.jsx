@@ -1,7 +1,7 @@
 import { useApi } from '../../hooks/useApi';
 import { 
   LayoutDashboard, Activity, Cpu, HardDrive, Zap, 
-  ArrowUpRight, ArrowDownRight, RefreshCw, BarChart3
+  RefreshCw, BarChart3, Container, Shield, Server
 } from 'lucide-react';
 
 function StatCard({ title, value, sub, icon: Icon, color, details, percent }) {
@@ -44,6 +44,8 @@ export default function Dashboard() {
   const metrics = data || {
     cpu: 0, ram: { percent: 0, used: 0, free: 0, total: 0 },
     disk: { percent: 0, used: 0, free: 0, total: 0 },
+    docker: { running: 0, total: 0 },
+    services: [],
     net: { sent: 0, recv: 0 },
     load: [0, 0, 0]
   };
@@ -100,21 +102,41 @@ export default function Dashboard() {
       </div>
 
       <div className="grid-2" style={{ marginTop: 'var(--space-lg)' }}>
+        {/* Docker Overview */}
         <div className="card">
-          <div className="card-header"><div className="card-title"><BarChart3 size={16} /> Load Average</div></div>
-          <div style={{ display: 'flex', justifyContent: 'space-around', padding: 'var(--space-lg) 0' }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--text-primary)' }}>{metrics.load[0].toFixed(2)}</div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>1 min</div>
+          <div className="card-header">
+            <div className="card-title"><Container size={16} /> Docker Overview</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xl)', padding: 'var(--space-md) 0' }}>
+            <div style={{ flex: 1, textAlign: 'center', borderRight: '1px solid var(--border-color)' }}>
+              <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--accent-green)' }}>{metrics.docker.running}</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Running</div>
             </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--text-primary)' }}>{metrics.load[1].toFixed(2)}</div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>5 min</div>
+            <div style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text-primary)' }}>{metrics.docker.total}</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Total Containers</div>
             </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--text-primary)' }}>{metrics.load[2].toFixed(2)}</div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>15 min</div>
-            </div>
+          </div>
+          <div className="progress-bar">
+            <div className="progress-fill green" style={{ width: `${(metrics.docker.running / metrics.docker.total * 100) || 0}%` }}></div>
+          </div>
+        </div>
+
+        {/* Essential Services Status */}
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title"><Server size={16} /> Essential Services</div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {metrics.services.map((s) => (
+              <div key={s.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{s.name}</span>
+                <span className={`badge ${s.status === 'active' ? 'badge-success' : 'badge-danger'}`} style={{ textTransform: 'capitalize' }}>
+                  {s.status}
+                </span>
+              </div>
+            ))}
+            {metrics.services.length === 0 && <div className="empty-state">No services monitored</div>}
           </div>
         </div>
       </div>
