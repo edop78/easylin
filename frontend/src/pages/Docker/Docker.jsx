@@ -127,6 +127,16 @@ export default function Docker() {
     }
   };
 
+  const removeVolume = async (name) => {
+    try {
+      await api.del(`/docker/volumes/${name}`);
+      setMsg({ type: 'success', text: 'Volume removed successfully' });
+      refetchVolumes();
+    } catch (err) {
+      setMsg({ type: 'error', text: err.message });
+    }
+  };
+
   const isAppInstalled = (containerName) => {
     return containersData?.containers?.some(c => c.name === containerName);
   };
@@ -299,7 +309,6 @@ export default function Docker() {
           </table>
         ) : tab === 'market' ? (
           <div style={{ padding: 'var(--space-md)' }}>
-            {/* Custom Deploy Card (unchanged logic, just ensuring consistency) */}
             <div className="card" style={{ 
               marginBottom: 'var(--space-xl)', 
               background: 'linear-gradient(145deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.01) 100%)',
@@ -364,6 +373,10 @@ export default function Docker() {
                     <button 
                       className="btn btn-sm btn-icon btn-ghost" 
                       disabled={v.in_use}
+                      onClick={() => setConfirm({
+                        open: true, title: 'Remove Volume', message: `Delete volume ${v.name}? This action cannot be undone.`, 
+                        action: () => removeVolume(v.name)
+                      })} 
                       title={v.in_use ? "Volume in use by a container" : "Remove"}
                       style={{ color: v.in_use ? 'var(--text-muted)' : 'var(--accent-red)' }}
                     >

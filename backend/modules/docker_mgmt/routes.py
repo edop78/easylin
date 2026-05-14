@@ -203,6 +203,22 @@ def list_volumes():
         return jsonify({"error": str(e)}), 500
 
 
+@docker_bp.route("/volumes/<name>", methods=["DELETE"])
+@jwt_required()
+def remove_volume(name):
+    """Remove a Docker volume."""
+    client = get_client()
+    if not client:
+        return jsonify({"error": "Cannot connect to Docker daemon"}), 503
+
+    try:
+        volume = client.volumes.get(name)
+        volume.remove(force=True)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @docker_bp.route("/containers/<container_id>/logs", methods=["GET"])
 @jwt_required()
 def container_logs(container_id):
