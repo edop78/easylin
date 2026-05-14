@@ -1,11 +1,19 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
-from backend.utils.command import run_host_command
 import socket
 import platform
 import distro
 import psutil
 import datetime
+import os
+
+# Import using a more robust way
+try:
+    from backend.utils.command import run_host_command
+except ImportError:
+    import sys
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
+    from backend.utils.command import run_host_command
 
 system_bp = Blueprint("system", __name__)
 
