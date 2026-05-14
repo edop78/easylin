@@ -1,23 +1,25 @@
 import { useState } from 'react';
 import api from '../../api/client';
-import { RefreshCw, Download, Trash2, ShieldCheck, AlertCircle, CheckCircle, Terminal, Info } from 'lucide-react';
+import { RefreshCw, Download, Trash2, ShieldCheck, AlertCircle, CheckCircle, Info, Wind } from 'lucide-react';
 
 const MAINTENANCE_TASKS = [
-  { id: 'update', name: 'APT Update', icon: RefreshCw, desc: 'Updates the list of available packages and their versions.', color: 'blue' },
-  { id: 'upgrade', name: 'APT Upgrade', icon: Download, desc: 'Installs newer versions of the packages you have.', color: 'green' },
-  { id: 'full-upgrade', name: 'APT Full Upgrade', icon: Download, desc: 'Upgrades packages and handles changing dependencies.', color: 'green' },
-  { id: 'dist-upgrade', name: 'APT Dist Upgrade', icon: Download, desc: 'Advanced upgrade that manages complex dependency changes.', color: 'cyan' },
-  { id: 'autoremove', name: 'APT Autoremove', icon: Trash2, desc: 'Removes packages that were installed as dependencies but are no longer needed.', color: 'amber' },
-  { id: 'clean', name: 'APT Clean', icon: Trash2, desc: 'Clears out the local repository of retrieved package files.', color: 'amber' },
-  { id: 'fix-broken', name: 'Fix Broken', icon: ShieldCheck, desc: 'Attempts to correct a system with broken dependencies in place.', color: 'red' },
-  { id: 'fix-dpkg', name: 'Fix Interrupted', icon: ShieldCheck, desc: 'Configures any packages that were unpacked but not configured.', color: 'red' },
-  { id: 'vacuum-logs', name: 'Clean Logs', icon: Trash2, desc: 'Deletes system logs older than 7 days to free up space.', color: 'cyan' },
-  { id: 'purge-configs', name: 'Purge Configs', icon: Trash2, desc: 'Removes residual configuration files from uninstalled packages.', color: 'amber' },
-  { id: 'release-upgrade', name: 'OS Release Upgrade', icon: ShieldCheck, desc: 'Upgrades to the next stable Ubuntu version.', color: 'purple' },
-  { id: 'release-upgrade-dev', name: 'OS Release Upgrade (Dev)', icon: ShieldCheck, desc: 'Upgrades to the next development Ubuntu version.', color: 'purple' },
+  { id: 'update', cat: 'update', name: 'APT Update', icon: RefreshCw, desc: 'Updates the list of available packages and their versions.', color: 'blue' },
+  { id: 'upgrade', cat: 'update', name: 'APT Upgrade', icon: Download, desc: 'Installs newer versions of the packages you have.', color: 'green' },
+  { id: 'full-upgrade', cat: 'update', name: 'APT Full Upgrade', icon: Download, desc: 'Upgrades packages and handles changing dependencies.', color: 'green' },
+  { id: 'dist-upgrade', cat: 'update', name: 'APT Dist Upgrade', icon: Download, desc: 'Advanced upgrade that manages complex dependency changes.', color: 'cyan' },
+  { id: 'fix-broken', cat: 'update', name: 'Fix Broken', icon: ShieldCheck, desc: 'Attempts to correct a system with broken dependencies in place.', color: 'red' },
+  { id: 'fix-dpkg', cat: 'update', name: 'Fix Interrupted', icon: ShieldCheck, desc: 'Configures any packages that were unpacked but not configured.', color: 'red' },
+  { id: 'release-upgrade', cat: 'update', name: 'OS Release Upgrade', icon: ShieldCheck, desc: 'Upgrades to the next stable Ubuntu version.', color: 'purple' },
+  { id: 'release-upgrade-dev', cat: 'update', name: 'OS Release Upgrade (Dev)', icon: ShieldCheck, desc: 'Upgrades to the next development Ubuntu version.', color: 'purple' },
+  
+  { id: 'autoremove', cat: 'clean', name: 'APT Autoremove', icon: Trash2, desc: 'Removes packages that were installed as dependencies but are no longer needed.', color: 'amber' },
+  { id: 'clean', cat: 'clean', name: 'APT Clean', icon: Trash2, desc: 'Clears out the local repository of retrieved package files.', color: 'amber' },
+  { id: 'vacuum-logs', cat: 'clean', name: 'Clean Logs', icon: Trash2, desc: 'Deletes system logs older than 7 days to free up space.', color: 'cyan' },
+  { id: 'purge-configs', cat: 'clean', name: 'Purge Configs', icon: Trash2, desc: 'Removes residual configuration files from uninstalled packages.', color: 'amber' },
 ];
 
 export default function UpdateClean() {
+  const [tab, setTab] = useState('update');
   const [running, setRunning] = useState(null);
   const [result, setResult] = useState(null);
 
@@ -34,19 +36,33 @@ export default function UpdateClean() {
     }
   };
 
+  const filteredTasks = MAINTENANCE_TASKS.filter(t => t.cat === tab);
+
   return (
     <div className="page fade-in">
       <div className="page-header">
         <div className="page-title"><RefreshCw size={28} /><h1>Update & Clean</h1></div>
       </div>
 
-      <div className="alert alert-info">
+      <div className="tabs">
+        <button className={`tab ${tab === 'update' ? 'active' : ''}`} onClick={() => setTab('update')}>
+          <RefreshCw size={14} /> Updates & Fixes
+        </button>
+        <button className={`tab ${tab === 'clean' ? 'active' : ''}`} onClick={() => setTab('clean')}>
+          <Wind size={14} /> Cleaning & Space
+        </button>
+      </div>
+
+      <div className="alert alert-info" style={{ marginBottom: 'var(--space-lg)' }}>
         <Info size={16} />
-        These actions will run commands on the host system. Upgrades may take several minutes to complete.
+        {tab === 'update' 
+          ? "Keep your system up to date and repair package manager issues." 
+          : "Free up disk space and remove unnecessary files from your server."
+        }
       </div>
 
       <div className="grid-2">
-        {MAINTENANCE_TASKS.map((task) => (
+        {filteredTasks.map((task) => (
           <div key={task.id} className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: 'var(--space-sm)' }}>
