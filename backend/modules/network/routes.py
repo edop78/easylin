@@ -75,6 +75,65 @@ def list_connections():
     return jsonify({"output": result["stdout"]})
 
 
+@network_bp.route("/interfaces/<iface>/config", methods=["POST"])
+@jwt_required()
+def configure_interface(iface):
+    """Configure a network interface (DHCP or Static)."""
+    data = request.get_json()
+    use_dhcp = data.get("dhcp", True)
+    address = data.get("address", "")  # e.g., 192.168.1.100/24
+    gateway = data.get("gateway", "")
+    dns = data.get("dns", ["8.8.8.8", "1.1.1.1"])
+
+    # Basic validation for static IP
+    if not use_dhcp:
+        if not address or "/" not in address:
+            return jsonify({"error": "Valid IP address with CIDR (e.g. /24) is required for static config"}), 400
+
+    # Create a netplan configuration
+    # Note: This targets Ubuntu/Debian with netplan.
+    config = {
+        "network": {
+            "version": 2,
+            "renderer": "networkd",
+            "ethernets": {
+                iface: {
+                    "dhcp4": "yes" if use_dhcp else "no"
+                }
+            }
+        }
+    }
+
+    if not use_dhcp:
+        config["network"]["ethernets"][iface]["addresses"] = [address]
+        if gateway:
+            config["network"]["ethernets"][iface]["routes"] = [{"to": "default", "via": gateway}]
+        if dns:
+            config["network"]["ethernets"][iface]["nameservers"] = {"addresses": dns}
+
+    # Convert to YAML manually to avoid external dependencies for simple structure
+    import yaml
+    yaml_content = yaml.dump(config, default_flow_style=False)
+
+    # Write to a netplan file (this will override or coexist depending on filename)
+    # We use 99-easylin.yaml to ensure it takes precedence
+    file_path = "/etc/netplan/99-easylin.yaml"
+    write_res = run_host_command(f"cat > {file_path} << 'EOF'\n{yaml_content}\nEOF")
+
+    if write_res["returncode"] != 0:
+        return jsonify({"error": f"Failed to write netplan file: {write_res['stderr']}"}), 500
+
+    # Apply netplan
+    # WARNING: This might disconnect the user!
+    apply_res = run_host_command("netplan apply", timeout=10)
+
+    return jsonify({
+        "success": True,
+        "message": "Network configuration applied. Note: If you changed the IP, you might need to reconnect.",
+        "output": apply_res["stdout"]
+    })
+
+
 @network_bp.route("/ping", methods=["POST"])
 @jwt_required()
 def ping_host():

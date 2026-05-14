@@ -1,16 +1,21 @@
 import { useState } from 'react';
 import { useApi } from '../../hooks/useApi';
 import api from '../../api/client';
-import { Network as NetworkIcon, RefreshCw, Wifi, Globe, Send, CheckCircle, AlertCircle } from 'lucide-react';
+import { Network as NetworkIcon, RefreshCw, Wifi, Globe, Send, CheckCircle, AlertCircle, Edit2, ShieldAlert } from 'lucide-react';
 
 export default function Network() {
   const { data: ifaceData, loading } = useApi('/network/interfaces');
   const { data: dnsData, refetch: refetchDns } = useApi('/network/dns');
   const { data: connData } = useApi('/network/connections');
+  
+  const [tab, setTab] = useState('interfaces');
   const [pingHost, setPingHost] = useState('');
   const [pingResult, setPingResult] = useState(null);
   const [pinging, setPinging] = useState(false);
-  const [tab, setTab] = useState('interfaces');
+  const [editIface, setEditIface] = useState(null);
+  const [config, setConfig] = useState({ dhcp: true, address: '', gateway: '', dns: '8.8.8.8, 1.1.1.1' });
+  const [applying, setApplying] = useState(false);
+  const [msg, setMsg] = useState(null);
 
   const doPing = async () => {
     if (!pingHost) return;
@@ -26,11 +31,48 @@ export default function Network() {
     }
   };
 
+  const openEdit = (iface) => {
+    const addr = iface.addresses?.find(a => a.family === 'AF_INET');
+    setEditIface(iface.name);
+    setConfig({
+      dhcp: true,
+      address: addr ? `${addr.address}/24` : '',
+      gateway: '',
+      dns: '8.8.8.8, 1.1.1.1'
+    });
+  };
+
+  const applyConfig = async () => {
+    if (!confirm("WARNING: Applying new network settings may disconnect your current session. If you set a wrong IP, you might lose access to the server. Continue?")) return;
+
+    setApplying(true);
+    setMsg(null);
+    try {
+      const result = await api.post(`/network/interfaces/${editIface}/config`, {
+        ...config,
+        dns: config.dns.split(',').map(s => s.trim())
+      });
+      setMsg({ type: 'success', text: result.message });
+      setEditIface(null);
+    } catch (err) {
+      setMsg({ type: 'error', text: err.message });
+    } finally {
+      setApplying(false);
+    }
+  };
+
   return (
     <div className="page fade-in">
       <div className="page-header">
         <div className="page-title"><NetworkIcon size={28} /><h1>Network</h1></div>
       </div>
+
+      {msg && (
+        <div className={`alert alert-${msg.type}`} style={{ marginBottom: 'var(--space-md)' }}>
+          {msg.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle size={16} />}
+          {msg.text}
+        </div>
+      )}
 
       <div className="tabs">
         <button className={`tab ${tab === 'interfaces' ? 'active' : ''}`} onClick={() => setTab('interfaces')}>Interfaces</button>
@@ -45,7 +87,7 @@ export default function Network() {
             <div className="loading-container"><div className="spinner" /></div>
           ) : (
             <table className="data-table">
-              <thead><tr><th>Interface</th><th>Status</th><th>Address</th><th>Speed</th><th>MTU</th></tr></thead>
+              <thead><tr><th>Interface</th><th>Status</th><th>Address</th><th>Speed</th><th>Actions</th></tr></thead>
               <tbody>
                 {(ifaceData?.interfaces || []).map((iface) => (
                   <tr key={iface.name}>
@@ -59,12 +101,79 @@ export default function Network() {
                       {iface.addresses?.filter(a => a.family === 'AF_INET').map(a => a.address).join(', ') || '—'}
                     </td>
                     <td>{iface.speed ? `${iface.speed} Mbps` : '—'}</td>
-                    <td>{iface.mtu || '—'}</td>
+                    <td>
+                      <button className="btn btn-ghost btn-sm btn-icon" onClick={() => openEdit(iface)} title="Configure">
+                        <Edit2 size={14} />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editIface && (
+        <div className="modal-overlay" onClick={() => setEditIface(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3 className="modal-title">Configure {editIface}</h3>
+
+            <div className="alert alert-warning" style={{ fontSize: '12px' }}>
+              <ShieldAlert size={16} />
+              Changing network settings can lead to <strong>disconnection</strong> and loss of access if misconfigured.
+            </div>
+
+            <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)', background: 'var(--bg-primary)', padding: '12px', borderRadius: 'var(--radius-sm)' }}>
+              <label className="form-label" style={{ marginBottom: 0 }}>Use DHCP</label>
+              <input
+                type="checkbox"
+                checked={config.dhcp}
+                onChange={(e) => setConfig({ ...config, dhcp: e.target.checked })}
+                style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+              />
+            </div>
+
+            {!config.dhcp && (
+              <div className="fade-in" style={{ marginTop: 'var(--space-md)' }}>
+                <div className="form-group">
+                  <label className="form-label">IP Address (with CIDR, e.g. /24)</label>
+                  <input
+                    className="form-input"
+                    value={config.address}
+                    onChange={(e) => setConfig({ ...config, address: e.target.value })}
+                    placeholder="192.168.1.100/24"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Gateway</label>
+                  <input
+                    className="form-input"
+                    value={config.gateway}
+                    onChange={(e) => setConfig({ ...config, gateway: e.target.value })}
+                    placeholder="192.168.1.1"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">DNS Servers (comma separated)</label>
+                  <input
+                    className="form-input"
+                    value={config.dns}
+                    onChange={(e) => setConfig({ ...config, dns: e.target.value })}
+                    placeholder="8.8.8.8, 1.1.1.1"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setEditIface(null)}>Cancel</button>
+              <button className="btn btn-primary" onClick={applyConfig} disabled={applying}>
+                {applying ? <div className="spinner spinner-sm" /> : "Apply Changes"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
