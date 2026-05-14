@@ -1,36 +1,49 @@
 import { useApi } from '../../hooks/useApi';
 import { 
   LayoutDashboard, Activity, Cpu, HardDrive, Zap, 
-  ArrowUpRight, ArrowDownRight, RefreshCw
+  ArrowUpRight, ArrowDownRight, RefreshCw, BarChart3
 } from 'lucide-react';
 
-function StatCard({ title, value, sub, icon: Icon, color, trend }) {
+function StatCard({ title, value, sub, icon: Icon, color, details, percent }) {
   return (
     <div className="stat-card">
       <div className={`stat-icon ${color}`}><Icon size={20} /></div>
       <div className="stat-info">
         <div className="stat-label">{title}</div>
         <div className="stat-value">{value}</div>
-        <div className="stat-sub">
-          {trend && (
-            <span style={{ color: trend > 0 ? 'var(--accent-red)' : 'var(--accent-green)', display: 'inline-flex', alignItems: 'center' }}>
-              {trend > 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-              {Math.abs(trend)}%
-            </span>
-          )}
-          {sub}
+        
+        {percent !== undefined && (
+          <div className="progress-bar" style={{ margin: '8px 0' }}>
+            <div className={`progress-fill ${color}`} style={{ width: `${percent}%` }}></div>
+          </div>
+        )}
+
+        <div className="stat-sub" style={{ fontSize: '11px', lineHeight: '1.6' }}>
+          {details ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+              {details.map((d, i) => <span key={i}>{d}</span>)}
+            </div>
+          ) : sub}
         </div>
       </div>
     </div>
   );
 }
 
+const formatBytes = (bytes) => {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+};
+
 export default function Dashboard() {
   const { data, loading, refetch } = useApi('/dashboard/metrics');
 
   const metrics = data || {
-    cpu: 0, ram: { percent: 0, used: 0, total: 0 },
-    disk: { percent: 0, used: 0, total: 0 },
+    cpu: 0, ram: { percent: 0, used: 0, free: 0, total: 0 },
+    disk: { percent: 0, used: 0, free: 0, total: 0 },
     net: { sent: 0, recv: 0 },
     load: [0, 0, 0]
   };
@@ -48,29 +61,39 @@ export default function Dashboard() {
         <StatCard 
           title="CPU Usage" 
           value={`${metrics.cpu}%`} 
-          sub={`Load: ${metrics.load[0].toFixed(2)}`}
+          percent={metrics.cpu}
+          sub={`Load Avg: ${metrics.load[0].toFixed(2)}`}
           icon={Cpu} 
           color="blue"
-          trend={metrics.cpu > 50 ? 5 : -2}
         />
         <StatCard 
-          title="Memory" 
+          title="Memory (RAM)" 
           value={`${metrics.ram.percent}%`} 
-          sub={`${(metrics.ram.used / 1024 / 1024 / 1024).toFixed(1)}GB / ${(metrics.ram.total / 1024 / 1024 / 1024).toFixed(1)}GB`}
+          percent={metrics.ram.percent}
+          details={[
+            `Used: ${formatBytes(metrics.ram.used)}`,
+            `Free: ${formatBytes(metrics.ram.free)}`,
+            `Total: ${formatBytes(metrics.ram.total)}`
+          ]}
           icon={Activity} 
           color="purple" 
         />
         <StatCard 
-          title="Disk Usage" 
+          title="Disk Storage" 
           value={`${metrics.disk.percent}%`} 
-          sub={`${(metrics.disk.used / 1024 / 1024 / 1024).toFixed(1)}GB / ${(metrics.disk.total / 1024 / 1024 / 1024).toFixed(1)}GB`}
+          percent={metrics.disk.percent}
+          details={[
+            `Used: ${formatBytes(metrics.disk.used)}`,
+            `Free: ${formatBytes(metrics.disk.free)}`,
+            `Total: ${formatBytes(metrics.disk.total)}`
+          ]}
           icon={HardDrive} 
           color="cyan" 
         />
         <StatCard 
-          title="Network" 
-          value="Active" 
-          sub={`↑ ${(metrics.net.sent / 1024 / 1024).toFixed(1)}MB / ↓ ${(metrics.net.recv / 1024 / 1024).toFixed(1)}MB`}
+          title="Network Traffic" 
+          value="Live" 
+          sub={`↑ ${formatBytes(metrics.net.sent)} / ↓ ${formatBytes(metrics.net.recv)}`}
           icon={Zap} 
           color="amber" 
         />
@@ -78,7 +101,7 @@ export default function Dashboard() {
 
       <div className="grid-2" style={{ marginTop: 'var(--space-lg)' }}>
         <div className="card">
-          <div className="card-header"><div className="card-title"><Activity size={16} /> Load Average</div></div>
+          <div className="card-header"><div className="card-title"><BarChart3 size={16} /> Load Average</div></div>
           <div style={{ display: 'flex', justifyContent: 'space-around', padding: 'var(--space-lg) 0' }}>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--text-primary)' }}>{metrics.load[0].toFixed(2)}</div>
