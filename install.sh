@@ -81,8 +81,12 @@ fi
 echo -e "${GREEN}Starting EasyLin...${NC}"
 docker compose up -d --build
 
+LOCAL_IP=$(hostname -I | awk '{print $1}')
+EXTERNAL_IP=$(curl -s https://ifconfig.me || echo "N/A")
+
 echo -e "${GREEN}==========================================${NC}"
 echo -e "${GREEN}   EasyLin is now running!               ${NC}"
-echo -e "${GREEN}   Access it at: http://$(curl -s https://ifconfig.me):5050 ${NC}"
+echo -e "${GREEN}   Local Access:    http://$LOCAL_IP:5050 ${NC}"
+echo -e "${GREEN}   External Access: http://$EXTERNAL_IP:5050 ${NC}"
 echo -e "${GREEN}==========================================${NC}"
 echo -e "${YELLOW}Log in with your server username and password.${NC}"
