@@ -559,18 +559,25 @@ select.form-input {
 
 /* --- Search --- */
 .search-bar {
+  display: flex;
+  gap: var(--space-sm);
   position: relative;
+  align-items: center;
 }
 .search-bar svg {
   position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
+  left: 14px;
   color: var(--text-muted);
   pointer-events: none;
+  z-index: 1;
 }
 .search-bar input {
-  padding-left: 38px;
+  flex: 1;
+  padding-left: 42px;
+}
+.search-bar .btn {
+  padding: 10px 24px;
+  height: 42px;
 }
 
 /* --- Tabs --- */
