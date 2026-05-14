@@ -155,6 +155,17 @@ export default function Packages() {
                   </td>
                 </tr>
               ))}
+              {(!data?.packages || data?.packages.length === 0) && !loading && (
+                <tr>
+                  <td colSpan="3" className="empty-state">
+                    {data?.error ? (
+                      <div style={{ color: 'var(--accent-red)' }}>Error loading packages: {data.error}</div>
+                    ) : (
+                      "No installed packages found."
+                    )}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         ) : (
