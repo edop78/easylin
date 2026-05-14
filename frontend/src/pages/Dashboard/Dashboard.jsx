@@ -1,206 +1,96 @@
 import { useApi } from '../../hooks/useApi';
-import {
-  Cpu,
-  MemoryStick,
-  HardDrive,
-  Activity,
-  Clock,
-  Monitor,
-  ArrowUpDown,
-  RefreshCw,
-  CheckCircle,
-  AlertCircle,
+import { 
+  LayoutDashboard, Activity, Cpu, HardDrive, Zap, 
+  ArrowUpRight, ArrowDownRight, RefreshCw
 } from 'lucide-react';
-import api from '../../api/client';
-import { useState } from 'react';
 
-function formatBytes(bytes) {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-}
-
-function ProgressBar({ percent, color }) {
-  const barColor = percent > 90 ? 'red' : percent > 70 ? 'amber' : color;
+function StatCard({ title, value, sub, icon: Icon, color, trend }) {
   return (
-    <div className="progress-bar">
-      <div
-        className={`progress-fill ${barColor}`}
-        style={{ width: `${Math.min(percent, 100)}%` }}
-      />
+    <div className="stat-card">
+      <div className={`stat-icon ${color}`}><Icon size={20} /></div>
+      <div className="stat-info">
+        <div className="stat-label">{title}</div>
+        <div className="stat-value">{value}</div>
+        <div className="stat-sub">
+          {trend && (
+            <span style={{ color: trend > 0 ? 'var(--accent-red)' : 'var(--accent-green)', display: 'inline-flex', alignItems: 'center' }}>
+              {trend > 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+              {Math.abs(trend)}%
+            </span>
+          )}
+          {sub}
+        </div>
+      </div>
     </div>
   );
 }
 
 export default function Dashboard() {
-  const { data, loading, error, refetch } = useApi('/dashboard/', {
-    interval: 5000,
-  });
-  const [msg, setMsg] = useState(null);
+  const { data, loading, refetch } = useApi('/dashboard/metrics');
 
-  const installPackage = async (name) => {
-    if (!confirm(`Install ${name}?`)) return;
-    try {
-      setMsg({ type: 'info', text: `Installing ${name}...` });
-      const result = await api.post('/packages/install', { name });
-      setMsg({
-        type: result.success ? 'success' : 'error',
-        text: result.success ? `${name} installed successfully` : result.error,
-      });
-    } catch (err) {
-      setMsg({ type: 'error', text: err.message });
-    }
+  const metrics = data || {
+    cpu: 0, ram: { percent: 0, used: 0, total: 0 },
+    disk: { percent: 0, used: 0, total: 0 },
+    net: { sent: 0, recv: 0 },
+    load: [0, 0, 0]
   };
-
-  if (loading && !data) {
-    return (
-      <div className="loading-container">
-        <div className="spinner" />
-        <span>Loading dashboard...</span>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="page">
-        <div className="alert alert-error">{error}</div>
-      </div>
-    );
-  }
-
-  const d = data || {};
 
   return (
     <div className="page fade-in">
       <div className="page-header">
-        <div className="page-title">
-          <Monitor size={28} />
-          <div>
-            <h1>Dashboard</h1>
-            <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
-              {d.hostname || 'Server'} — {d.uptime || ''}
-            </p>
-          </div>
-        </div>
-        <button className="btn btn-ghost" onClick={refetch}>
-          <RefreshCw size={15} /> Refresh
+        <div className="page-title"><LayoutDashboard size={28} /><h1>Dashboard</h1></div>
+        <button className="btn btn-ghost" onClick={refetch} disabled={loading}>
+          <RefreshCw size={15} className={loading ? 'spin' : ''} /> Refresh
         </button>
       </div>
 
-      {msg && (
-        <div className={`alert alert-${msg.type === 'info' ? 'warning' : msg.type}`} style={{ marginBottom: 'var(--space-lg)' }}>
-          {msg.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle size={16} />}
-          {msg.text}
-        </div>
-      )}
-
-      {/* Stats Grid */}
       <div className="stat-grid">
-        <div className="stat-card">
-          <div className="stat-icon blue"><Cpu size={22} /></div>
-          <div className="stat-info">
-            <div className="stat-label">CPU Usage</div>
-            <div className="stat-value">{d.cpu?.percent || 0}%</div>
-            <div className="stat-sub">{d.cpu?.cores || 0} cores · {Math.round(d.cpu?.frequency || 0)} MHz</div>
-            <ProgressBar percent={d.cpu?.percent || 0} color="blue" />
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon green"><MemoryStick size={22} /></div>
-          <div className="stat-info">
-            <div className="stat-label">Memory</div>
-            <div className="stat-value">{d.memory?.percent || 0}%</div>
-            <div className="stat-sub">
-              {formatBytes(d.memory?.used || 0)} / {formatBytes(d.memory?.total || 0)}
-            </div>
-            <ProgressBar percent={d.memory?.percent || 0} color="green" />
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon amber"><HardDrive size={22} /></div>
-          <div className="stat-info">
-            <div className="stat-label">Disk</div>
-            <div className="stat-value">{d.disk?.percent || 0}%</div>
-            <div className="stat-sub">
-              {formatBytes(d.disk?.used || 0)} / {formatBytes(d.disk?.total || 0)}
-            </div>
-            <ProgressBar percent={d.disk?.percent || 0} color="amber" />
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon purple"><Activity size={22} /></div>
-          <div className="stat-info">
-            <div className="stat-label">Load Average</div>
-            <div className="stat-value">{d.load_average?.['1min']?.toFixed(2) || '0.00'}</div>
-            <div className="stat-sub">
-              5m: {d.load_average?.['5min']?.toFixed(2) || '0.00'} · 15m: {d.load_average?.['15min']?.toFixed(2) || '0.00'}
-            </div>
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon cyan"><ArrowUpDown size={22} /></div>
-          <div className="stat-info">
-            <div className="stat-label">Network I/O</div>
-            <div className="stat-value">{formatBytes(d.network?.bytes_recv || 0)}</div>
-            <div className="stat-sub">
-              ↑ {formatBytes(d.network?.bytes_sent || 0)} sent
-            </div>
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon blue"><Clock size={22} /></div>
-          <div className="stat-info">
-            <div className="stat-label">Uptime</div>
-            <div className="stat-value" style={{ fontSize: '1rem' }}>
-              {d.uptime || 'N/A'}
-            </div>
-            <div className="stat-sub">{d.platform || ''}</div>
-          </div>
-        </div>
+        <StatCard 
+          title="CPU Usage" 
+          value={`${metrics.cpu}%`} 
+          sub={`Load: ${metrics.load[0].toFixed(2)}`}
+          icon={Cpu} 
+          color="blue"
+          trend={metrics.cpu > 50 ? 5 : -2}
+        />
+        <StatCard 
+          title="Memory" 
+          value={`${metrics.ram.percent}%`} 
+          sub={`${(metrics.ram.used / 1024 / 1024 / 1024).toFixed(1)}GB / ${(metrics.ram.total / 1024 / 1024 / 1024).toFixed(1)}GB`}
+          icon={Activity} 
+          color="purple" 
+        />
+        <StatCard 
+          title="Disk Usage" 
+          value={`${metrics.disk.percent}%`} 
+          sub={`${(metrics.disk.used / 1024 / 1024 / 1024).toFixed(1)}GB / ${(metrics.disk.total / 1024 / 1024 / 1024).toFixed(1)}GB`}
+          icon={HardDrive} 
+          color="cyan" 
+        />
+        <StatCard 
+          title="Network" 
+          value="Active" 
+          sub={`↑ ${(metrics.net.sent / 1024 / 1024).toFixed(1)}MB / ↓ ${(metrics.net.recv / 1024 / 1024).toFixed(1)}MB`}
+          icon={Zap} 
+          color="amber" 
+        />
       </div>
 
-      {/* OS Info & Quick Setup */}
       <div className="grid-2" style={{ marginTop: 'var(--space-lg)' }}>
-        {d.os_info && (
-          <div className="card">
-            <div className="card-header">
-              <div className="card-title">
-                <Monitor size={16} /> System Information
-              </div>
-            </div>
-            <pre className="code-block" style={{ height: '240px' }}>{d.os_info}</pre>
-          </div>
-        )}
-
         <div className="card">
-          <div className="card-header">
-            <div className="card-title">
-              <Activity size={16} /> Quick Setup
+          <div className="card-header"><div className="card-title"><Activity size={16} /> Load Average</div></div>
+          <div style={{ display: 'flex', justifyContent: 'space-around', padding: 'var(--space-lg) 0' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--text-primary)' }}>{metrics.load[0].toFixed(2)}</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>1 min</div>
             </div>
-          </div>
-          <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: 'var(--space-md)' }}>
-            Common tools and operations for new servers.
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-sm)' }}>
-              <span style={{ fontSize: '13px' }}>Common Utilities (git, curl, htop, vim)</span>
-              <button className="btn btn-primary btn-sm" onClick={() => installPackage('git curl htop vim')}>Install</button>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--text-primary)' }}>{metrics.load[1].toFixed(2)}</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>5 min</div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-sm)' }}>
-              <span style={{ fontSize: '13px' }}>Build Essentials (gcc, make, build-essential)</span>
-              <button className="btn btn-ghost btn-sm" onClick={() => installPackage('build-essential')}>Install</button>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-sm)' }}>
-              <span style={{ fontSize: '13px' }}>Network Tools (net-tools, nmap)</span>
-              <button className="btn btn-ghost btn-sm" onClick={() => installPackage('net-tools nmap')}>Install</button>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--text-primary)' }}>{metrics.load[2].toFixed(2)}</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>15 min</div>
             </div>
           </div>
         </div>
