@@ -5,7 +5,7 @@ import { Settings, Power, RotateCw, Server, Clock, HardDrive, CheckCircle, Alert
 import ConfirmModal from '../../components/Common/ConfirmModal';
 
 export default function System() {
-  const { data, loading, refetch } = useApi('/system/info');
+  const { data, loading, error, refetch } = useApi('/system/info');
   const [msg, setMsg] = useState(null);
   const [confirm, setConfirm] = useState({ open: false, title: '', message: '', action: null });
 
@@ -18,11 +18,28 @@ export default function System() {
     }
   };
 
+  if (error) {
+    return (
+      <div className="page fade-in">
+        <div className="page-header">
+          <div className="page-title"><Settings size={28} /><h1>System Management</h1></div>
+        </div>
+        <div className="alert alert-error">
+          <AlertCircle size={20} />
+          <div><strong>Error loading system info:</strong> {error}</div>
+          <button className="btn btn-sm btn-ghost" onClick={refetch}>Retry</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="page fade-in">
       <div className="page-header">
         <div className="page-title"><Settings size={28} /><h1>System Management</h1></div>
-        <button className="btn btn-ghost" onClick={refetch} disabled={loading}><RotateCw size={15} /> Refresh</button>
+        <button className="btn btn-ghost" onClick={refetch} disabled={loading}>
+          <RotateCw size={15} className={loading ? 'spin' : ''} /> Refresh
+        </button>
       </div>
 
       {msg && (
@@ -50,15 +67,12 @@ export default function System() {
               <Power size={15} /> Shutdown
             </button>
           </div>
-          <p style={{ marginTop: 'var(--space-md)', color: 'var(--text-muted)', fontSize: '12px' }}>
-            Warning: These actions will affect the physical host server.
-          </p>
         </div>
 
         {/* Unified System Details */}
         <div className="card">
           <div className="card-header"><div className="card-title"><Server size={16} /> System Details</div></div>
-          {loading ? <div className="spinner" /> : (
+          {loading && !data ? <div className="spinner" /> : (
             <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-md)' }}>
               <div className="stat-info">
                 <div className="stat-label"><Monitor size={14} /> Hostname</div>

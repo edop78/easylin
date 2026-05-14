@@ -2,7 +2,6 @@ from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
 import socket
 import platform
-import distro
 import psutil
 import datetime
 import os
@@ -68,9 +67,18 @@ def system_info():
     except:
         uptime = "N/A"
 
-    # OS Info con fallback
+    # OS Info - Usiamo /etc/os-release che è standard su Linux
+    os_name = "Linux"
     try:
-        os_name = f"{distro.name()} {distro.version()}"
+        if os.path.exists("/etc/os-release"):
+            with open("/etc/os-release") as f:
+                lines = f.readlines()
+                for line in lines:
+                    if line.startswith("PRETTY_NAME="):
+                        os_name = line.split("=")[1].strip().replace('"', '')
+                        break
+        else:
+            os_name = platform.system()
     except:
         os_name = platform.system()
 
