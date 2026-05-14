@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useApi } from '../../hooks/useApi';
 import api from '../../api/client';
-import { Globe, Plus, Trash2, RefreshCw, Download, AlertCircle, CheckCircle, ScrollText, X, Shield, ShieldCheck, Lock } from 'lucide-react';
+import { Globe, Plus, Trash2, RefreshCw, Download, AlertCircle, CheckCircle, ScrollText, X, Shield, ShieldCheck, Lock, Info } from 'lucide-react';
 import ConfirmModal from '../../components/Common/ConfirmModal';
 
 export default function ReverseProxy() {
