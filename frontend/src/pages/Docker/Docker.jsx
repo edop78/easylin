@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useApi } from '../../hooks/useApi';
 import api from '../../api/client';
-import { Container, Play, Square, RotateCw, Trash2, RefreshCw, Image, HardDrive, Network, ScrollText } from 'lucide-react';
+import { Container, Play, Square, RotateCw, Trash2, RefreshCw, Image, HardDrive, Network, ScrollText, Cog } from 'lucide-react';
+import ConfirmModal from '../../components/Common/ConfirmModal';
 
 function formatSize(bytes) {
   if (!bytes) return '0 B';
@@ -20,6 +21,7 @@ export default function Docker() {
   const [tab, setTab] = useState('containers');
   const [logsModal, setLogsModal] = useState(null);
   const [actionLoading, setActionLoading] = useState('');
+  const [confirm, setConfirm] = useState({ open: false, title: '', message: '', action: null });
 
   const containerAction = async (id, action) => {
     setActionLoading(`${id}-${action}`);
@@ -43,7 +45,6 @@ export default function Docker() {
   };
 
   const removeImage = async (id) => {
-    if (!confirm('Remove this image?')) return;
     try {
       await api.del(`/docker/images/${id}`);
       refetchImages();
@@ -70,7 +71,6 @@ export default function Docker() {
         <button className="btn btn-ghost" onClick={() => { refetch(); refetchImages(); }}><RefreshCw size={15} /> Refresh</button>
       </div>
 
-      {/* Docker Stats */}
       {info && (
         <div className="stat-grid" style={{ marginBottom: 'var(--space-lg)' }}>
           <div className="stat-card">
@@ -102,7 +102,6 @@ export default function Docker() {
         </div>
       )}
 
-      {/* Logs Modal */}
       {logsModal && (
         <div className="modal-overlay" onClick={() => setLogsModal(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px' }}>
@@ -115,7 +114,6 @@ export default function Docker() {
         </div>
       )}
 
-      {/* Tabs */}
       <div className="tabs">
         <button className={`tab ${tab === 'containers' ? 'active' : ''}`} onClick={() => setTab('containers')}>
           Containers ({containersData?.containers?.length || 0})
@@ -153,7 +151,10 @@ export default function Docker() {
                       <button className="btn btn-sm btn-icon btn-ghost" onClick={() => containerAction(c.id, 'stop')} title="Stop"><Square size={13} /></button>
                       <button className="btn btn-sm btn-icon btn-ghost" onClick={() => containerAction(c.id, 'restart')} title="Restart"><RotateCw size={13} /></button>
                       <button className="btn btn-sm btn-icon btn-ghost" onClick={() => viewLogs(c.id, c.name)} title="Logs"><ScrollText size={13} /></button>
-                      <button className="btn btn-sm btn-icon btn-ghost" onClick={() => containerAction(c.id, 'remove')} title="Remove" style={{ color: 'var(--accent-red)' }}><Trash2 size={13} /></button>
+                      <button className="btn btn-sm btn-icon btn-ghost" onClick={() => setConfirm({
+                        open: true, title: 'Remove Container', message: `Delete container ${c.name}?`, 
+                        action: () => containerAction(c.id, 'remove')
+                      })} title="Remove" style={{ color: 'var(--accent-red)' }}><Trash2 size={13} /></button>
                     </div>
                   </td>
                 </tr>
@@ -169,7 +170,10 @@ export default function Docker() {
                   <td style={{ color: 'var(--text-primary)' }}>{img.tags?.[0] || img.id}</td>
                   <td>{formatSize(img.size)}</td>
                   <td>
-                    <button className="btn btn-sm btn-icon btn-ghost" onClick={() => removeImage(img.id)} title="Remove" style={{ color: 'var(--accent-red)' }}><Trash2 size={14} /></button>
+                    <button className="btn btn-sm btn-icon btn-ghost" onClick={() => setConfirm({
+                      open: true, title: 'Remove Image', message: 'Delete this image from the server?', 
+                      action: () => removeImage(img.id)
+                    })} title="Remove" style={{ color: 'var(--accent-red)' }}><Trash2 size={14} /></button>
                   </td>
                 </tr>
               ))}
@@ -203,10 +207,14 @@ export default function Docker() {
           </table>
         )}
       </div>
+
+      <ConfirmModal 
+        isOpen={confirm.open}
+        title={confirm.title}
+        message={confirm.message}
+        onConfirm={confirm.action}
+        onCancel={() => setConfirm({ ...confirm, open: false })}
+      />
     </div>
   );
-}
-
-function Cog({ size }) {
-  return <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>;
 }

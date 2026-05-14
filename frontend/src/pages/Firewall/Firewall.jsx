@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useApi } from '../../hooks/useApi';
 import api from '../../api/client';
 import { Shield, Plus, Trash2, RefreshCw, Power, PowerOff, AlertCircle, CheckCircle } from 'lucide-react';
+import ConfirmModal from '../../components/Common/ConfirmModal';
 
 export default function Firewall() {
   const { data, loading, refetch } = useApi('/firewall/status');
@@ -9,10 +10,10 @@ export default function Firewall() {
   const [newRule, setNewRule] = useState({ action: 'allow', port: '', protocol: '', from: '' });
   const [message, setMessage] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [confirm, setConfirm] = useState({ open: false, title: '', message: '', action: null });
 
   const toggleFirewall = async () => {
     const action = data?.active ? 'disable' : 'enable';
-    if (!confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} the firewall?`)) return;
     setActionLoading(true);
     try {
       await api.post(`/firewall/${action}`);
@@ -40,7 +41,6 @@ export default function Firewall() {
   };
 
   const deleteRule = async (num) => {
-    if (!confirm(`Delete rule #${num}?`)) return;
     try {
       await api.del(`/firewall/rules/${num}`);
       refetch();
@@ -55,7 +55,11 @@ export default function Firewall() {
         <div className="page-title"><Shield size={28} /><h1>Firewall (UFW)</h1></div>
         <div className="page-actions">
           <button className="btn btn-ghost" onClick={refetch}><RefreshCw size={15} /> Refresh</button>
-          <button className={`btn ${data?.active ? 'btn-danger' : 'btn-success'}`} onClick={toggleFirewall} disabled={actionLoading}>
+          <button className={`btn ${data?.active ? 'btn-danger' : 'btn-success'}`} onClick={() => setConfirm({
+            open: true, title: data?.active ? 'Disable Firewall' : 'Enable Firewall',
+            message: `Are you sure you want to ${data?.active ? 'disable' : 'enable'} the firewall?`,
+            action: toggleFirewall
+          })} disabled={actionLoading}>
             {data?.active ? <><PowerOff size={15} /> Disable</> : <><Power size={15} /> Enable</>}
           </button>
           <button className="btn btn-primary" onClick={() => setShowAdd(!showAdd)}><Plus size={15} /> Add Rule</button>
@@ -75,7 +79,6 @@ export default function Firewall() {
         </span>
       </div>
 
-      {/* Add Rule Form */}
       {showAdd && (
         <div className="card" style={{ marginBottom: 'var(--space-lg)' }}>
           <h3 style={{ marginBottom: 'var(--space-md)' }}>Add Rule</h3>
@@ -108,7 +111,6 @@ export default function Firewall() {
         </div>
       )}
 
-      {/* Rules */}
       <div className="card">
         <div className="card-header">
           <div className="card-title"><Shield size={16} /> Firewall Rules</div>
@@ -127,7 +129,10 @@ export default function Firewall() {
                     <td className="mono">{num}</td>
                     <td style={{ color: 'var(--text-primary)' }}>{rule}</td>
                     <td>
-                      <button className="btn btn-sm btn-icon btn-ghost" onClick={() => deleteRule(num)} title="Delete" style={{ color: 'var(--accent-red)' }}>
+                      <button className="btn btn-sm btn-icon btn-ghost" onClick={() => setConfirm({
+                        open: true, title: 'Delete Rule', message: `Remove firewall rule #${num}?`,
+                        action: () => deleteRule(num)
+                      })} title="Delete" style={{ color: 'var(--accent-red)' }}>
                         <Trash2 size={14} />
                       </button>
                     </td>
@@ -140,6 +145,14 @@ export default function Firewall() {
           <div className="empty-state"><p>No firewall rules configured</p></div>
         )}
       </div>
+
+      <ConfirmModal 
+        isOpen={confirm.open}
+        title={confirm.title}
+        message={confirm.message}
+        onConfirm={confirm.action}
+        onCancel={() => setConfirm({ ...confirm, open: false })}
+      />
     </div>
   );
 }
