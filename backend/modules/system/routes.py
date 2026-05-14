@@ -1,11 +1,13 @@
-"""System management API — hostname, timezone, reboot, updates."""
-
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
-from utils.command import run_host_command
+from backend.utils.command import run_host_command
+import socket
+import platform
+import distro
+import psutil
+import datetime
 
 system_bp = Blueprint("system", __name__)
-
 
 @system_bp.route("/maintenance", methods=["POST"])
 @jwt_required()
@@ -33,7 +35,6 @@ def run_maintenance():
     if not cmd:
         return jsonify({"error": "Invalid command"}), 400
         
-    # Use longer timeout for upgrades
     res = run_host_command(cmd, timeout=600)
     
     return jsonify({
@@ -43,105 +44,51 @@ def run_maintenance():
         "returncode": res["returncode"]
     })
 
-
 @system_bp.route("/info", methods=["GET"])
 @jwt_required()
 def system_info():
-    """Get system information."""
-    hostname = run_host_command("hostname")
-    timezone = run_host_command("timedatectl show --property=Timezone --value")
-    kernel = run_host_command("uname -r")
-    os_info = run_host_command("cat /etc/os-release")
+    """Get comprehensive system info."""
+    # Get local IP
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+    except:
+        local_ip = "N/A"
+
+    # Get Public IP (cached for speed)
+    public_ip = run_host_command("curl -s https://api.ipify.org")["stdout"].strip() or "N/A"
+    
+    # Virtualization
+    virt = run_host_command("systemd-detect-virt")["stdout"].strip() or "physical"
+    
+    # Boot time
+    boot_time_timestamp = psutil.boot_time()
+    bt = datetime.datetime.fromtimestamp(boot_time_timestamp).strftime("%Y-%m-%d %H:%M:%S")
 
     return jsonify({
-        "hostname": hostname["stdout"],
-        "timezone": timezone["stdout"],
-        "kernel": kernel["stdout"],
-        "os_release": os_info["stdout"],
+        "hostname": socket.gethostname(),
+        "os": f"{distro.name()} {distro.version()}",
+        "kernel": platform.release(),
+        "arch": platform.machine(),
+        "uptime": run_host_command("uptime -p")["stdout"].strip().replace("up ", ""),
+        "cpu_count": psutil.cpu_count(),
+        "local_ip": local_ip,
+        "public_ip": public_ip,
+        "virtualization": virt,
+        "boot_time": bt,
+        "python_version": platform.python_version()
     })
-
-
-@system_bp.route("/hostname", methods=["PUT"])
-@jwt_required()
-def set_hostname():
-    """Set the system hostname."""
-    data = request.get_json()
-    new_hostname = data.get("hostname", "").strip()
-    if not new_hostname:
-        return jsonify({"error": "Hostname is required"}), 400
-
-    result = run_host_command(f"hostnamectl set-hostname {new_hostname}")
-    if result["returncode"] != 0:
-        return jsonify({"error": result["stderr"]}), 500
-
-    return jsonify({"success": True, "hostname": new_hostname})
-
-
-@system_bp.route("/timezone", methods=["PUT"])
-@jwt_required()
-def set_timezone():
-    """Set the system timezone."""
-    data = request.get_json()
-    tz = data.get("timezone", "").strip()
-    if not tz:
-        return jsonify({"error": "Timezone is required"}), 400
-
-    result = run_host_command(f"timedatectl set-timezone {tz}")
-    if result["returncode"] != 0:
-        return jsonify({"error": result["stderr"]}), 500
-
-    return jsonify({"success": True, "timezone": tz})
-
-
-@system_bp.route("/timezones", methods=["GET"])
-@jwt_required()
-def list_timezones():
-    """List available timezones."""
-    result = run_host_command("timedatectl list-timezones")
-    timezones = result["stdout"].split("\n") if result["stdout"] else []
-    return jsonify({"timezones": timezones})
-
 
 @system_bp.route("/reboot", methods=["POST"])
 @jwt_required()
 def reboot():
-    """Reboot the system."""
     run_host_command("reboot")
-    return jsonify({"success": True, "message": "System is rebooting..."})
-
+    return jsonify({"success": True})
 
 @system_bp.route("/shutdown", methods=["POST"])
 @jwt_required()
 def shutdown():
-    """Shutdown the system."""
-    run_host_command("shutdown -h now")
-    return jsonify({"success": True, "message": "System is shutting down..."})
-
-
-@system_bp.route("/updates/check", methods=["GET"])
-@jwt_required()
-def check_updates():
-    """Check for available system updates."""
-    run_host_command("apt-get update -qq", timeout=60)
-    result = run_host_command("apt list --upgradable 2>/dev/null | tail -n +2")
-    packages = []
-    if result["stdout"]:
-        for line in result["stdout"].split("\n"):
-            if line.strip():
-                packages.append(line.strip())
-    return jsonify({"updates": packages, "count": len(packages)})
-
-
-@system_bp.route("/updates/apply", methods=["POST"])
-@jwt_required()
-def apply_updates():
-    """Apply all pending system updates."""
-    result = run_host_command(
-        "DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq",
-        timeout=300,
-    )
-    return jsonify({
-        "success": result["returncode"] == 0,
-        "output": result["stdout"],
-        "error": result["stderr"],
-    })
+    run_host_command("poweroff")
+    return jsonify({"success": True})
