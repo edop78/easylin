@@ -82,7 +82,7 @@ echo -e "${GREEN}Starting EasyLin...${NC}"
 docker compose up -d --build
 
 LOCAL_IP=$(hostname -I | awk '{print $1}')
-EXTERNAL_IP=$(curl -s https://ifconfig.me || echo "N/A")
+EXTERNAL_IP=$(curl -s --connect-timeout 2 https://ifconfig.me || echo "N/A")
 
 echo -e "${GREEN}==========================================${NC}"
 echo -e "${GREEN}   EasyLin is now running!               ${NC}"
