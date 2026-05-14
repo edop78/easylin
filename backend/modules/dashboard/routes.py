@@ -7,57 +7,68 @@ dashboard_bp = Blueprint("dashboard", __name__)
 
 def safe_int(value):
     try:
-        return int(str(value).strip())
+        # Pulisce la stringa da eventuali caratteri non numerici
+        digit_only = "".join(filter(str.isdigit, str(value)))
+        return int(digit_only) if digit_only else 0
     except:
         return 0
 
 @dashboard_bp.route("/metrics")
 @jwt_required()
 def get_metrics():
+    # CPU (usiamo un piccolo intervallo per avere un dato reale)
+    cpu_percent = psutil.cpu_percent(interval=0.1)
+    load_avg = psutil.getloadavg()
+    
     # RAM
-    try:
-        vm = psutil.virtual_memory()
-        ram = {"percent": vm.percent, "used": vm.used, "free": vm.available, "total": vm.total}
-    except:
-        ram = {"percent": 0, "used": 0, "free": 0, "total": 0}
+    vm = psutil.virtual_memory()
+    ram = {
+        "percent": vm.percent,
+        "used": vm.used,
+        "free": vm.available,
+        "total": vm.total
+    }
     
-    # Disk
-    try:
-        du = psutil.disk_usage('/')
-        disk = {"percent": du.percent, "used": du.used, "free": du.free, "total": du.total}
-    except:
-        disk = {"percent": 0, "used": 0, "free": 0, "total": 0}
+    # DISK
+    du = psutil.disk_usage('/')
+    disk = {
+        "percent": du.percent,
+        "used": du.used,
+        "free": du.free,
+        "total": du.total
+    }
     
-    # Docker Overview (Safe Parsing)
+    # DOCKER (Usiamo comandi shell sicuri)
     res_total = run_host_command("docker ps -a -q | wc -l")
     res_running = run_host_command("docker ps -q | wc -l")
     
     docker_info = {
-        "total": safe_int(res_total["stdout"]),
-        "running": safe_int(res_running["stdout"])
+        "total": safe_int(res_total.get("stdout", "0")),
+        "running": safe_int(res_running.get("stdout", "0"))
     }
     
-    # Services
+    # SERVICES
     services = []
     for s in ["docker", "ssh", "ufw"]:
         res = run_host_command(f"systemctl is-active {s}")
         services.append({
             "name": s.upper() if s != 'ufw' else 'Firewall (UFW)',
-            "status": res["stdout"].strip() if res["returncode"] == 0 else "inactive"
+            "status": res.get("stdout", "inactive").strip() if res.get("returncode") == 0 else "inactive"
         })
-
-    # Load
-    try:
-        load = psutil.getloadavg()
-    except:
-        load = [0, 0, 0]
-
+    
+    # NETWORK
+    net_io = psutil.net_io_counters()
+    net = {
+        "sent": net_io.bytes_sent,
+        "recv": net_io.bytes_recv
+    }
+    
     return jsonify({
-        "cpu": psutil.cpu_percent(),
-        "load": load,
+        "cpu": cpu_percent,
+        "load": load_avg,
         "ram": ram,
         "disk": disk,
         "docker": docker_info,
         "services": services,
-        "net": {"sent": psutil.net_io_counters().bytes_sent, "recv": psutil.net_io_counters().bytes_recv}
+        "net": net
     })
