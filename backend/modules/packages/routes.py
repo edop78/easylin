@@ -10,19 +10,22 @@ packages_bp = Blueprint("packages", __name__)
 @packages_bp.route("/")
 @jwt_required()
 def list_packages():
-    """List installed packages using a direct query."""
-    # Use a direct command without pipes to avoid potential shell issues
+    """List installed packages with clean names."""
     res = run_host_command("dpkg-query -W -f='${Package}|${Version}\n'")
     
     packages = []
     if res["returncode"] == 0 and res["stdout"]:
         for line in res["stdout"].splitlines():
+            line = line.strip()
             if "|" in line:
                 parts = line.split("|")
                 if len(parts) == 2:
-                    packages.append({"name": parts[0], "version": parts[1]})
+                    # Clean the names to ensure perfect matching in frontend
+                    name = parts[0].strip()
+                    version = parts[1].strip()
+                    if name:
+                        packages.append({"name": name, "version": version})
     
-    # Error fallback
     if not packages and res["returncode"] != 0:
         return jsonify({"packages": [], "error": res["stderr"] or "Command failed"}), 500
 

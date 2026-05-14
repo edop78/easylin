@@ -104,39 +104,25 @@ export default function Packages() {
           <div className="loading-container"><div className="spinner" /></div>
         ) : tab === 'common' ? (
           <table className="data-table">
-            <thead><tr><th>App</th><th>Description</th><th>Status</th><th>Action</th></tr></thead>
+            <thead><tr><th>App</th><th>Description</th><th>Action</th></tr></thead>
             <tbody>
-              {COMMON_APPS.map((app) => {
-                const isInstalled = installedNames.has(app.name);
-                return (
-                  <tr key={app.name}>
-                    <td><div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{app.name}</div></td>
-                    <td>{app.desc}</td>
-                    <td>
-                      <span className={`badge ${isInstalled ? 'badge-success' : 'badge-neutral'}`}>
-                        {isInstalled ? 'Installed' : 'Not Installed'}
-                      </span>
-                    </td>
-                    <td>
-                      {!isInstalled ? (
-                        <button className="btn btn-sm btn-primary" onClick={() => setConfirm({
-                          open: true, title: 'Install App', message: `Install ${app.name}?`,
-                          action: () => handleAction(app.name, 'install'), type: 'info', confirmText: 'Install'
-                        })} disabled={actionLoading === `${app.name}-install`}>
-                          <Download size={13} /> Install
-                        </button>
-                      ) : (
-                        <button className="btn btn-sm btn-ghost" onClick={() => setConfirm({
-                          open: true, title: 'Uninstall App', message: `Are you sure you want to uninstall ${app.name}?`,
-                          action: () => handleAction(app.name, 'remove'), type: 'danger', confirmText: 'Uninstall'
-                        })} style={{ color: 'var(--accent-red)' }} disabled={actionLoading === `${app.name}-remove`}>
-                          <Trash2 size={13} /> Uninstall
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+              {COMMON_APPS.filter(app => !installedNames.has(app.name)).map((app) => (
+                <tr key={app.name}>
+                  <td><div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{app.name}</div></td>
+                  <td>{app.desc}</td>
+                  <td>
+                    <button className="btn btn-sm btn-primary" onClick={() => setConfirm({
+                      open: true, title: 'Install App', message: `Install ${app.name}?`,
+                      action: () => handleAction(app.name, 'install'), type: 'info', confirmText: 'Install'
+                    })} disabled={actionLoading === `${app.name}-install`}>
+                      <Download size={13} /> Install
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {COMMON_APPS.filter(app => !installedNames.has(app.name)).length === 0 && (
+                <tr><td colSpan="3" className="empty-state">All common apps are already installed!</td></tr>
+              )}
             </tbody>
           </table>
         ) : tab === 'installed' ? (
