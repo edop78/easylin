@@ -31,7 +31,7 @@ function StatCard({ title, value, sub, icon: Icon, color, details, percent }) {
 }
 
 const formatBytes = (bytes) => {
-  if (bytes === 0) return '0 B';
+  if (!bytes || bytes === 0) return '0 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -41,14 +41,14 @@ const formatBytes = (bytes) => {
 export default function Dashboard() {
   const { data, loading, refetch } = useApi('/dashboard/metrics');
 
-  const metrics = data || {
-    cpu: 0, ram: { percent: 0, used: 0, free: 0, total: 0 },
-    disk: { percent: 0, used: 0, free: 0, total: 0 },
-    docker: { running: 0, total: 0 },
-    services: [],
-    net: { sent: 0, recv: 0 },
-    load: [0, 0, 0]
-  };
+  // Protezione totale contro dati mancanti o parziali
+  const cpu = data?.cpu || 0;
+  const ram = data?.ram || { percent: 0, used: 0, free: 0, total: 0 };
+  const disk = data?.disk || { percent: 0, used: 0, free: 0, total: 0 };
+  const dockerData = data?.docker || { running: 0, total: 0 };
+  const services = data?.services || [];
+  const net = data?.net || { sent: 0, recv: 0 };
+  const load = data?.load || [0, 0, 0];
 
   return (
     <div className="page fade-in">
@@ -62,32 +62,32 @@ export default function Dashboard() {
       <div className="stat-grid">
         <StatCard 
           title="CPU Usage" 
-          value={`${metrics.cpu}%`} 
-          percent={metrics.cpu}
-          sub={`Load Avg: ${metrics.load[0].toFixed(2)}`}
+          value={`${cpu}%`} 
+          percent={cpu}
+          sub={`Load Avg: ${load[0]?.toFixed(2) || '0.00'}`}
           icon={Cpu} 
           color="blue"
         />
         <StatCard 
           title="Memory (RAM)" 
-          value={`${metrics.ram.percent}%`} 
-          percent={metrics.ram.percent}
+          value={`${ram.percent}%`} 
+          percent={ram.percent}
           details={[
-            `Used: ${formatBytes(metrics.ram.used)}`,
-            `Free: ${formatBytes(metrics.ram.free)}`,
-            `Total: ${formatBytes(metrics.ram.total)}`
+            `Used: ${formatBytes(ram.used)}`,
+            `Free: ${formatBytes(ram.free)}`,
+            `Total: ${formatBytes(ram.total)}`
           ]}
           icon={Activity} 
           color="purple" 
         />
         <StatCard 
           title="Disk Storage" 
-          value={`${metrics.disk.percent}%`} 
-          percent={metrics.disk.percent}
+          value={`${disk.percent}%`} 
+          percent={disk.percent}
           details={[
-            `Used: ${formatBytes(metrics.disk.used)}`,
-            `Free: ${formatBytes(metrics.disk.free)}`,
-            `Total: ${formatBytes(metrics.disk.total)}`
+            `Used: ${formatBytes(disk.used)}`,
+            `Free: ${formatBytes(disk.free)}`,
+            `Total: ${formatBytes(disk.total)}`
           ]}
           icon={HardDrive} 
           color="cyan" 
@@ -95,40 +95,38 @@ export default function Dashboard() {
         <StatCard 
           title="Network Traffic" 
           value="Live" 
-          sub={`↑ ${formatBytes(metrics.net.sent)} / ↓ ${formatBytes(metrics.net.recv)}`}
+          sub={`↑ ${formatBytes(net.sent)} / ↓ ${formatBytes(net.recv)}`}
           icon={Zap} 
           color="amber" 
         />
       </div>
 
       <div className="grid-2" style={{ marginTop: 'var(--space-lg)' }}>
-        {/* Docker Overview */}
         <div className="card">
           <div className="card-header">
             <div className="card-title"><Container size={16} /> Docker Overview</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xl)', padding: 'var(--space-md) 0' }}>
             <div style={{ flex: 1, textAlign: 'center', borderRight: '1px solid var(--border-color)' }}>
-              <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--accent-green)' }}>{metrics.docker.running}</div>
+              <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--accent-green)' }}>{dockerData.running}</div>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Running</div>
             </div>
             <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text-primary)' }}>{metrics.docker.total}</div>
+              <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text-primary)' }}>{dockerData.total}</div>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Total Containers</div>
             </div>
           </div>
           <div className="progress-bar">
-            <div className="progress-fill green" style={{ width: `${(metrics.docker.running / metrics.docker.total * 100) || 0}%` }}></div>
+            <div className="progress-fill green" style={{ width: `${(dockerData.running / (dockerData.total || 1) * 100)}%` }}></div>
           </div>
         </div>
 
-        {/* Essential Services Status */}
         <div className="card">
           <div className="card-header">
             <div className="card-title"><Server size={16} /> Essential Services</div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {metrics.services.map((s) => (
+            {services.map((s) => (
               <div key={s.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{s.name}</span>
                 <span className={`badge ${s.status === 'active' ? 'badge-success' : 'badge-danger'}`} style={{ textTransform: 'capitalize' }}>
@@ -136,7 +134,7 @@ export default function Dashboard() {
                 </span>
               </div>
             ))}
-            {metrics.services.length === 0 && <div className="empty-state">No services monitored</div>}
+            {services.length === 0 && <div className="empty-state">No services monitored</div>}
           </div>
         </div>
       </div>
