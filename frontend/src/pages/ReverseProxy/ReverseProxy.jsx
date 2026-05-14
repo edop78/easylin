@@ -51,7 +51,7 @@ export default function ReverseProxy() {
     e.preventDefault();
     setLoadingAction(true);
     try {
-      const res = await api.post('/sites', newSite);
+      const res = await api.post('/proxy/sites', newSite);
       if (res.success) {
         let msg = `Proxy for ${newSite.domain} created.`;
         if (newSite.use_ssl) {
@@ -219,7 +219,7 @@ export default function ReverseProxy() {
               </tr>
             </thead>
             <tbody>
-              {sitesData.enabled.filter(s => s && s !== 'default').map((site) => (
+              {sitesData?.enabled?.filter(s => s && s !== 'default').map((site) => (
                 <tr key={site} className="hover-row">
                   <td style={{ padding: '14px 24px', fontWeight: 600 }}>{site}</td>
                   <td style={{ padding: '14px 24px' }}>
