@@ -3,6 +3,7 @@
 import docker
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
+import os
 
 docker_bp = Blueprint("docker", __name__)
 
@@ -105,6 +106,121 @@ def container_logs(container_id):
         return jsonify({"error": str(e)}), 500
 
 
+@docker_bp.route("/containers/run", methods=["POST"])
+@jwt_required()
+def run_container():
+    """Run a custom container manually or from GitHub."""
+    client = get_client()
+    if not client:
+        return jsonify({"error": "Cannot connect to Docker daemon"}), 503
+
+    data = request.get_json()
+    install_type = data.get("type", "image") # "image" or "github"
+    image_or_repo = data.get("image") # can be image name or git URL
+    name = data.get("name")
+    ports_raw = data.get("ports", "")
+    
+    if not image_or_repo:
+        return jsonify({"error": "Image name or Repository URL is required"}), 400
+
+    # Parse ports
+    ports_dict = {}
+    if ports_raw:
+        try:
+            for p in ports_raw.split(","):
+                host_port, container_port = p.strip().split(":")
+                ports_dict[f"{container_port}/tcp"] = int(host_port)
+        except Exception:
+            return jsonify({"error": "Invalid ports format. Use host:container"}), 400
+
+    try:
+        final_image = image_or_repo
+
+        # Build if GitHub
+        if install_type == "github":
+            tag = name if name else "custom-app-build"
+            # Docker build from URL (supports git urls)
+            # path is the git repo URL
+            client.images.build(path=image_or_repo, tag=tag, rm=True)
+            final_image = tag
+
+        elif install_type == "image":
+            # Pull image
+            client.images.pull(image_or_repo)
+
+        # Run container
+        container = client.containers.run(
+            final_image,
+            name=name if name else None,
+            ports=ports_dict,
+            detach=True,
+            restart_policy={"Name": "unless-stopped"}
+        )
+        return jsonify({
+            "success": True, 
+            "container_id": container.short_id,
+            "message": f"Container {container.name} started successfully"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@docker_bp.route("/market/install", methods=["POST"])
+@jwt_required()
+def market_install():
+    """Install a predefined app from the marketplace."""
+    client = get_client()
+    if not client:
+        return jsonify({"error": "Cannot connect to Docker daemon"}), 503
+
+    data = request.get_json()
+    app_id = data.get("app_id")
+
+    # App definitions
+    apps = {
+        "nginx-proxy-manager": {
+            "name": "nginx-proxy-manager",
+            "image": "jc21/nginx-proxy-manager:latest",
+            "ports": {"80/tcp": 80, "81/tcp": 81, "443/tcp": 443},
+            "volumes": {
+                "npm_data": {"bind": "/data", "mode": "rw"},
+                "npm_letsencrypt": {"bind": "/etc/letsencrypt", "mode": "rw"}
+            },
+            "restart_policy": {"Name": "unless-stopped"}
+        }
+    }
+
+    app_config = apps.get(app_id)
+    if not app_config:
+        return jsonify({"error": "Unknown app"}), 400
+
+    try:
+        # Check if already exists
+        try:
+            client.containers.get(app_config["name"])
+            return jsonify({"error": f"Container {app_config['name']} already exists"}), 409
+        except Exception:
+            pass
+
+        # Pull and create
+        client.images.pull(app_config["image"])
+        container = client.containers.run(
+            app_config["image"],
+            name=app_config["name"],
+            ports=app_config["ports"],
+            volumes=app_config["volumes"],
+            restart_policy=app_config["restart_policy"],
+            detach=True
+        )
+        return jsonify({
+            "success": True, 
+            "container_id": container.short_id,
+            "message": f"{app_config['name']} installed and started"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @docker_bp.route("/images", methods=["GET"])
 @jwt_required()
 def list_images():
@@ -185,106 +301,5 @@ def list_networks():
                 "scope": n.attrs.get("Scope", ""),
             })
         return jsonify({"networks": result})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@docker_bp.route("/containers/run", methods=["POST"])
-@jwt_required()
-def run_container():
-    """Run a custom container manually."""
-    client = get_client()
-    if not client:
-        return jsonify({"error": "Cannot connect to Docker daemon"}), 503
-
-    data = request.get_json()
-    image = data.get("image")
-    name = data.get("name")
-    ports_raw = data.get("ports", "") # format: "80:80, 443:443"
-    
-    if not image:
-        return jsonify({"error": "Image name is required"}), 400
-
-    # Parse ports
-    ports_dict = {}
-    if ports_raw:
-        try:
-            for p in ports_raw.split(","):
-                host_port, container_port = p.strip().split(":")
-                ports_dict[f"{container_port}/tcp"] = int(host_port)
-        except Exception:
-            return jsonify({"error": "Invalid ports format. Use host:container,host:container"}), 400
-
-    try:
-        # Pull and run
-        client.images.pull(image)
-        container = client.containers.run(
-            image,
-            name=name if name else None,
-            ports=ports_dict,
-            detach=True,
-            restart_policy={"Name": "unless-stopped"}
-        )
-        return jsonify({
-            "success": True, 
-            "container_id": container.short_id,
-            "message": f"Container {container.name} started successfully"
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@docker_bp.route("/market/install", methods=["POST"])
-@jwt_required()
-def market_install():
-    """Install a predefined app from the marketplace."""
-    client = get_client()
-    if not client:
-        return jsonify({"error": "Cannot connect to Docker daemon"}), 503
-
-    data = request.get_json()
-    app_id = data.get("app_id")
-
-    # App definitions
-    apps = {
-        "nginx-proxy-manager": {
-            "name": "nginx-proxy-manager",
-            "image": "jc21/nginx-proxy-manager:latest",
-            "ports": {"80/tcp": 80, "81/tcp": 81, "443/tcp": 443},
-            "volumes": {
-                "npm_data": {"bind": "/data", "mode": "rw"},
-                "npm_letsencrypt": {"bind": "/etc/letsencrypt", "mode": "rw"}
-            },
-            "restart_policy": {"Name": "unless-stopped"}
-        }
-    }
-
-    app_config = apps.get(app_id)
-    if not app_config:
-        return jsonify({"error": "Unknown app"}), 400
-
-    try:
-        # Check if already exists
-        try:
-            client.containers.get(app_config["name"])
-            return jsonify({"error": f"Container {app_config['name']} already exists"}), 409
-        except Exception:
-            pass
-
-        # Pull and create
-        client.images.pull(app_config["image"])
-        container = client.containers.run(
-            app_config["image"],
-            name=app_config["name"],
-            ports=app_config["ports"],
-            volumes=app_config["volumes"],
-            restart_policy=app_config["restart_policy"],
-            detach=True
-        )
-        return jsonify({
-            "success": True, 
-            "container_id": container.short_id,
-            "message": f"{app_config['name']} installed and started"
-        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500

@@ -4,7 +4,7 @@ import api from '../../api/client';
 import { 
   Container, Play, Square, RotateCw, Trash2, RefreshCw, 
   Image, HardDrive, Network, ScrollText, Cog, ShoppingCart, 
-  Download, ExternalLink, Globe, Trash, CheckCircle, AlertCircle, Copy, Plus
+  Download, ExternalLink, Globe, Trash, CheckCircle, AlertCircle, Copy, Plus, Github
 } from 'lucide-react';
 import ConfirmModal from '../../components/Common/ConfirmModal';
 
@@ -45,7 +45,7 @@ export default function Docker() {
   const [confirm, setConfirm] = useState({ open: false, title: '', message: '', action: null });
   
   // Manual install form state
-  const [customApp, setCustomApp] = useState({ image: '', name: '', ports: '' });
+  const [customApp, setCustomApp] = useState({ type: 'image', image: '', name: '', ports: '' });
 
   useEffect(() => {
     if (msg) {
@@ -85,7 +85,7 @@ export default function Docker() {
     try {
       const res = await api.post('/docker/containers/run', customApp);
       setMsg({ type: 'success', text: res.message });
-      setCustomApp({ image: '', name: '', ports: '' });
+      setCustomApp({ type: 'image', image: '', name: '', ports: '' });
       refetchContainers();
       setTab('containers');
     } catch (err) {
@@ -283,21 +283,38 @@ export default function Docker() {
           </table>
         ) : tab === 'market' ? (
           <div style={{ padding: 'var(--space-md)' }}>
-            {/* Manual Install Card */}
+            {/* Custom Deploy Card */}
             <div className="card" style={{ 
               marginBottom: 'var(--space-xl)', 
-              border: '2px dashed var(--border-color)',
+              border: '1px solid var(--border-color)',
               backgroundColor: 'rgba(255,255,255,0.01)'
             }}>
-              <div className="card-header">
-                <div className="card-title" style={{ color: 'var(--accent-blue)' }}><Plus size={18} /> Deploy Custom Container</div>
+              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="card-title" style={{ color: 'var(--accent-blue)' }}><Plus size={18} /> Deploy Application</div>
+                <div style={{ display: 'flex', backgroundColor: 'var(--bg-secondary)', padding: '4px', borderRadius: '8px', gap: '4px' }}>
+                  <button 
+                    className={`btn btn-sm ${customApp.type === 'image' ? 'btn-primary' : 'btn-ghost'}`} 
+                    onClick={() => setCustomApp({...customApp, type: 'image'})}
+                    style={{ fontSize: '11px', padding: '4px 12px' }}
+                  >
+                    <Globe size={12} /> Docker Hub
+                  </button>
+                  <button 
+                    className={`btn btn-sm ${customApp.type === 'github' ? 'btn-primary' : 'btn-ghost'}`} 
+                    onClick={() => setCustomApp({...customApp, type: 'github'})}
+                    style={{ fontSize: '11px', padding: '4px 12px' }}
+                  >
+                    <Github size={12} /> GitHub Repo
+                  </button>
+                </div>
               </div>
+
               <form onSubmit={handleManualInstall} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-md)', alignItems: 'end' }}>
                 <div className="form-group">
-                  <label>Image Name *</label>
+                  <label>{customApp.type === 'github' ? 'GitHub Repo URL *' : 'Image Name *'}</label>
                   <input 
                     className="input" 
-                    placeholder="e.g. nginx:latest" 
+                    placeholder={customApp.type === 'github' ? 'https://github.com/user/repo' : 'e.g. nginx:latest'} 
                     value={customApp.image} 
                     onChange={e => setCustomApp({...customApp, image: e.target.value})}
                     required 
@@ -307,7 +324,7 @@ export default function Docker() {
                   <label>Container Name</label>
                   <input 
                     className="input" 
-                    placeholder="e.g. my-web-server" 
+                    placeholder="e.g. my-app" 
                     value={customApp.name} 
                     onChange={e => setCustomApp({...customApp, name: e.target.value})}
                   />
@@ -316,14 +333,14 @@ export default function Docker() {
                   <label>Ports (host:container)</label>
                   <input 
                     className="input" 
-                    placeholder="e.g. 8080:80, 443:443" 
+                    placeholder="e.g. 8080:80" 
                     value={customApp.ports} 
                     onChange={e => setCustomApp({...customApp, ports: e.target.value})}
                   />
                 </div>
                 <button className="btn btn-primary" type="submit" disabled={installing === 'custom'} style={{ height: '42px' }}>
-                  {installing === 'custom' ? <RefreshCw size={16} className="spin" /> : <Download size={16} />}
-                  Deploy Now
+                  {installing === 'custom' ? <RotateCw size={16} className="spin" /> : <Download size={16} />}
+                  {customApp.type === 'github' ? 'Build & Deploy' : 'Deploy Now'}
                 </button>
               </form>
             </div>
