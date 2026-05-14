@@ -7,34 +7,26 @@ from utils.command import run_host_command
 packages_bp = Blueprint("packages", __name__)
 
 
-@packages_bp.route("/installed", methods=["GET"])
+@packages_bp.route("/")
 @jwt_required()
-def list_installed():
-    """List installed packages."""
-    search = request.args.get("search", "")
-    if search:
-        result = run_host_command(
-            f"dpkg -l | grep -i '{search}' | awk '{{print $2, $3, $4}}'",
-            timeout=15,
-        )
-    else:
-        result = run_host_command(
-            "dpkg -l | tail -n +6 | awk '{print $2, $3, $4}' | head -200",
-            timeout=15,
-        )
-
+def list_packages():
+    """List installed packages using a direct query."""
+    # Use a direct command without pipes to avoid potential shell issues
+    res = run_host_command("dpkg-query -W -f='${Package}|${Version}\n'")
+    
     packages = []
-    if result["stdout"]:
-        for line in result["stdout"].split("\n"):
-            parts = line.strip().split(None, 2)
-            if len(parts) >= 2:
-                packages.append({
-                    "name": parts[0],
-                    "version": parts[1],
-                    "description": parts[2] if len(parts) > 2 else "",
-                })
+    if res["returncode"] == 0 and res["stdout"]:
+        for line in res["stdout"].splitlines():
+            if "|" in line:
+                parts = line.split("|")
+                if len(parts) == 2:
+                    packages.append({"name": parts[0], "version": parts[1]})
+    
+    # Error fallback
+    if not packages and res["returncode"] != 0:
+        return jsonify({"packages": [], "error": res["stderr"] or "Command failed"}), 500
 
-    return jsonify({"packages": packages, "count": len(packages)})
+    return jsonify({"packages": packages})
 
 
 @packages_bp.route("/search", methods=["GET"])
