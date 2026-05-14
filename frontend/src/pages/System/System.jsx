@@ -33,6 +33,19 @@ export default function System() {
     );
   }
 
+  const systemFields = [
+    { label: 'Hostname', value: data?.hostname, icon: Monitor },
+    { label: 'Local IP', value: data?.local_ip, icon: Globe },
+    { label: 'Public IP', value: data?.public_ip, icon: Globe },
+    { label: 'OS', value: data?.os, icon: Server },
+    { label: 'Virtualization', value: data?.virtualization, icon: Shield },
+    { label: 'Kernel', value: data?.kernel, icon: Settings },
+    { label: 'Architecture', value: data?.arch, icon: HardDrive },
+    { label: 'CPU Cores', value: data?.cpu_count, icon: Cpu },
+    { label: 'Uptime', value: data?.uptime, icon: Clock },
+    { label: 'Last Boot', value: data?.boot_time, icon: Activity },
+  ];
+
   return (
     <div className="page fade-in">
       <div className="page-header">
@@ -49,73 +62,48 @@ export default function System() {
         </div>
       )}
 
-      <div className="grid-2" style={{ alignItems: 'start' }}>
-        {/* Power Controls */}
-        <div className="card">
-          <div className="card-header"><div className="card-title"><Power size={16} /> Power Actions</div></div>
-          <div style={{ display: 'flex', gap: 'var(--space-md)' }}>
-            <button className="btn btn-danger" onClick={() => setConfirm({ 
-              open: true, title: 'Reboot System', message: 'Are you sure you want to reboot the server?', 
-              action: () => handleAction('reboot') 
-            })}>
-              <RotateCw size={15} /> Reboot
-            </button>
-            <button className="btn btn-ghost" style={{ color: 'var(--accent-red)' }} onClick={() => setConfirm({ 
-              open: true, title: 'Shutdown System', message: 'Are you sure you want to power off the server?', 
-              action: () => handleAction('shutdown') 
-            })}>
-              <Power size={15} /> Shutdown
-            </button>
-          </div>
+      {/* Full-width horizontal System Details */}
+      <div className="card" style={{ marginBottom: 'var(--space-lg)' }}>
+        <div className="card-header">
+          <div className="card-title"><Server size={16} /> System Information</div>
         </div>
+        {loading && !data ? <div className="spinner" /> : (
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', 
+            gap: 'var(--space-lg)',
+            padding: 'var(--space-sm) 0'
+          }}>
+            {systemFields.map((field, idx) => (
+              <div key={idx} className="stat-info" style={{ borderBottom: 'none' }}>
+                <div className="stat-label" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <field.icon size={14} /> {field.label}
+                </div>
+                <div className="stat-value" style={{ fontSize: '14px', wordBreak: 'break-all' }}>
+                  {field.value || 'N/A'}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
-        {/* Unified System Details */}
-        <div className="card">
-          <div className="card-header"><div className="card-title"><Server size={16} /> System Details</div></div>
-          {loading && !data ? <div className="spinner" /> : (
-            <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-md)' }}>
-              <div className="stat-info">
-                <div className="stat-label"><Monitor size={14} /> Hostname</div>
-                <div className="stat-value">{data?.hostname || 'N/A'}</div>
-              </div>
-              <div className="stat-info">
-                <div className="stat-label"><Globe size={14} /> Local IP</div>
-                <div className="stat-value">{data?.local_ip || 'N/A'}</div>
-              </div>
-              <div className="stat-info">
-                <div className="stat-label"><Globe size={14} /> Public IP</div>
-                <div className="stat-value">{data?.public_ip || 'N/A'}</div>
-              </div>
-              <div className="stat-info">
-                <div className="stat-label"><Server size={14} /> Operating System</div>
-                <div className="stat-value">{data?.os || 'N/A'}</div>
-              </div>
-              <div className="stat-info">
-                <div className="stat-label"><Shield size={14} /> Virtualization</div>
-                <div className="stat-value" style={{ textTransform: 'capitalize' }}>{data?.virtualization || 'N/A'}</div>
-              </div>
-              <div className="stat-info">
-                <div className="stat-label"><Settings size={14} /> Kernel</div>
-                <div className="stat-value">{data?.kernel || 'N/A'}</div>
-              </div>
-              <div className="stat-info">
-                <div className="stat-label"><HardDrive size={14} /> Architecture</div>
-                <div className="stat-value">{data?.arch || 'N/A'}</div>
-              </div>
-              <div className="stat-info">
-                <div className="stat-label"><Cpu size={14} /> CPU Cores</div>
-                <div className="stat-value">{data?.cpu_count || 'N/A'}</div>
-              </div>
-              <div className="stat-info">
-                <div className="stat-label"><Clock size={14} /> Uptime</div>
-                <div className="stat-value">{data?.uptime || 'N/A'}</div>
-              </div>
-              <div className="stat-info">
-                <div className="stat-label"><Activity size={14} /> Last Boot</div>
-                <div className="stat-value" style={{ fontSize: '11px' }}>{data?.boot_time || 'N/A'}</div>
-              </div>
-            </div>
-          )}
+      {/* Compact Power Actions below */}
+      <div className="card" style={{ maxWidth: '400px' }}>
+        <div className="card-header"><div className="card-title"><Power size={16} /> Power Controls</div></div>
+        <div style={{ display: 'flex', gap: 'var(--space-md)' }}>
+          <button className="btn btn-danger" onClick={() => setConfirm({ 
+            open: true, title: 'Reboot System', message: 'Are you sure you want to reboot the server?', 
+            action: () => handleAction('reboot') 
+          })}>
+            <RotateCw size={15} /> Reboot System
+          </button>
+          <button className="btn btn-ghost" style={{ color: 'var(--accent-red)' }} onClick={() => setConfirm({ 
+            open: true, title: 'Shutdown System', message: 'Are you sure you want to power off the server?', 
+            action: () => handleAction('shutdown') 
+          })}>
+            <Power size={15} /> Shutdown
+          </button>
         </div>
       </div>
 
