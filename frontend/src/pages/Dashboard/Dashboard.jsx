@@ -68,7 +68,6 @@ export default function Dashboard() {
   const ram = data?.ram || { percent: 0, used: 0, free: 0, total: 0 };
   const disk = data?.disk || { percent: 0, used: 0, free: 0, total: 0 };
   const dockerData = data?.docker || { running: 0, total: 0 };
-  const net = data?.net || { sent: 0, recv: 0 };
   const load = data?.load || [0, 0, 0];
   const updates = data?.updates || { total: 0 };
 
@@ -81,29 +80,38 @@ export default function Dashboard() {
         </button>
       </div>
 
-      <div className="stat-grid">
+      <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
         <StatCard title="CPU Usage" value={`${cpu}%`} percent={cpu} sub={`Load Avg: ${Number(load[0] || 0).toFixed(2)}`} icon={Cpu} color="blue" />
         <StatCard title="Memory (RAM)" value={`${ram.percent}%`} percent={ram.percent} details={[`U: ${formatBytes(ram.used)}`, `F: ${formatBytes(ram.free)}`, `T: ${formatBytes(ram.total)}`]} icon={Activity} color="purple" />
         <StatCard title="Disk Storage" value={`${disk.percent}%`} percent={disk.percent} details={[`U: ${formatBytes(disk.used)}`, `F: ${formatBytes(disk.free)}`, `T: ${formatBytes(disk.total)}`]} icon={HardDrive} color="cyan" />
-        <StatCard title="Network Traffic" value="Live" sub={`↑ ${formatBytes(net.sent)} / ↓ ${formatBytes(net.recv)}`} icon={Zap} color="amber" />
       </div>
 
       <div className="grid-2" style={{ marginTop: 'var(--space-lg)', alignItems: 'stretch' }}>
-        <div className="card">
-          <div className="card-header"><div className="card-title"><Container size={16} /> Docker Overview</div></div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xl)', padding: 'var(--space-md) 0' }}>
-            <div style={{ flex: 1, textAlign: 'center', borderRight: '1px solid var(--border-color)' }}>
-              <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--accent-green)' }}>{dockerData.running || 0}</div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Running</div>
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div>
+            <div className="card-header"><div className="card-title"><Container size={16} /> Docker Overview</div></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xl)', padding: 'var(--space-md) 0' }}>
+              <div style={{ flex: 1, textAlign: 'center', borderRight: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--accent-green)' }}>{dockerData.running || 0}</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Running</div>
+              </div>
+              <div style={{ flex: 1, textAlign: 'center' }}>
+                <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text-primary)' }}>{dockerData.total || 0}</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Total Containers</div>
+              </div>
             </div>
-            <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text-primary)' }}>{dockerData.total || 0}</div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Total Containers</div>
+            <div className="progress-bar">
+              <div className="progress-fill green" style={{ width: `${(dockerData.running / (dockerData.total || 1) * 100) || 0}%` }}></div>
             </div>
           </div>
-          <div className="progress-bar">
-            <div className="progress-fill green" style={{ width: `${(dockerData.running / (dockerData.total || 1) * 100) || 0}%` }}></div>
-          </div>
+          
+          <button 
+            className="btn btn-ghost" 
+            style={{ width: '100%', marginTop: 'var(--space-lg)' }}
+            onClick={() => navigate('/docker')}
+          >
+            Manage Docker <ArrowRight size={14} />
+          </button>
         </div>
 
         <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -117,7 +125,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{updates.total} Updates</div>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Security and system patches available.</div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Security and patches available.</div>
                 </div>
               </>
             ) : (
@@ -127,7 +135,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>Up to Date</div>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Your system is running the latest versions.</div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Your system is fully updated.</div>
                 </div>
               </>
             )}
