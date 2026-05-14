@@ -186,4 +186,57 @@ def list_networks():
             })
         return jsonify({"networks": result})
     except Exception as e:
+@docker_bp.route("/market/install", methods=["POST"])
+@jwt_required()
+def market_install():
+    """Install a predefined app from the marketplace."""
+    client = get_client()
+    if not client:
+        return jsonify({"error": "Cannot connect to Docker daemon"}), 503
+
+    data = request.get_json()
+    app_id = data.get("app_id")
+
+    # App definitions
+    apps = {
+        "nginx-proxy-manager": {
+            "name": "nginx-proxy-manager",
+            "image": "jc21/nginx-proxy-manager:latest",
+            "ports": {"80/tcp": 80, "81/tcp": 81, "443/tcp": 443},
+            "volumes": {
+                "npm_data": {"bind": "/data", "mode": "rw"},
+                "npm_letsencrypt": {"bind": "/etc/letsencrypt", "mode": "rw"}
+            },
+            "restart_policy": {"Name": "unless-stopped"}
+        }
+    }
+
+    app_config = apps.get(app_id)
+    if not app_config:
+        return jsonify({"error": "Unknown app"}), 400
+
+    try:
+        # Check if already exists
+        try:
+            client.containers.get(app_config["name"])
+            return jsonify({"error": f"Container {app_config['name']} already exists"}), 409
+        except docker.errors.NotFound:
+            pass
+
+        # Pull and create
+        client.images.pull(app_config["image"])
+        container = client.containers.run(
+            app_config["image"],
+            name=app_config["name"],
+            ports=app_config["ports"],
+            volumes=app_config["volumes"],
+            restart_policy=app_config["restart_policy"],
+            detach=True
+        )
+        return jsonify({
+            "success": True, 
+            "container_id": container.short_id,
+            "message": f"{app_config['name']} installed and started"
+        })
+    except Exception as e:
         return jsonify({"error": str(e)}), 500

@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import { useApi } from '../../hooks/useApi';
 import api from '../../api/client';
-import { Container, Play, Square, RotateCw, Trash2, RefreshCw, Image, HardDrive, Network, ScrollText, Cog } from 'lucide-react';
+import { 
+  Container, Play, Square, RotateCw, Trash2, RefreshCw, 
+  Image, HardDrive, Network, ScrollText, Cog, ShoppingCart, 
+  Download, ExternalLink, ShieldCheck, Globe
+} from 'lucide-react';
 import ConfirmModal from '../../components/Common/ConfirmModal';
 
 function formatSize(bytes) {
@@ -12,15 +16,29 @@ function formatSize(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
+const MARKET_APPS = [
+  {
+    id: 'nginx-proxy-manager',
+    name: 'Nginx Proxy Manager',
+    desc: 'Expose your services easily and securely with SSL.',
+    icon: Globe,
+    image: 'jc21/nginx-proxy-manager:latest',
+    tags: ['Proxy', 'SSL', 'Security'],
+    url: 'https://nginxproxymanager.com/'
+  }
+];
+
 export default function Docker() {
   const { data: info } = useApi('/docker/info');
   const { data: containersData, loading, refetch } = useApi('/docker/containers');
   const { data: imagesData, refetch: refetchImages } = useApi('/docker/images');
   const { data: volumesData } = useApi('/docker/volumes');
   const { data: networksData } = useApi('/docker/networks');
+  
   const [tab, setTab] = useState('containers');
   const [logsModal, setLogsModal] = useState(null);
   const [actionLoading, setActionLoading] = useState('');
+  const [installing, setInstalling] = useState(null);
   const [confirm, setConfirm] = useState({ open: false, title: '', message: '', action: null });
 
   const containerAction = async (id, action) => {
@@ -32,6 +50,20 @@ export default function Docker() {
       alert(err.message);
     } finally {
       setActionLoading('');
+    }
+  };
+
+  const installApp = async (appId) => {
+    setInstalling(appId);
+    try {
+      const res = await api.post('/docker/market/install', { app_id: appId });
+      alert(res.message);
+      setTab('containers');
+      refetch();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setInstalling(null);
     }
   };
 
@@ -68,7 +100,9 @@ export default function Docker() {
     <div className="page fade-in">
       <div className="page-header">
         <div className="page-title"><Container size={28} /><h1>Docker</h1></div>
-        <button className="btn btn-ghost" onClick={() => { refetch(); refetchImages(); }}><RefreshCw size={15} /> Refresh</button>
+        <button className="btn btn-ghost" onClick={() => { refetch(); refetchImages(); }}>
+          <RefreshCw size={15} /> Refresh
+        </button>
       </div>
 
       {info && (
@@ -121,11 +155,14 @@ export default function Docker() {
         <button className={`tab ${tab === 'images' ? 'active' : ''}`} onClick={() => setTab('images')}>
           Images ({imagesData?.images?.length || 0})
         </button>
+        <button className={`tab ${tab === 'market' ? 'active' : ''}`} onClick={() => setTab('market')}>
+          <ShoppingCart size={14} style={{ marginRight: '6px' }} /> App Store
+        </button>
         <button className={`tab ${tab === 'volumes' ? 'active' : ''}`} onClick={() => setTab('volumes')}>
-          Volumes ({volumesData?.volumes?.length || 0})
+          Volumes
         </button>
         <button className={`tab ${tab === 'networks' ? 'active' : ''}`} onClick={() => setTab('networks')}>
-          Networks ({networksData?.networks?.length || 0})
+          Networks
         </button>
       </div>
 
@@ -179,6 +216,49 @@ export default function Docker() {
               ))}
             </tbody>
           </table>
+        ) : tab === 'market' ? (
+          <div className="grid-3" style={{ padding: 'var(--space-md)' }}>
+            {MARKET_APPS.map(app => (
+              <div key={app.id} className="app-card" style={{ 
+                border: '1px solid var(--border-color)', 
+                borderRadius: '12px', 
+                padding: 'var(--space-lg)',
+                backgroundColor: 'rgba(255,255,255,0.02)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 'var(--space-md)' }}>
+                  <div style={{ backgroundColor: 'var(--accent-blue)', padding: '10px', borderRadius: '10px', color: 'white' }}>
+                    <app.icon size={24} />
+                  </div>
+                  <a href={app.url} target="_blank" rel="noreferrer" style={{ color: 'var(--text-muted)' }}>
+                    <ExternalLink size={16} />
+                  </a>
+                </div>
+                <h3 style={{ marginBottom: '4px', fontSize: '1.1rem' }}>{app.name}</h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 'var(--space-md)', lineHeight: 1.4 }}>{app.desc}</p>
+                
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: 'var(--space-lg)' }}>
+                  {app.tags.map(tag => (
+                    <span key={tag} style={{ fontSize: '10px', backgroundColor: 'var(--border-color)', padding: '2px 8px', borderRadius: '10px' }}>{tag}</span>
+                  ))}
+                </div>
+
+                <button 
+                  className="btn btn-primary" 
+                  style={{ width: '100%' }}
+                  disabled={installing === app.id}
+                  onClick={() => setConfirm({
+                    open: true,
+                    title: `Install ${app.name}`,
+                    message: `This will pull ${app.image} and create a new container. Continue?`,
+                    action: () => installApp(app.id)
+                  })}
+                >
+                  {installing === app.id ? <RefreshCw size={16} className="spin" /> : <Download size={16} />}
+                  {installing === app.id ? 'Installing...' : 'Install App'}
+                </button>
+              </div>
+            ))}
+          </div>
         ) : tab === 'volumes' ? (
           <table className="data-table">
             <thead><tr><th>Name</th><th>Driver</th><th>Mountpoint</th></tr></thead>
