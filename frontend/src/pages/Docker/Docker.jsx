@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApi } from '../../hooks/useApi';
 import api from '../../api/client';
 import { 
   Container, Play, Square, RotateCw, Trash2, RefreshCw, 
   Image, HardDrive, Network, ScrollText, Cog, ShoppingCart, 
-  Download, ExternalLink, ShieldCheck, Globe, Trash
+  Download, ExternalLink, Globe, Trash, CheckCircle, AlertCircle
 } from 'lucide-react';
 import ConfirmModal from '../../components/Common/ConfirmModal';
 
@@ -32,24 +32,41 @@ const MARKET_APPS = [
 
 export default function Docker() {
   const { data: info } = useApi('/docker/info');
-  const { data: containersData, loading, refetch } = useApi('/docker/containers');
+  const { data: containersData, loading, refetch: refetchContainers } = useApi('/docker/containers');
   const { data: imagesData, refetch: refetchImages } = useApi('/docker/images');
-  const { data: volumesData } = useApi('/docker/volumes');
-  const { data: networksData } = useApi('/docker/networks');
+  const { data: volumesData, refetch: refetchVolumes } = useApi('/docker/volumes');
+  const { data: networksData, refetch: refetchNetworks } = useApi('/docker/networks');
   
   const [tab, setTab] = useState('containers');
   const [logsModal, setLogsModal] = useState(null);
   const [actionLoading, setActionLoading] = useState('');
   const [installing, setInstalling] = useState(null);
+  const [msg, setMsg] = useState(null);
   const [confirm, setConfirm] = useState({ open: false, title: '', message: '', action: null });
+
+  // Auto-hide messages after 5 seconds
+  useEffect(() => {
+    if (msg) {
+      const timer = setTimeout(() => setMsg(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [msg]);
+
+  const refetchAll = () => {
+    refetchContainers();
+    refetchImages();
+    refetchVolumes();
+    refetchNetworks();
+  };
 
   const containerAction = async (id, action) => {
     setActionLoading(`${id}-${action}`);
     try {
       await api.post(`/docker/containers/${id}/${action}`);
-      refetch();
+      setMsg({ type: 'success', text: `Container ${action}ed successfully` });
+      refetchContainers();
     } catch (err) {
-      alert(err.message);
+      setMsg({ type: 'error', text: err.message });
     } finally {
       setActionLoading('');
     }
@@ -59,10 +76,11 @@ export default function Docker() {
     setInstalling(appId);
     try {
       const res = await api.post('/docker/market/install', { app_id: appId });
-      alert(res.message);
-      refetch();
+      setMsg({ type: 'success', text: res.message });
+      refetchContainers();
+      setTab('containers');
     } catch (err) {
-      alert(err.message);
+      setMsg({ type: 'error', text: err.message });
     } finally {
       setInstalling(null);
     }
@@ -73,16 +91,17 @@ export default function Docker() {
       const result = await api.get(`/docker/containers/${id}/logs?tail=100`);
       setLogsModal({ name, logs: result.logs });
     } catch (err) {
-      alert(err.message);
+      setMsg({ type: 'error', text: err.message });
     }
   };
 
   const removeImage = async (id) => {
     try {
       await api.del(`/docker/images/${id}`);
+      setMsg({ type: 'success', text: 'Image removed successfully' });
       refetchImages();
     } catch (err) {
-      alert(err.message);
+      setMsg({ type: 'error', text: err.message });
     }
   };
 
@@ -109,10 +128,17 @@ export default function Docker() {
     <div className="page fade-in">
       <div className="page-header">
         <div className="page-title"><Container size={28} /><h1>Docker</h1></div>
-        <button className="btn btn-ghost" onClick={() => { refetch(); refetchImages(); }}>
+        <button className="btn btn-ghost" onClick={refetchAll}>
           <RefreshCw size={15} /> Refresh
         </button>
       </div>
+
+      {msg && (
+        <div className={`alert alert-${msg.type}`} style={{ marginBottom: 'var(--space-lg)' }}>
+          {msg.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle size={16} />}
+          {msg.text}
+        </div>
+      )}
 
       {info && (
         <div className="stat-grid" style={{ marginBottom: 'var(--space-lg)' }}>
@@ -162,13 +188,13 @@ export default function Docker() {
           Containers ({containersData?.containers?.length || 0})
         </button>
         <button className={`tab ${tab === 'images' ? 'active' : ''}`} onClick={() => setTab('images')}>
-          Images
+          Images ({imagesData?.images?.length || 0})
         </button>
         <button className={`tab ${tab === 'volumes' ? 'active' : ''}`} onClick={() => setTab('volumes')}>
-          Volumes
+          Volumes ({volumesData?.volumes?.length || 0})
         </button>
         <button className={`tab ${tab === 'networks' ? 'active' : ''}`} onClick={() => setTab('networks')}>
-          Networks
+          Networks ({networksData?.networks?.length || 0})
         </button>
         <button className={`tab ${tab === 'market' ? 'active' : ''}`} onClick={() => setTab('market')}>
           <ShoppingCart size={14} style={{ marginRight: '6px' }} /> App Store
