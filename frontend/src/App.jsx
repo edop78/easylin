@@ -1,4 +1,4 @@
-import { MemoryRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import Layout from './components/Layout/Layout';
 import Login from './pages/Login/Login';
@@ -37,35 +37,33 @@ function ProtectedRoute({ children }) {
 
 export default function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route
-          path="/*"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Routes>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/system" element={<System />} />
-                  <Route path="/packages" element={<Packages />} />
-                  <Route path="/users" element={<Users />} />
-                  <Route path="/services" element={<Services />} />
-                  <Route path="/docker" element={<Docker />} />
-                  <Route path="/network" element={<Network />} />
-                  <Route path="/firewall" element={<Firewall />} />
-                  <Route path="/proxy" element={<ReverseProxy />} />
-                  <Route path="/files" element={<Files />} />
-                  <Route path="/terminal" element={<Terminal />} />
-                  <Route path="/logs" element={<Logs />} />
-                  <Route path="/system/maintenance" element={<UpdateClean />} />
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
-    </Router>
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route
+        path="/*"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/system" element={<System />} />
+                <Route path="/packages" element={<Packages />} />
+                <Route path="/users" element={<Users />} />
+                <Route path="/services" element={<Services />} />
+                <Route path="/docker" element={<Docker />} />
+                <Route path="/network" element={<Network />} />
+                <Route path="/firewall" element={<Firewall />} />
+                <Route path="/proxy" element={<ReverseProxy />} />
+                <Route path="/files" element={<Files />} />
+                <Route path="/terminal" element={<Terminal />} />
+                <Route path="/logs" element={<Logs />} />
+                <Route path="/system/maintenance" element={<UpdateClean />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+    </Routes>
   );
 }
