@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useApi } from '../../hooks/useApi';
 import api from '../../api/client';
 import { 
   Cog, RefreshCw, Play, Square, RotateCw, ScrollText, 
-  CheckCircle, AlertCircle, Search, Copy
+  CheckCircle, AlertCircle, Search, Copy, ChevronUp, ChevronDown
 } from 'lucide-react';
 
 export default function Services() {
@@ -12,6 +12,9 @@ export default function Services() {
   const [actionLoading, setActionLoading] = useState(null);
   const [logsModal, setLogsModal] = useState(null);
   const [msg, setMsg] = useState(null);
+  
+  // Sort state
+  const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
 
   useEffect(() => {
     if (msg) {
@@ -47,10 +50,41 @@ export default function Services() {
     setMsg({ type: 'success', text: 'Error message copied to clipboard!' });
   };
 
-  const filteredServices = (data?.services || []).filter(s => 
-    s.name.toLowerCase().includes(filter.toLowerCase()) || 
-    s.description.toLowerCase().includes(filter.toLowerCase())
-  );
+  const requestSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const sortedServices = useMemo(() => {
+    let items = [...(data?.services || [])];
+    
+    // Filter
+    if (filter) {
+      items = items.filter(s => 
+        s.name.toLowerCase().includes(filter.toLowerCase()) || 
+        s.description.toLowerCase().includes(filter.toLowerCase())
+      );
+    }
+
+    // Sort
+    items.sort((a, b) => {
+      const valA = a[sortConfig.key].toLowerCase();
+      const valB = b[sortConfig.key].toLowerCase();
+      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return items;
+  }, [data, filter, sortConfig]);
+
+  const SortIcon = ({ column }) => {
+    if (sortConfig.key !== column) return null;
+    return sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />;
+  };
 
   return (
     <div className="page fade-in">
@@ -102,14 +136,28 @@ export default function Services() {
           <table className="data-table" style={{ borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', width: '100%' }}>
             <thead>
               <tr style={{ backgroundColor: 'rgba(255,255,255,0.02)' }}>
-                <th style={{ padding: '16px 24px', width: '25%' }}>Service Name</th>
-                <th style={{ padding: '16px 24px', width: '15%' }}>Status</th>
+                <th 
+                  style={{ padding: '16px 24px', width: '25%', cursor: 'pointer', userSelect: 'none' }}
+                  onClick={() => requestSort('name')}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    Service Name <SortIcon column="name" />
+                  </div>
+                </th>
+                <th 
+                  style={{ padding: '16px 24px', width: '15%', cursor: 'pointer', userSelect: 'none' }}
+                  onClick={() => requestSort('active')}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    Status <SortIcon column="active" />
+                  </div>
+                </th>
                 <th style={{ padding: '16px 24px', width: '40%' }}>Description</th>
                 <th style={{ padding: '16px 24px', width: '20%', textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredServices.length > 0 ? filteredServices.map((s) => (
+              {sortedServices.length > 0 ? sortedServices.map((s) => (
                 <tr key={s.name} className="hover-row">
                   <td style={{ padding: '14px 24px', fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {s.name}
