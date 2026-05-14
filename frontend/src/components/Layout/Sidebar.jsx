@@ -1,26 +1,15 @@
-import { NavLink, useLocation } from 'react-router-dom';
-import {
-  LayoutDashboard,
-  Server,
-  Package,
-  Users,
-  Cog,
-  Container,
-  Network,
-  Shield,
-  Globe,
-  FolderOpen,
-  TerminalSquare,
-  ScrollText,
-  RefreshCw,
+import { Link, useLocation, NavLink } from 'react-router-dom';
+import { 
+  LayoutDashboard, Settings, Package, Users, Activity, Container, Network, Shield, Globe, FileText, Terminal, ScrollText, RefreshCw, 
+  Server, Cog, HardDrive, List, Wind
 } from 'lucide-react';
 
 const navSections = [
   {
-    title: 'Overview',
+    title: 'Main',
     links: [
       { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-    ],
+    ]
   },
   {
     title: 'System',
@@ -30,25 +19,25 @@ const navSections = [
       { to: '/packages', icon: Package, label: 'Packages' },
       { to: '/users', icon: Users, label: 'Users & Groups' },
       { to: '/services', icon: Cog, label: 'Services' },
-    ],
+    ]
   },
   {
-    title: 'Infrastructure',
+    title: 'Management',
     links: [
       { to: '/docker', icon: Container, label: 'Docker' },
       { to: '/network', icon: Network, label: 'Network' },
       { to: '/firewall', icon: Shield, label: 'Firewall' },
       { to: '/proxy', icon: Globe, label: 'Reverse Proxy' },
-    ],
+    ]
   },
   {
     title: 'Tools',
     links: [
-      { to: '/files', icon: FolderOpen, label: 'File Manager' },
-      { to: '/terminal', icon: TerminalSquare, label: 'Terminal' },
-      { to: '/logs', icon: ScrollText, label: 'Logs' },
-    ],
-  },
+      { to: '/files', icon: FileText, label: 'File Manager' },
+      { to: '/terminal', icon: Terminal, label: 'Terminal' },
+      { to: '/logs', icon: ScrollText, label: 'System Logs' },
+    ]
+  }
 ];
 
 export default function Sidebar() {
@@ -56,38 +45,45 @@ export default function Sidebar() {
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-logo">
-        <div className="sidebar-logo-icon">EL</div>
-        <div className="sidebar-logo-text">
-          Easy<span>Lin</span>
+      <div className="sidebar-brand">
+        <div className="brand-icon">
+          <Zap size={20} fill="currentColor" />
         </div>
+        <span className="brand-name">EasyLin</span>
       </div>
 
       <nav className="sidebar-nav">
         {navSections.map((section) => (
           <div key={section.title} className="sidebar-section">
             <div className="sidebar-section-title">{section.title}</div>
-            {section.links.map((link) => {
-              const isActive = link.to === '/'
-                ? location.pathname === '/'
-                : link.to === '/system'
-                  ? location.pathname === '/system'
-                  : location.pathname.startsWith(link.to);
-
-              return (
-                <NavLink
-                  key={link.to}
-                  to={link.to}
-                  className={`sidebar-link${isActive ? ' active' : ''}`}
-                >
-                  <link.icon />
-                  <span>{link.label}</span>
-                </NavLink>
-              );
-            })}
+            {section.links.map((link) => (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                // 'end' prevents /system from being active when on /system/maintenance
+                end={link.to === '/system' || link.to === '/'}
+                className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
+              >
+                <link.icon size={18} />
+                <span>{link.label}</span>
+              </NavLink>
+            ))}
           </div>
         ))}
       </nav>
+
+      <div className="sidebar-footer">
+        <div className="user-profile">
+          <div className="user-avatar">E</div>
+          <div className="user-info">
+            <div className="user-name">Administrator</div>
+            <div className="user-role">Sudo Access</div>
+          </div>
+        </div>
+      </div>
     </aside>
   );
 }
+
+// Missing import fix
+import { Zap } from 'lucide-react';
