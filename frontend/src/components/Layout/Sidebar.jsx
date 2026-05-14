@@ -67,19 +67,24 @@ export default function Sidebar() {
         {navSections.map((section) => (
           <div key={section.title} className="sidebar-section">
             <div className="sidebar-section-title">{section.title}</div>
-            {section.links.map((link) => (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                end={link.to === '/'}
-                className={({ isActive }) =>
-                  `sidebar-link${isActive ? ' active' : ''}`
-                }
-              >
-                <link.icon />
-                <span>{link.label}</span>
-              </NavLink>
-            ))}
+            {section.links.map((link) => {
+              const isActive = link.to === '/'
+                ? location.pathname === '/'
+                : link.to === '/system'
+                  ? location.pathname === '/system'
+                  : location.pathname.startsWith(link.to);
+
+              return (
+                <NavLink
+                  key={link.to}
+                  to={link.to}
+                  className={`sidebar-link${isActive ? ' active' : ''}`}
+                >
+                  <link.icon />
+                  <span>{link.label}</span>
+                </NavLink>
+              );
+            })}
           </div>
         ))}
       </nav>
