@@ -9,7 +9,7 @@ import sys
 
 system_bp = Blueprint("system", __name__)
 
-# Funzione di aiuto per importare run_host_command in modo sicuro
+# Helper to import run_host_command safely
 def get_run_command():
     try:
         from backend.utils.command import run_host_command
@@ -67,18 +67,15 @@ def system_info():
     except:
         uptime = "N/A"
 
-    # OS Info - Usiamo /etc/os-release che è standard su Linux
+    # OS Info
     os_name = "Linux"
     try:
         if os.path.exists("/etc/os-release"):
             with open("/etc/os-release") as f:
-                lines = f.readlines()
-                for line in lines:
+                for line in f:
                     if line.startswith("PRETTY_NAME="):
                         os_name = line.split("=")[1].strip().replace('"', '')
                         break
-        else:
-            os_name = platform.system()
     except:
         os_name = platform.system()
 
@@ -94,3 +91,29 @@ def system_info():
         "virtualization": virt,
         "boot_time": bt
     })
+
+@system_bp.route("/reboot", methods=["POST"])
+@jwt_required()
+def reboot():
+    res = run_host_command("reboot")
+    return jsonify(res)
+
+@system_bp.route("/shutdown", methods=["POST"])
+@jwt_required()
+def shutdown():
+    res = run_host_command("shutdown -h now")
+    return jsonify(res)
+
+@system_bp.route("/apt-clean", methods=["POST"])
+@jwt_required()
+def apt_clean():
+    # Runs apt clean and autoremove
+    res = run_host_command("apt-get clean && apt-get autoremove -y")
+    return jsonify(res)
+
+@system_bp.route("/docker-prune", methods=["POST"])
+@jwt_required()
+def docker_prune():
+    # Cleans unused docker resources
+    res = run_host_command("docker system prune -f")
+    return jsonify(res)
