@@ -6,16 +6,17 @@ import distro
 import psutil
 import datetime
 import os
+import sys
 
-# Import using a more robust way
+# Definizione Blueprint
+system_bp = Blueprint("system", __name__)
+
+# Import robusto per run_host_command
 try:
     from backend.utils.command import run_host_command
 except ImportError:
-    import sys
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
     from backend.utils.command import run_host_command
-
-system_bp = Blueprint("system", __name__)
 
 @system_bp.route("/maintenance", methods=["POST"])
 @jwt_required()
@@ -56,7 +57,7 @@ def run_maintenance():
 @jwt_required()
 def system_info():
     """Get comprehensive system info."""
-    # Get local IP
+    # Local IP
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
@@ -65,22 +66,31 @@ def system_info():
     except:
         local_ip = "N/A"
 
-    # Get Public IP (cached for speed)
-    public_ip = run_host_command("curl -s https://api.ipify.org")["stdout"].strip() or "N/A"
+    # Public IP
+    res_pub = run_host_command("curl -s https://api.ipify.org")
+    public_ip = res_pub["stdout"].strip() if res_pub["returncode"] == 0 else "N/A"
     
     # Virtualization
-    virt = run_host_command("systemd-detect-virt")["stdout"].strip() or "physical"
+    res_virt = run_host_command("systemd-detect-virt")
+    virt = res_virt["stdout"].strip() if res_virt["returncode"] == 0 else "physical"
     
     # Boot time
-    boot_time_timestamp = psutil.boot_time()
-    bt = datetime.datetime.fromtimestamp(boot_time_timestamp).strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        boot_time_timestamp = psutil.boot_time()
+        bt = datetime.datetime.fromtimestamp(boot_time_timestamp).strftime("%Y-%m-%d %H:%M:%S")
+    except:
+        bt = "N/A"
+
+    # Uptime
+    res_uptime = run_host_command("uptime -p")
+    uptime = res_uptime["stdout"].strip().replace("up ", "") if res_uptime["returncode"] == 0 else "N/A"
 
     return jsonify({
         "hostname": socket.gethostname(),
         "os": f"{distro.name()} {distro.version()}",
         "kernel": platform.release(),
         "arch": platform.machine(),
-        "uptime": run_host_command("uptime -p")["stdout"].strip().replace("up ", ""),
+        "uptime": uptime,
         "cpu_count": psutil.cpu_count(),
         "local_ip": local_ip,
         "public_ip": public_ip,
