@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useApi } from '../../hooks/useApi';
 import api from '../../api/client';
-import { Settings, Power, RotateCw, Server, Clock, HardDrive, CheckCircle, AlertCircle, Cpu, CpuIcon } from 'lucide-react';
+import { Settings, Power, RotateCw, Server, Clock, HardDrive, CheckCircle, AlertCircle, Cpu, Monitor } from 'lucide-react';
 import ConfirmModal from '../../components/Common/ConfirmModal';
 
 export default function System() {
@@ -31,7 +31,7 @@ export default function System() {
         </div>
       )}
 
-      <div className="grid-2">
+      <div className="grid-2" style={{ alignItems: 'start' }}>
         {/* Power Controls */}
         <div className="card">
           <div className="card-header"><div className="card-title"><Power size={16} /> Power Actions</div></div>
@@ -49,49 +49,43 @@ export default function System() {
               <Power size={15} /> Shutdown
             </button>
           </div>
+          <p style={{ marginTop: 'var(--space-md)', color: 'var(--text-muted)', fontSize: '12px' }}>
+            Warning: These actions will affect the physical host server.
+          </p>
         </div>
 
-        {/* Basic OS Info */}
+        {/* Unified System Details */}
         <div className="card">
-          <div className="card-header"><div className="card-title"><Server size={16} /> Operating System</div></div>
+          <div className="card-header"><div className="card-title"><Server size={16} /> System Details</div></div>
           {loading ? <div className="spinner" /> : (
-            <div className="stat-grid" style={{ gridTemplateColumns: '1fr', gap: 'var(--space-sm)' }}>
+            <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--space-md)' }}>
               <div className="stat-info">
-                <div className="stat-label">Hostname</div>
-                <div className="stat-value" style={{ fontSize: '1.1rem' }}>{data?.hostname}</div>
+                <div className="stat-label"><Monitor size={14} /> Hostname</div>
+                <div className="stat-value" style={{ fontSize: '1rem' }}>{data?.hostname}</div>
               </div>
               <div className="stat-info">
-                <div className="stat-label">OS Version</div>
-                <div className="stat-value" style={{ fontSize: '1.1rem' }}>{data?.os}</div>
+                <div className="stat-label"><Server size={14} /> Operating System</div>
+                <div className="stat-value" style={{ fontSize: '1rem' }}>{data?.os}</div>
+              </div>
+              <div className="stat-info">
+                <div className="stat-label"><Settings size={14} /> Kernel</div>
+                <div className="stat-value" style={{ fontSize: '1rem' }}>{data?.kernel}</div>
+              </div>
+              <div className="stat-info">
+                <div className="stat-label"><HardDrive size={14} /> Architecture</div>
+                <div className="stat-value" style={{ fontSize: '1rem' }}>{data?.arch}</div>
+              </div>
+              <div className="stat-info">
+                <div className="stat-label"><Cpu size={14} /> CPU Cores</div>
+                <div className="stat-value" style={{ fontSize: '1rem' }}>{data?.cpu_count || 'N/A'}</div>
+              </div>
+              <div className="stat-info">
+                <div className="stat-label"><Clock size={14} /> Uptime</div>
+                <div className="stat-value" style={{ fontSize: '1rem' }}>{data?.uptime}</div>
               </div>
             </div>
           )}
         </div>
-      </div>
-
-      {/* Technical Info (Merged from Dashboard) */}
-      <div className="card" style={{ marginTop: 'var(--space-lg)' }}>
-        <div className="card-header"><div className="card-title"><Settings size={16} /> Technical Info</div></div>
-        {loading ? <div className="spinner" /> : (
-          <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-            <div className="stat-info">
-              <div className="stat-label"><HardDrive size={14} /> Architecture</div>
-              <div className="stat-value">{data?.arch}</div>
-            </div>
-            <div className="stat-info">
-              <div className="stat-label"><Settings size={14} /> Kernel Version</div>
-              <div className="stat-value">{data?.kernel}</div>
-            </div>
-            <div className="stat-info">
-              <div className="stat-label"><Clock size={14} /> System Uptime</div>
-              <div className="stat-value">{data?.uptime}</div>
-            </div>
-            <div className="stat-info">
-              <div className="stat-label"><Cpu size={14} /> CPU Cores</div>
-              <div className="stat-value">{data?.cpu_count || 'N/A'}</div>
-            </div>
-          </div>
-        )}
       </div>
 
       <ConfirmModal 
