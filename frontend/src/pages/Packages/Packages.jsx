@@ -1,17 +1,40 @@
 import { useState } from 'react';
 import { useApi } from '../../hooks/useApi';
 import api from '../../api/client';
-import { Package, Search, Trash2, Download, RefreshCw, AlertCircle, CheckCircle, Info } from 'lucide-react';
+import { Package, Search, Trash2, Download, RefreshCw, AlertCircle, CheckCircle, Star, List } from 'lucide-react';
 import ConfirmModal from '../../components/Common/ConfirmModal';
+
+const COMMON_APPS = [
+  { name: 'nginx', desc: 'High-performance Web Server & Reverse Proxy' },
+  { name: 'apache2', desc: 'The classic Apache HTTP Server' },
+  { name: 'mysql-server', desc: 'MySQL Database Server' },
+  { name: 'postgresql', desc: 'PostgreSQL Object-Relational Database' },
+  { name: 'redis-server', desc: 'In-memory Data Structure Store' },
+  { name: 'nodejs', desc: 'JavaScript Runtime Environment' },
+  { name: 'python3-pip', desc: 'Python Package Index Installer' },
+  { name: 'certbot', desc: 'Let\'s Encrypt SSL Certificate Tool' },
+  { name: 'fail2ban', desc: 'Intrusion Prevention Framework' },
+  { name: 'htop', desc: 'Interactive Process Viewer' },
+  { name: 'git', desc: 'Distributed Version Control System' },
+  { name: 'curl', desc: 'Command line tool for transferring data' },
+  { name: 'vim', desc: 'Advanced Text Editor' },
+  { name: 'tmux', desc: 'Terminal Multiplexer' },
+  { name: 'ufw', desc: 'Uncomplicated Firewall' },
+  { name: 'zip', desc: 'Archive compression utility' },
+];
 
 export default function Packages() {
   const { data, loading, refetch } = useApi('/packages/');
+  const [tab, setTab] = useState('common'); // Default to Common Apps
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState(null);
   const [searching, setSearching] = useState(false);
   const [actionLoading, setActionLoading] = useState('');
   const [message, setMessage] = useState(null);
   const [confirm, setConfirm] = useState({ open: false, title: '', message: '', action: null });
+
+  const installedNames = new Set((data?.packages || []).map(p => p.name));
+  const availableCommon = COMMON_APPS.filter(app => !installedNames.has(app.name));
 
   const searchPackages = async (e) => {
     e.preventDefault();
@@ -20,6 +43,7 @@ export default function Packages() {
     try {
       const result = await api.get(`/packages/search?q=${query}`);
       setSearchResults(result.packages);
+      setTab('search');
     } catch (err) {
       setMessage({ type: 'error', text: err.message });
     } finally {
@@ -54,42 +78,57 @@ export default function Packages() {
         </div>
       )}
 
+      {/* Search Bar always visible */}
       <div className="card" style={{ marginBottom: 'var(--space-lg)' }}>
         <form onSubmit={searchPackages} className="search-bar">
           <Search size={18} />
-          <input className="form-input" placeholder="Search packages (e.g. nginx, docker, git)..." value={query} onChange={(e) => setQuery(e.target.value)} />
+          <input className="form-input" placeholder="Search for any package..." value={query} onChange={(e) => setQuery(e.target.value)} />
           <button type="submit" className="btn btn-primary" disabled={searching}>{searching ? <div className="spinner spinner-sm" /> : 'Search'}</button>
         </form>
       </div>
 
-      {searchResults && (
-        <div className="card" style={{ marginBottom: 'var(--space-lg)' }}>
-          <div className="card-header"><div className="card-title"><Search size={16} /> Search Results</div></div>
+      {/* Tabs */}
+      <div className="tabs">
+        <button className={`tab ${tab === 'common' ? 'active' : ''}`} onClick={() => setTab('common')}>
+          <Star size={14} /> App Store
+        </button>
+        <button className={`tab ${tab === 'installed' ? 'active' : ''}`} onClick={() => setTab('installed')}>
+          <List size={14} /> Installed ({data?.packages?.length || 0})
+        </button>
+        {searchResults && (
+          <button className={`tab ${tab === 'search' ? 'active' : ''}`} onClick={() => setTab('search')}>
+            <Search size={14} /> Search Results
+          </button>
+        )}
+      </div>
+
+      <div className="card">
+        {loading && !data ? (
+          <div className="loading-container"><div className="spinner" /></div>
+        ) : tab === 'common' ? (
           <table className="data-table">
-            <thead><tr><th>Name</th><th>Description</th><th>Action</th></tr></thead>
+            <thead><tr><th>App</th><th>Description</th><th>Action</th></tr></thead>
             <tbody>
-              {searchResults.map((pkg) => (
-                <tr key={pkg.name}>
-                  <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{pkg.name}</td>
-                  <td>{pkg.description}</td>
+              {availableCommon.map((app) => (
+                <tr key={app.name}>
+                  <td><div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{app.name}</div></td>
+                  <td>{app.desc}</td>
                   <td>
                     <button className="btn btn-sm btn-primary" onClick={() => setConfirm({
-                      open: true, title: 'Install Package', message: `Install ${pkg.name}?`,
-                      action: () => handleAction(pkg.name, 'install'), type: 'info'
-                    })} disabled={actionLoading === `${pkg.name}-install`}>
+                      open: true, title: 'Install App', message: `Install ${app.name}?`,
+                      action: () => handleAction(app.name, 'install'), type: 'info', confirmText: 'Install'
+                    })} disabled={actionLoading === `${app.name}-install`}>
                       <Download size={13} /> Install
                     </button>
                   </td>
                 </tr>
               ))}
+              {availableCommon.length === 0 && (
+                <tr><td colSpan="3" className="empty-state">All common apps are already installed!</td></tr>
+              )}
             </tbody>
           </table>
-        </div>
-      )}
-
-      <div className="card">
-        <div className="card-header"><div className="card-title"><Package size={16} /> Installed Packages</div></div>
-        {loading ? <div className="loading-container"><div className="spinner" /></div> : (
+        ) : tab === 'installed' ? (
           <table className="data-table">
             <thead><tr><th>Name</th><th>Version</th><th>Actions</th></tr></thead>
             <tbody>
@@ -99,9 +138,33 @@ export default function Packages() {
                   <td className="mono">{pkg.version}</td>
                   <td>
                     <button className="btn btn-sm btn-icon btn-ghost" onClick={() => setConfirm({
-                      open: true, title: 'Uninstall Package', message: `Remove ${pkg.name}? This might affect other software.`,
+                      open: true, title: 'Uninstall', message: `Remove ${pkg.name}?`,
                       action: () => handleAction(pkg.name, 'remove')
                     })} style={{ color: 'var(--accent-red)' }} title="Uninstall"><Trash2 size={14} /></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <table className="data-table">
+            <thead><tr><th>Name</th><th>Description</th><th>Action</th></tr></thead>
+            <tbody>
+              {(searchResults || []).map((pkg) => (
+                <tr key={pkg.name}>
+                  <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{pkg.name}</td>
+                  <td>{pkg.description}</td>
+                  <td>
+                    {!installedNames.has(pkg.name) ? (
+                      <button className="btn btn-sm btn-primary" onClick={() => setConfirm({
+                        open: true, title: 'Install', message: `Install ${pkg.name}?`,
+                        action: () => handleAction(pkg.name, 'install'), type: 'info', confirmText: 'Install'
+                      })} disabled={actionLoading === `${pkg.name}-install`}>
+                        <Download size={13} /> Install
+                      </button>
+                    ) : (
+                      <span className="badge badge-success">Installed</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -110,7 +173,7 @@ export default function Packages() {
         )}
       </div>
 
-      <ConfirmModal isOpen={confirm.open} title={confirm.title} message={confirm.message} onConfirm={confirm.action} onCancel={() => setConfirm({ ...confirm, open: false })} type={confirm.type || 'danger'} />
+      <ConfirmModal isOpen={confirm.open} title={confirm.title} message={confirm.message} onConfirm={confirm.action} onCancel={() => setConfirm({ ...confirm, open: false })} type={confirm.type || 'danger'} confirmText={confirm.confirmText} />
     </div>
   );
 }
