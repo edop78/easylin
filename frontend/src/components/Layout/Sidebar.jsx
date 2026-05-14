@@ -1,67 +1,54 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { 
-  LayoutDashboard, Package, Users, Activity, Container, Network, Shield, Globe, FileText, Terminal, ScrollText, RefreshCw, 
-  Server, Cog, Zap, LogOut
+  LayoutDashboard, Package, Users, Activity, Container, Network, Shield, Globe, 
+  FileText, Terminal, RefreshCw, Server, Cog, Zap, LogOut
 } from 'lucide-react';
-
-const navSections = [
-  {
-    title: 'Main',
-    links: [
-      { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-    ]
-  },
-  {
-    title: 'System',
-    links: [
-      { to: '/system', icon: Server, label: 'System' },
-      { to: '/system/maintenance', icon: RefreshCw, label: 'Update & Clean' },
-      { to: '/packages', icon: Package, label: 'Packages' },
-      { to: '/users', icon: Users, label: 'Users & Groups' },
-      { to: '/services', icon: Cog, label: 'Services' },
-    ]
-  },
-  {
-    title: 'Management',
-    links: [
-      { to: '/docker', icon: Container, label: 'Docker' },
-      { to: '/network', icon: Network, label: 'Network' },
-      { to: '/firewall', icon: Shield, label: 'Firewall' },
-      { to: '/proxy', icon: Globe, label: 'Reverse Proxy' },
-    ]
-  },
-  {
-    title: 'Tools',
-    links: [
-      { to: '/files', icon: FileText, label: 'File Manager' },
-      { to: '/terminal', icon: Terminal, label: 'Terminal' },
-      { to: '/logs', icon: ScrollText, label: 'System Logs' },
-    ]
-  }
-];
+import './Layout.css';
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
 
+  const sections = [
+    {
+      title: 'Main',
+      links: [{ to: '/', icon: LayoutDashboard, label: 'Dashboard' }]
+    },
+    {
+      title: 'System',
+      links: [
+        { to: '/system', icon: Server, label: 'System' },
+        { to: '/system/maintenance', icon: RefreshCw, label: 'Update & Clean' },
+        { to: '/packages', icon: Package, label: 'Packages' },
+        { to: '/users', icon: Users, label: 'Users' }
+      ]
+    },
+    {
+      title: 'Management',
+      links: [
+        { to: '/docker', icon: Container, label: 'Docker' },
+        { to: '/network', icon: Network, label: 'Network' },
+        { to: '/firewall', icon: Shield, label: 'Firewall' }
+      ]
+    }
+  ];
+
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <div className="brand-icon">
-          <Zap size={20} fill="currentColor" />
-        </div>
+        <div className="brand-icon"><Zap size={20} fill="currentColor" /></div>
         <span className="brand-name">EasyLin</span>
       </div>
 
       <nav className="sidebar-nav">
-        {navSections.map((section) => (
+        {sections.map((section) => (
           <div key={section.title} className="sidebar-section">
             <div className="sidebar-section-title">{section.title}</div>
             {section.links.map((link) => (
               <NavLink
                 key={link.to}
                 to={link.to}
-                end={link.to === '/system' || link.to === '/'}
+                end={link.to === '/'}
                 className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
               >
                 <link.icon size={18} />
