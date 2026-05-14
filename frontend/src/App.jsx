@@ -37,33 +37,35 @@ function ProtectedRoute({ children }) {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route
-        path="/*"
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/system" element={<System />} />
-                <Route path="/packages" element={<Packages />} />
-                <Route path="/users" element={<Users />} />
-                <Route path="/services" element={<Services />} />
-                <Route path="/docker" element={<Docker />} />
-                <Route path="/network" element={<Network />} />
-                <Route path="/firewall" element={<Firewall />} />
-                <Route path="/proxy" element={<ReverseProxy />} />
-                <Route path="/files" element={<Files />} />
-                <Route path="/terminal" element={<Terminal />} />
-                <Route path="/logs" element={<Logs />} />
-                <Route path="/system/maintenance" element={<UpdateClean />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-    </Routes>
+    <Router>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route
+          path="/*"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/system" element={<System />} />
+                  <Route path="/packages" element={<Packages />} />
+                  <Route path="/users" element={<Users />} />
+                  <Route path="/services" element={<Services />} />
+                  <Route path="/docker" element={<Docker />} />
+                  <Route path="/network" element={<Network />} />
+                  <Route path="/firewall" element={<Firewall />} />
+                  <Route path="/proxy" element={<ReverseProxy />} />
+                  <Route path="/files" element={<Files />} />
+                  <Route path="/terminal" element={<Terminal />} />
+                  <Route path="/logs" element={<Logs />} />
+                  <Route path="/system/maintenance" element={<UpdateClean />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </Router>
   );
 }
