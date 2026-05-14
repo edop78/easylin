@@ -12,6 +12,7 @@ import {
   FolderOpen,
   TerminalSquare,
   ScrollText,
+  RefreshCw,
 } from 'lucide-react';
 
 const navSections = [
@@ -25,6 +26,7 @@ const navSections = [
     title: 'System',
     links: [
       { to: '/system', icon: Server, label: 'System' },
+      { to: '/system/maintenance', icon: RefreshCw, label: 'Update & Clean' },
       { to: '/packages', icon: Package, label: 'Packages' },
       { to: '/users', icon: Users, label: 'Users & Groups' },
       { to: '/services', icon: Cog, label: 'Services' },

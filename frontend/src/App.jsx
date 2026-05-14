@@ -14,6 +14,7 @@ import ReverseProxy from './pages/ReverseProxy/ReverseProxy';
 import Files from './pages/Files/Files';
 import Terminal from './pages/Terminal/Terminal';
 import Logs from './pages/Logs/Logs';
+import UpdateClean from './pages/System/UpdateClean';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -56,6 +57,7 @@ export default function App() {
                 <Route path="/files" element={<Files />} />
                 <Route path="/terminal" element={<Terminal />} />
                 <Route path="/logs" element={<Logs />} />
+                <Route path="/system/maintenance" element={<UpdateClean />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Layout>

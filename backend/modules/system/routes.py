@@ -7,6 +7,39 @@ from utils.command import run_host_command
 system_bp = Blueprint("system", __name__)
 
 
+@system_bp.route("/maintenance", methods=["POST"])
+@jwt_required()
+def run_maintenance():
+    """Run a maintenance command (apt, release-upgrade)."""
+    data = request.get_json()
+    cmd_type = data.get("command")
+    
+    commands = {
+        "update": "apt-get update",
+        "upgrade": "apt-get upgrade -y",
+        "full-upgrade": "apt-get full-upgrade -y",
+        "dist-upgrade": "apt-get dist-upgrade -y",
+        "autoremove": "apt-get autoremove -y",
+        "clean": "apt-get clean",
+        "release-upgrade": "do-release-upgrade -f DistUpgradeViewNonInteractive",
+        "release-upgrade-dev": "do-release-upgrade -d -f DistUpgradeViewNonInteractive"
+    }
+    
+    cmd = commands.get(cmd_type)
+    if not cmd:
+        return jsonify({"error": "Invalid command"}), 400
+        
+    # Use longer timeout for upgrades
+    res = run_host_command(cmd, timeout=600)
+    
+    return jsonify({
+        "success": res["returncode"] == 0,
+        "stdout": res["stdout"],
+        "stderr": res["stderr"],
+        "returncode": res["returncode"]
+    })
+
+
 @system_bp.route("/info", methods=["GET"])
 @jwt_required()
 def system_info():
