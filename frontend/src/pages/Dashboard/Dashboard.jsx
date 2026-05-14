@@ -1,7 +1,7 @@
 import { useApi } from '../../hooks/useApi';
 import { 
   LayoutDashboard, Activity, Cpu, HardDrive, Zap, 
-  RefreshCw, BarChart3, Container, Shield, Server
+  RefreshCw, BarChart3, Container, Shield, Server, AlertCircle
 } from 'lucide-react';
 
 function StatCard({ title, value, sub, icon: Icon, color, details, percent }) {
@@ -37,7 +37,30 @@ const formatBytes = (bytes) => {
 };
 
 export default function Dashboard() {
-  const { data, loading, refetch } = useApi('/dashboard/metrics');
+  const { data, loading, error, refetch } = useApi('/dashboard/metrics');
+
+  if (loading && !data) {
+    return (
+      <div className="loading-container" style={{ height: '60vh' }}>
+        <div className="spinner" />
+        <p>Fetching real-time metrics...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="page fade-in">
+        <div className="alert alert-error">
+          <AlertCircle size={20} />
+          <div>
+            <strong>Error fetching metrics:</strong> {error}
+            <button className="btn btn-sm btn-ghost" onClick={refetch} style={{ marginLeft: '10px' }}>Try Again</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const cpu = data?.cpu || 0;
   const ram = data?.ram || { percent: 0, used: 0, free: 0, total: 0 };
@@ -57,14 +80,7 @@ export default function Dashboard() {
       </div>
 
       <div className="stat-grid">
-        <StatCard 
-          title="CPU Usage" 
-          value={`${cpu}%`} 
-          percent={cpu} 
-          sub={`Load Avg: ${Number(load[0] || 0).toFixed(2)}`} 
-          icon={Cpu} 
-          color="blue" 
-        />
+        <StatCard title="CPU Usage" value={`${cpu}%`} percent={cpu} sub={`Load Avg: ${Number(load[0] || 0).toFixed(2)}`} icon={Cpu} color="blue" />
         <StatCard title="Memory (RAM)" value={`${ram.percent}%`} percent={ram.percent} details={[`U: ${formatBytes(ram.used)}`, `F: ${formatBytes(ram.free)}`, `T: ${formatBytes(ram.total)}`]} icon={Activity} color="purple" />
         <StatCard title="Disk Storage" value={`${disk.percent}%`} percent={disk.percent} details={[`U: ${formatBytes(disk.used)}`, `F: ${formatBytes(disk.free)}`, `T: ${formatBytes(disk.total)}`]} icon={HardDrive} color="cyan" />
         <StatCard title="Network Traffic" value="Live" sub={`↑ ${formatBytes(net.sent)} / ↓ ${formatBytes(net.recv)}`} icon={Zap} color="amber" />
