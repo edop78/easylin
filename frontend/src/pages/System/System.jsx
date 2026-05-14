@@ -1,13 +1,26 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApi } from '../../hooks/useApi';
 import api from '../../api/client';
-import { Settings, Power, RotateCw, Server, Clock, HardDrive, CheckCircle, AlertCircle, Cpu, Monitor, Globe, Shield, Activity } from 'lucide-react';
+import { Settings, Power, RotateCw, Server, Clock, HardDrive, CheckCircle, AlertCircle, Cpu, Monitor, Globe, Shield, Activity, Copy } from 'lucide-react';
 import ConfirmModal from '../../components/Common/ConfirmModal';
 
 export default function System() {
   const { data, loading, error, refetch } = useApi('/system/info');
   const [msg, setMsg] = useState(null);
   const [confirm, setConfirm] = useState({ open: false, title: '', message: '', action: null });
+
+  // Auto-hide messages after 10 seconds
+  useEffect(() => {
+    if (msg) {
+      const timer = setTimeout(() => setMsg(null), 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [msg]);
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    setMsg({ type: 'success', text: 'Error message copied to clipboard!' });
+  };
 
   const handleAction = async (action) => {
     try {
@@ -24,10 +37,17 @@ export default function System() {
         <div className="page-header">
           <div className="page-title"><Settings size={28} /><h1>System Management</h1></div>
         </div>
-        <div className="alert alert-error">
-          <AlertCircle size={20} />
-          <div><strong>Error loading system info:</strong> {error}</div>
-          <button className="btn btn-sm btn-ghost" onClick={refetch}>Retry</button>
+        <div className="alert alert-error" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertCircle size={20} />
+            <div><strong>Error loading system info:</strong> {error}</div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button className="btn btn-sm btn-ghost" onClick={() => copyToClipboard(error)} title="Copy error">
+              <Copy size={14} /> Copy
+            </button>
+            <button className="btn btn-sm btn-ghost" onClick={refetch}>Retry</button>
+          </div>
         </div>
       </div>
     );
@@ -56,9 +76,17 @@ export default function System() {
       </div>
 
       {msg && (
-        <div className={`alert alert-${msg.type === 'info' ? 'warning' : msg.type}`} style={{ marginBottom: 'var(--space-lg)' }}>
-          {msg.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle size={16} />}
-          {msg.text}
+        <div className={`alert alert-${msg.type === 'info' ? 'warning' : (msg.type === 'error' ? 'error' : 'success')}`} 
+             style={{ marginBottom: 'var(--space-lg)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {msg.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle size={16} />}
+            <span>{msg.text}</span>
+          </div>
+          {msg.type === 'error' && (
+            <button className="btn btn-sm btn-ghost" onClick={() => copyToClipboard(msg.text)} title="Copy error">
+              <Copy size={14} /> Copy
+            </button>
+          )}
         </div>
       )}
 

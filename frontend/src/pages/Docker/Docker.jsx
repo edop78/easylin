@@ -4,7 +4,7 @@ import api from '../../api/client';
 import { 
   Container, Play, Square, RotateCw, Trash2, RefreshCw, 
   Image, HardDrive, Network, ScrollText, Cog, ShoppingCart, 
-  Download, ExternalLink, Globe, Trash, CheckCircle, AlertCircle
+  Download, ExternalLink, Globe, Trash, CheckCircle, AlertCircle, Copy
 } from 'lucide-react';
 import ConfirmModal from '../../components/Common/ConfirmModal';
 
@@ -44,13 +44,18 @@ export default function Docker() {
   const [msg, setMsg] = useState(null);
   const [confirm, setConfirm] = useState({ open: false, title: '', message: '', action: null });
 
-  // Auto-hide messages after 5 seconds
+  // Auto-hide messages after 10 seconds (increased to give time to copy)
   useEffect(() => {
     if (msg) {
-      const timer = setTimeout(() => setMsg(null), 5000);
+      const timer = setTimeout(() => setMsg(null), 10000);
       return () => clearTimeout(timer);
     }
   }, [msg]);
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    setMsg({ type: 'success', text: 'Error message copied to clipboard!' });
+  };
 
   const refetchAll = () => {
     refetchContainers();
@@ -134,9 +139,16 @@ export default function Docker() {
       </div>
 
       {msg && (
-        <div className={`alert alert-${msg.type}`} style={{ marginBottom: 'var(--space-lg)' }}>
-          {msg.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle size={16} />}
-          {msg.text}
+        <div className={`alert alert-${msg.type}`} style={{ marginBottom: 'var(--space-lg)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {msg.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle size={16} />}
+            <span>{msg.text}</span>
+          </div>
+          {msg.type === 'error' && (
+            <button className="btn btn-sm btn-ghost" onClick={() => copyToClipboard(msg.text)} title="Copy error">
+              <Copy size={14} /> Copy
+            </button>
+          )}
         </div>
       )}
 
