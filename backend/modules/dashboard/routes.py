@@ -1,7 +1,6 @@
 from flask import Blueprint, jsonify
 from flask_jwt_extended import jwt_required
 import psutil
-import docker
 from backend.utils.command import run_host_command
 
 dashboard_bp = Blueprint("dashboard", __name__)
@@ -31,13 +30,16 @@ def get_metrics():
         "total": disk_usage.total
     }
     
-    # DOCKER OVERVIEW
+    # DOCKER OVERVIEW (Safe Import)
     docker_info = {"running": 0, "total": 0, "error": None}
     try:
+        import docker
         client = docker.from_env()
         containers = client.containers.list(all=True)
         docker_info["total"] = len(containers)
         docker_info["running"] = len([c for c in containers if c.status == 'running'])
+    except ImportError:
+        docker_info["error"] = "docker library not installed"
     except Exception as e:
         docker_info["error"] = str(e)
     
@@ -46,9 +48,11 @@ def get_metrics():
     monitored = ["docker", "ssh", "ufw", "nginx"]
     for s in monitored:
         res = run_host_command(f"systemctl is-active {s}")
+        # Se il comando fallisce o il servizio non esiste, restituiamo inactive
+        status = res["stdout"].strip() if res["returncode"] == 0 else "inactive"
         services.append({
             "name": s.upper() if s != 'ufw' else 'Firewall (UFW)',
-            "status": res["stdout"].strip() if res["returncode"] == 0 else "inactive"
+            "status": status
         })
     
     # NETWORK
