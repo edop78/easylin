@@ -9,6 +9,10 @@ const MAINTENANCE_TASKS = [
   { id: 'dist-upgrade', name: 'APT Dist Upgrade', icon: Download, desc: 'Advanced upgrade that manages complex dependency changes.', color: 'cyan' },
   { id: 'autoremove', name: 'APT Autoremove', icon: Trash2, desc: 'Removes packages that were installed as dependencies but are no longer needed.', color: 'amber' },
   { id: 'clean', name: 'APT Clean', icon: Trash2, desc: 'Clears out the local repository of retrieved package files.', color: 'amber' },
+  { id: 'fix-broken', name: 'Fix Broken', icon: ShieldCheck, desc: 'Attempts to correct a system with broken dependencies in place.', color: 'red' },
+  { id: 'fix-dpkg', name: 'Fix Interrupted', icon: ShieldCheck, desc: 'Configures any packages that were unpacked but not configured.', color: 'red' },
+  { id: 'vacuum-logs', name: 'Clean Logs', icon: Trash2, desc: 'Deletes system logs older than 7 days to free up space.', color: 'cyan' },
+  { id: 'purge-configs', name: 'Purge Configs', icon: Trash2, desc: 'Removes residual configuration files from uninstalled packages.', color: 'amber' },
   { id: 'release-upgrade', name: 'OS Release Upgrade', icon: ShieldCheck, desc: 'Upgrades to the next stable Ubuntu version.', color: 'purple' },
   { id: 'release-upgrade-dev', name: 'OS Release Upgrade (Dev)', icon: ShieldCheck, desc: 'Upgrades to the next development Ubuntu version.', color: 'purple' },
 ];

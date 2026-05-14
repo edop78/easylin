@@ -21,6 +21,10 @@ def run_maintenance():
         "dist-upgrade": "apt-get dist-upgrade -y",
         "autoremove": "apt-get autoremove -y",
         "clean": "apt-get clean",
+        "fix-broken": "apt-get install -f -y",
+        "fix-dpkg": "dpkg --configure -a",
+        "vacuum-logs": "journalctl --vacuum-time=7d",
+        "purge-configs": "dpkg -l | grep '^rc' | awk '{print $2}' | xargs -r apt-get purge -y",
         "release-upgrade": "do-release-upgrade -f DistUpgradeViewNonInteractive",
         "release-upgrade-dev": "do-release-upgrade -d -f DistUpgradeViewNonInteractive"
     }
