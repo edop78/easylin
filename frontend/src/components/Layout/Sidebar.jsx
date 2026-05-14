@@ -1,8 +1,8 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { 
   LayoutDashboard, Package, Users, Activity, Container, Network, Shield, Globe, 
-  FileText, Terminal, RefreshCw, Server, Cog, Zap, LogOut, ScrollText
+  FileText, Terminal, RefreshCw, Server, Cog, Zap, LogOut, ScrollText, Rocket
 } from 'lucide-react';
 import './Layout.css';
 
@@ -45,10 +45,21 @@ export default function Sidebar() {
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-brand">
-        <div className="brand-icon"><Zap size={20} fill="currentColor" /></div>
-        <span className="brand-name">EasyLin</span>
-      </div>
+      <Link to="/" className="sidebar-brand" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: '12px', padding: 'var(--space-md) var(--space-lg)' }}>
+        <div className="brand-icon" style={{ 
+          background: 'linear-gradient(135deg, var(--accent-blue) 0%, #3b82f6 100%)', 
+          color: 'white', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          borderRadius: '10px', 
+          padding: '6px',
+          boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+        }}>
+          <Rocket size={18} />
+        </div>
+        <span className="brand-name" style={{ fontSize: '1.2rem', fontWeight: 700, letterSpacing: '-0.5px' }}>EasyLin</span>
+      </Link>
 
       <nav className="sidebar-nav">
         {sections.map((section) => (
