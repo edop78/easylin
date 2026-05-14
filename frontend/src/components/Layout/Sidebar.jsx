@@ -58,7 +58,7 @@ export default function Sidebar() {
               <NavLink
                 key={link.to}
                 to={link.to}
-                end={link.to === '/'}
+                end
                 className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
               >
                 <link.icon size={18} />
