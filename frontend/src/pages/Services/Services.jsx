@@ -3,7 +3,7 @@ import { useApi } from '../../hooks/useApi';
 import api from '../../api/client';
 import { 
   Cog, RefreshCw, Play, Square, RotateCw, ScrollText, 
-  CheckCircle, AlertCircle, Search, Power, Copy, Info
+  CheckCircle, AlertCircle, Search, Copy
 } from 'lucide-react';
 
 export default function Services() {
@@ -99,78 +99,44 @@ export default function Services() {
         ) : error ? (
           <div className="alert alert-error" style={{ margin: '20px' }}><AlertCircle size={16} /> {error}</div>
         ) : (
-          <table className="data-table" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
+          <table className="data-table" style={{ borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', width: '100%' }}>
             <thead>
               <tr style={{ backgroundColor: 'rgba(255,255,255,0.02)' }}>
-                <th style={{ padding: '16px 24px' }}>Service Name</th>
-                <th style={{ padding: '16px 24px' }}>Status</th>
-                <th style={{ padding: '16px 24px' }}>Description</th>
-                <th style={{ padding: '16px 24px', textAlign: 'right' }}>Actions</th>
+                <th style={{ padding: '16px 24px', width: '25%' }}>Service Name</th>
+                <th style={{ padding: '16px 24px', width: '15%' }}>Status</th>
+                <th style={{ padding: '16px 24px', width: '40%' }}>Description</th>
+                <th style={{ padding: '16px 24px', width: '20%', textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredServices.length > 0 ? filteredServices.map((s) => (
                 <tr key={s.name} className="hover-row">
-                  <td style={{ padding: '14px 24px', fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.95rem' }}>
+                  <td style={{ padding: '14px 24px', fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {s.name}
                   </td>
                   <td style={{ padding: '14px 24px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <span className={`badge ${s.active === 'active' ? 'badge-success' : s.active === 'failed' ? 'badge-danger' : 'badge-warning'}`} style={{ width: 'fit-content', padding: '2px 10px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      <span className={`badge ${s.active === 'active' ? 'badge-success' : s.active === 'failed' ? 'badge-danger' : 'badge-warning'}`} style={{ width: 'fit-content', padding: '1px 8px', fontSize: '10px' }}>
                         {s.active}
                       </span>
-                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: '4px', fontStyle: 'italic' }}>{s.sub}</span>
                     </div>
                   </td>
-                  <td style={{ padding: '14px 24px', fontSize: '0.85rem', color: 'var(--text-muted)', maxWidth: '350px' }}>
+                  <td style={{ padding: '14px 24px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                     <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.description}>
                       {s.description || 'No description available'}
                     </div>
                   </td>
                   <td style={{ padding: '14px 24px', textAlign: 'right' }}>
                     <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                      <button 
-                        className="btn btn-sm btn-icon btn-ghost" 
-                        onClick={() => handleAction(s.name, 'start')}
-                        title="Start Service"
-                        disabled={actionLoading === `${s.name}-start`}
-                      >
-                        <Play size={14} />
-                      </button>
-                      <button 
-                        className="btn btn-sm btn-icon btn-ghost" 
-                        onClick={() => handleAction(s.name, 'stop')}
-                        title="Stop Service"
-                        disabled={actionLoading === `${s.name}-stop`}
-                      >
-                        <Square size={14} />
-                      </button>
-                      <button 
-                        className="btn btn-sm btn-icon btn-ghost" 
-                        onClick={() => handleAction(s.name, 'restart')}
-                        title="Restart Service"
-                        disabled={actionLoading === `${s.name}-restart`}
-                      >
-                        <RotateCw size={14} className={actionLoading === `${s.name}-restart` ? 'spin' : ''} />
-                      </button>
-                      <div style={{ width: '1px', height: '20px', backgroundColor: 'var(--border-color)', margin: '0 4px', alignSelf: 'center' }} />
-                      <button 
-                        className="btn btn-sm btn-icon btn-ghost" 
-                        onClick={() => viewLogs(s.name)}
-                        title="View Logs"
-                      >
-                        <ScrollText size={14} />
-                      </button>
+                      <button className="btn btn-sm btn-icon btn-ghost" onClick={() => handleAction(s.name, 'start')} title="Start"><Play size={14} /></button>
+                      <button className="btn btn-sm btn-icon btn-ghost" onClick={() => handleAction(s.name, 'stop')} title="Stop"><Square size={14} /></button>
+                      <button className="btn btn-sm btn-icon btn-ghost" onClick={() => handleAction(s.name, 'restart')} title="Restart"><RotateCw size={14} className={actionLoading === `${s.name}-restart` ? 'spin' : ''} /></button>
+                      <button className="btn btn-sm btn-icon btn-ghost" onClick={() => viewLogs(s.name)} title="View Logs"><ScrollText size={14} /></button>
                     </div>
                   </td>
                 </tr>
               )) : (
-                <tr><td colSpan="4" style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                    <Search size={40} style={{ opacity: 0.2 }} />
-                    No services found matching "{filter}"
-                  </div>
-                </td></tr>
+                <tr><td colSpan="4" style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>No services found.</td></tr>
               )}
             </tbody>
           </table>
@@ -180,37 +146,18 @@ export default function Services() {
       {logsModal && (
         <div className="modal-overlay" onClick={() => setLogsModal(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px', width: '90%' }}>
-            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-blue)', padding: '8px', borderRadius: '8px' }}>
-                  <ScrollText size={20} />
-                </div>
-                <h3 className="modal-title" style={{ margin: 0 }}>Logs: {logsModal.name}.service</h3>
-              </div>
-              <button className="btn btn-sm btn-ghost" onClick={() => setLogsModal(null)}>Close</button>
-            </div>
-            
-            <pre className="code-block" style={{ maxHeight: '550px', fontSize: '11px', overflow: 'auto', backgroundColor: '#000', borderRadius: '8px', padding: '20px' }}>
-              {logsModal.logs || 'No logs found for this service.'}
+            <h3 className="modal-title">Logs: {logsModal.name}.service</h3>
+            <pre className="code-block" style={{ maxHeight: '550px', fontSize: '11px', overflow: 'auto', backgroundColor: '#000', padding: '20px' }}>
+              {logsModal.logs || 'No logs found.'}
             </pre>
-            
-            <div className="modal-actions" style={{ marginTop: '20px' }}>
-              <button className="btn btn-primary" onClick={() => setLogsModal(null)}>Close Viewer</button>
-            </div>
+            <div className="modal-actions"><button className="btn btn-primary" onClick={() => setLogsModal(null)}>Close</button></div>
           </div>
         </div>
       )}
 
       <style dangerouslySetInnerHTML={{ __html: `
-        .hover-row:hover {
-          background-color: rgba(255, 255, 255, 0.02) !important;
-        }
-        .data-table th {
-          border-bottom: 1px solid var(--border-color);
-        }
-        .data-table td {
-          border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-        }
+        .hover-row:hover { background-color: rgba(255, 255, 255, 0.02) !important; }
+        .data-table th, .data-table td { border-bottom: 1px solid var(--border-color); }
       `}} />
     </div>
   );
