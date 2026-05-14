@@ -186,6 +186,9 @@ def list_networks():
             })
         return jsonify({"networks": result})
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @docker_bp.route("/market/install", methods=["POST"])
 @jwt_required()
 def market_install():
@@ -220,7 +223,7 @@ def market_install():
         try:
             client.containers.get(app_config["name"])
             return jsonify({"error": f"Container {app_config['name']} already exists"}), 409
-        except docker.errors.NotFound:
+        except Exception:
             pass
 
         # Pull and create
