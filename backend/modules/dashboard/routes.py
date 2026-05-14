@@ -27,32 +27,21 @@ def safe_int(value):
 @dashboard_bp.route("/metrics")
 @jwt_required()
 def get_metrics():
+    # CPU
     cpu_percent = psutil.cpu_percent(interval=0.1)
     load_avg = psutil.getloadavg()
+    
+    # RAM
     vm = psutil.virtual_memory()
+    
+    # DISK
     du = psutil.disk_usage('/')
     
     # Docker Stats
     res_total = run_host_command("docker ps -a -q | wc -l")
     res_running = run_host_command("docker ps -q | wc -l")
     
-    # SERVICE STATUS
-    services = []
-    monitored = ["docker", "ssh", "ufw", "nginx"]
-    for s in monitored:
-        if s == "ssh":
-            # Metodo ultra-sicuro per SSH: controlla se il processo sshd esiste
-            res_pgrep = run_host_command("pgrep sshd")
-            status = "active" if res_pgrep.get("returncode") == 0 else "inactive"
-        else:
-            res = run_host_command(f"systemctl is-active {s}")
-            status = res.get("stdout", "").strip()
-            
-        services.append({
-            "name": s.upper() if s not in ['ufw', 'nginx'] else ('Firewall (UFW)' if s == 'ufw' else 'Nginx'),
-            "status": status if status in ["active", "failed", "activating"] else "inactive"
-        })
-    
+    # NETWORK
     net_io = psutil.net_io_counters()
     
     return jsonify({
@@ -61,6 +50,5 @@ def get_metrics():
         "ram": {"percent": vm.percent, "used": vm.used, "free": vm.available, "total": vm.total},
         "disk": {"percent": du.percent, "used": du.used, "free": du.free, "total": du.total},
         "docker": {"total": safe_int(res_total.get("stdout", "0")), "running": safe_int(res_running.get("stdout", "0"))},
-        "services": services,
         "net": {"sent": net_io.bytes_sent, "recv": net_io.bytes_recv}
     })

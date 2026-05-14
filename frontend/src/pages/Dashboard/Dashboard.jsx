@@ -1,7 +1,7 @@
 import { useApi } from '../../hooks/useApi';
 import { 
   LayoutDashboard, Activity, Cpu, HardDrive, Zap, 
-  RefreshCw, BarChart3, Container, Shield, Server, AlertCircle
+  RefreshCw, Container, AlertCircle
 } from 'lucide-react';
 
 function StatCard({ title, value, sub, icon: Icon, color, details, percent }) {
@@ -66,7 +66,6 @@ export default function Dashboard() {
   const ram = data?.ram || { percent: 0, used: 0, free: 0, total: 0 };
   const disk = data?.disk || { percent: 0, used: 0, free: 0, total: 0 };
   const dockerData = data?.docker || { running: 0, total: 0 };
-  const services = data?.services || [];
   const net = data?.net || { sent: 0, recv: 0 };
   const load = data?.load || [0, 0, 0];
 
@@ -86,8 +85,8 @@ export default function Dashboard() {
         <StatCard title="Network Traffic" value="Live" sub={`↑ ${formatBytes(net.sent)} / ↓ ${formatBytes(net.recv)}`} icon={Zap} color="amber" />
       </div>
 
-      <div className="grid-2" style={{ marginTop: 'var(--space-lg)' }}>
-        <div className="card">
+      <div style={{ marginTop: 'var(--space-lg)' }}>
+        <div className="card" style={{ maxWidth: '600px' }}>
           <div className="card-header"><div className="card-title"><Container size={16} /> Docker Overview</div></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xl)', padding: 'var(--space-md) 0' }}>
             <div style={{ flex: 1, textAlign: 'center', borderRight: '1px solid var(--border-color)' }}>
@@ -101,18 +100,6 @@ export default function Dashboard() {
           </div>
           <div className="progress-bar">
             <div className="progress-fill green" style={{ width: `${(dockerData.running / (dockerData.total || 1) * 100) || 0}%` }}></div>
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-header"><div className="card-title"><Server size={16} /> Essential Services</div></div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {services.map((s) => (
-              <div key={s.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{s.name}</span>
-                <span className={`badge ${s.status === 'active' ? 'badge-success' : 'badge-danger'}`} style={{ textTransform: 'capitalize' }}>{s.status || 'inactive'}</span>
-              </div>
-            ))}
           </div>
         </div>
       </div>
