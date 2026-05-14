@@ -286,32 +286,41 @@ export default function Docker() {
             {/* Custom Deploy Card */}
             <div className="card" style={{ 
               marginBottom: 'var(--space-xl)', 
+              background: 'linear-gradient(145deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.01) 100%)',
               border: '1px solid var(--border-color)',
-              backgroundColor: 'rgba(255,255,255,0.01)'
+              padding: 'var(--space-xl)'
             }}>
-              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div className="card-title" style={{ color: 'var(--accent-blue)' }}><Plus size={18} /> Deploy Application</div>
-                <div style={{ display: 'flex', backgroundColor: 'var(--bg-secondary)', padding: '4px', borderRadius: '8px', gap: '4px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-lg)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-blue)', padding: '10px', borderRadius: '12px' }}>
+                    <Plus size={20} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '1.2rem', marginBottom: '2px' }}>Deploy Application</h3>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Choose your source and start a new container.</p>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', backgroundColor: 'rgba(255,255,255,0.03)', padding: '4px', borderRadius: '10px', gap: '4px' }}>
                   <button 
                     className={`btn btn-sm ${customApp.type === 'image' ? 'btn-primary' : 'btn-ghost'}`} 
                     onClick={() => setCustomApp({...customApp, type: 'image'})}
-                    style={{ fontSize: '11px', padding: '4px 12px' }}
+                    style={{ fontSize: '11px', padding: '6px 16px', borderRadius: '8px' }}
                   >
-                    <Globe size={12} /> Docker Hub
+                    <Globe size={14} /> Docker Hub
                   </button>
                   <button 
                     className={`btn btn-sm ${customApp.type === 'github' ? 'btn-primary' : 'btn-ghost'}`} 
                     onClick={() => setCustomApp({...customApp, type: 'github'})}
-                    style={{ fontSize: '11px', padding: '4px 12px' }}
+                    style={{ fontSize: '11px', padding: '6px 16px', borderRadius: '8px' }}
                   >
-                    <Github size={12} /> GitHub Repo
+                    <Github size={14} /> GitHub Repo
                   </button>
                 </div>
               </div>
 
-              <form onSubmit={handleManualInstall} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-md)', alignItems: 'end' }}>
+              <form onSubmit={handleManualInstall} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-lg)', alignItems: 'end' }}>
                 <div className="form-group">
-                  <label>{customApp.type === 'github' ? 'GitHub Repo URL *' : 'Image Name *'}</label>
+                  <label>{customApp.type === 'github' ? 'Repository URL' : 'Image Name'}</label>
                   <input 
                     className="input" 
                     placeholder={customApp.type === 'github' ? 'https://github.com/user/repo' : 'e.g. nginx:latest'} 
@@ -321,7 +330,7 @@ export default function Docker() {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Container Name</label>
+                  <label>Container Name (Optional)</label>
                   <input 
                     className="input" 
                     placeholder="e.g. my-app" 
@@ -330,7 +339,7 @@ export default function Docker() {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Ports (host:container)</label>
+                  <label>Ports Mapping</label>
                   <input 
                     className="input" 
                     placeholder="e.g. 8080:80" 
@@ -338,8 +347,8 @@ export default function Docker() {
                     onChange={e => setCustomApp({...customApp, ports: e.target.value})}
                   />
                 </div>
-                <button className="btn btn-primary" type="submit" disabled={installing === 'custom'} style={{ height: '42px' }}>
-                  {installing === 'custom' ? <RotateCw size={16} className="spin" /> : <Download size={16} />}
+                <button className="btn btn-primary" type="submit" disabled={installing === 'custom'} style={{ height: '46px', fontWeight: 600 }}>
+                  {installing === 'custom' ? <RotateCw size={18} className="spin" /> : <Download size={18} />}
                   {customApp.type === 'github' ? 'Build & Deploy' : 'Deploy Now'}
                 </button>
               </form>
@@ -365,7 +374,7 @@ export default function Docker() {
                     )}
                     
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 'var(--space-md)' }}>
-                      <div style={{ backgroundColor: 'var(--accent-blue)', padding: '10px', borderRadius: '10px', color: 'white' }}>
+                      <div style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-blue)', padding: '10px', borderRadius: '10px' }}>
                         <app.icon size={24} />
                       </div>
                     </div>
@@ -393,7 +402,7 @@ export default function Docker() {
                           })}
                         >
                           {installing === app.id ? <RefreshCw size={16} className="spin" /> : <Download size={16} />}
-                          {installing === app.id ? 'Installing...' : 'Install App'}
+                          {installing === app.id ? 'Install App' : 'Install App'}
                         </button>
                       ) : (
                         <>
