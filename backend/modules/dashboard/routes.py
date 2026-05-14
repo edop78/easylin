@@ -32,15 +32,25 @@ def get_metrics():
     vm = psutil.virtual_memory()
     du = psutil.disk_usage('/')
     
+    # Docker Stats
     res_total = run_host_command("docker ps -a -q | wc -l")
     res_running = run_host_command("docker ps -q | wc -l")
     
+    # SERVICE STATUS
     services = []
-    for s in ["docker", "ssh", "ufw"]:
+    monitored = ["docker", "ssh", "ufw", "nginx"]
+    for s in monitored:
         res = run_host_command(f"systemctl is-active {s}")
+        status = res.get("stdout", "").strip()
+        
+        # Fallback per SSH (provare sshd se ssh fallisce)
+        if s == "ssh" and status != "active":
+            res_alt = run_host_command("systemctl is-active sshd")
+            status = res_alt.get("stdout", "inactive").strip()
+            
         services.append({
-            "name": s.upper() if s != 'ufw' else 'Firewall (UFW)',
-            "status": res.get("stdout", "inactive").strip() if res.get("returncode") == 0 else "inactive"
+            "name": s.upper() if s not in ['ufw', 'nginx'] else ('Firewall (UFW)' if s == 'ufw' else 'Nginx'),
+            "status": status if status in ["active", "failed", "activating"] else "inactive"
         })
     
     net_io = psutil.net_io_counters()
