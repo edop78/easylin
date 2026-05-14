@@ -4,7 +4,7 @@ import api from '../../api/client';
 import { 
   Container, Play, Square, RotateCw, Trash2, RefreshCw, 
   Image, HardDrive, Network, ScrollText, Cog, ShoppingCart, 
-  Download, ExternalLink, Globe, Trash, CheckCircle, AlertCircle, Copy
+  Download, ExternalLink, Globe, Trash, CheckCircle, AlertCircle, Copy, Plus
 } from 'lucide-react';
 import ConfirmModal from '../../components/Common/ConfirmModal';
 
@@ -43,8 +43,10 @@ export default function Docker() {
   const [installing, setInstalling] = useState(null);
   const [msg, setMsg] = useState(null);
   const [confirm, setConfirm] = useState({ open: false, title: '', message: '', action: null });
+  
+  // Manual install form state
+  const [customApp, setCustomApp] = useState({ image: '', name: '', ports: '' });
 
-  // Auto-hide messages after 10 seconds (increased to give time to copy)
   useEffect(() => {
     if (msg) {
       const timer = setTimeout(() => setMsg(null), 10000);
@@ -74,6 +76,22 @@ export default function Docker() {
       setMsg({ type: 'error', text: err.message });
     } finally {
       setActionLoading('');
+    }
+  };
+
+  const handleManualInstall = async (e) => {
+    e.preventDefault();
+    setInstalling('custom');
+    try {
+      const res = await api.post('/docker/containers/run', customApp);
+      setMsg({ type: 'success', text: res.message });
+      setCustomApp({ image: '', name: '', ports: '' });
+      refetchContainers();
+      setTab('containers');
+    } catch (err) {
+      setMsg({ type: 'error', text: err.message });
+    } finally {
+      setInstalling(null);
     }
   };
 
@@ -264,85 +282,132 @@ export default function Docker() {
             </tbody>
           </table>
         ) : tab === 'market' ? (
-          <div className="grid-3" style={{ padding: 'var(--space-md)' }}>
-            {MARKET_APPS.map(app => {
-              const installed = isAppInstalled(app.containerName);
-              const containerId = getAppContainerId(app.containerName);
-              
-              return (
-                <div key={app.id} className="app-card" style={{ 
-                  border: '1px solid var(--border-color)', 
-                  borderRadius: '12px', 
-                  padding: 'var(--space-lg)',
-                  backgroundColor: 'rgba(255,255,255,0.02)',
-                  position: 'relative'
-                }}>
-                  {installed && (
-                    <div style={{ position: 'absolute', top: '12px', right: '12px' }}>
-                      <span className="badge badge-success">Installed</span>
-                    </div>
-                  )}
-                  
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 'var(--space-md)' }}>
-                    <div style={{ backgroundColor: 'var(--accent-blue)', padding: '10px', borderRadius: '10px', color: 'white' }}>
-                      <app.icon size={24} />
-                    </div>
-                  </div>
-                  
-                  <h3 style={{ marginBottom: '4px', fontSize: '1.1rem' }}>{app.name}</h3>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 'var(--space-md)', lineHeight: 1.4 }}>{app.desc}</p>
-                  
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: 'var(--space-lg)' }}>
-                    {app.tags.map(tag => (
-                      <span key={tag} style={{ fontSize: '10px', backgroundColor: 'var(--border-color)', padding: '2px 8px', borderRadius: '10px' }}>{tag}</span>
-                    ))}
-                  </div>
+          <div style={{ padding: 'var(--space-md)' }}>
+            {/* Manual Install Card */}
+            <div className="card" style={{ 
+              marginBottom: 'var(--space-xl)', 
+              border: '2px dashed var(--border-color)',
+              backgroundColor: 'rgba(255,255,255,0.01)'
+            }}>
+              <div className="card-header">
+                <div className="card-title" style={{ color: 'var(--accent-blue)' }}><Plus size={18} /> Deploy Custom Container</div>
+              </div>
+              <form onSubmit={handleManualInstall} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-md)', alignItems: 'end' }}>
+                <div className="form-group">
+                  <label>Image Name *</label>
+                  <input 
+                    className="input" 
+                    placeholder="e.g. nginx:latest" 
+                    value={customApp.image} 
+                    onChange={e => setCustomApp({...customApp, image: e.target.value})}
+                    required 
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Container Name</label>
+                  <input 
+                    className="input" 
+                    placeholder="e.g. my-web-server" 
+                    value={customApp.name} 
+                    onChange={e => setCustomApp({...customApp, name: e.target.value})}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Ports (host:container)</label>
+                  <input 
+                    className="input" 
+                    placeholder="e.g. 8080:80, 443:443" 
+                    value={customApp.ports} 
+                    onChange={e => setCustomApp({...customApp, ports: e.target.value})}
+                  />
+                </div>
+                <button className="btn btn-primary" type="submit" disabled={installing === 'custom'} style={{ height: '42px' }}>
+                  {installing === 'custom' ? <RefreshCw size={16} className="spin" /> : <Download size={16} />}
+                  Deploy Now
+                </button>
+              </form>
+            </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {!installed ? (
-                      <button 
-                        className="btn btn-primary" 
-                        style={{ width: '100%' }}
-                        disabled={installing === app.id}
-                        onClick={() => setConfirm({
-                          open: true,
-                          title: `Install ${app.name}`,
-                          message: `This will pull ${app.image} and create a new container. Continue?`,
-                          action: () => installApp(app.id)
-                        })}
-                      >
-                        {installing === app.id ? <RefreshCw size={16} className="spin" /> : <Download size={16} />}
-                        {installing === app.id ? 'Installing...' : 'Install App'}
-                      </button>
-                    ) : (
-                      <>
-                        <a 
-                          href={`http://${window.location.hostname}:${app.uiPort}`} 
-                          target="_blank" 
-                          rel="noreferrer" 
-                          className="btn btn-primary"
-                          style={{ width: '100%', textDecoration: 'none', justifyContent: 'center' }}
-                        >
-                          <ExternalLink size={16} /> Open Web UI
-                        </a>
+            <div className="grid-3">
+              {MARKET_APPS.map(app => {
+                const installed = isAppInstalled(app.containerName);
+                const containerId = getAppContainerId(app.containerName);
+                
+                return (
+                  <div key={app.id} className="app-card" style={{ 
+                    border: '1px solid var(--border-color)', 
+                    borderRadius: '12px', 
+                    padding: 'var(--space-lg)',
+                    backgroundColor: 'rgba(255,255,255,0.02)',
+                    position: 'relative'
+                  }}>
+                    {installed && (
+                      <div style={{ position: 'absolute', top: '12px', right: '12px' }}>
+                        <span className="badge badge-success">Installed</span>
+                      </div>
+                    )}
+                    
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 'var(--space-md)' }}>
+                      <div style={{ backgroundColor: 'var(--accent-blue)', padding: '10px', borderRadius: '10px', color: 'white' }}>
+                        <app.icon size={24} />
+                      </div>
+                    </div>
+                    
+                    <h3 style={{ marginBottom: '4px', fontSize: '1.1rem' }}>{app.name}</h3>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 'var(--space-md)', lineHeight: 1.4 }}>{app.desc}</p>
+                    
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: 'var(--space-lg)' }}>
+                      {app.tags.map(tag => (
+                        <span key={tag} style={{ fontSize: '10px', backgroundColor: 'var(--border-color)', padding: '2px 8px', borderRadius: '10px' }}>{tag}</span>
+                      ))}
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {!installed ? (
                         <button 
-                          className="btn btn-ghost" 
-                          style={{ width: '100%', color: 'var(--accent-red)' }}
+                          className="btn btn-primary" 
+                          style={{ width: '100%' }}
+                          disabled={installing === app.id}
                           onClick={() => setConfirm({
                             open: true,
-                            title: `Uninstall ${app.name}`,
-                            message: `Are you sure you want to remove the ${app.name} container? All data in volumes will be preserved.`,
-                            action: () => containerAction(containerId, 'remove')
+                            title: `Install ${app.name}`,
+                            message: `This will pull ${app.image} and create a new container. Continue?`,
+                            action: () => installApp(app.id)
                           })}
                         >
-                          <Trash size={16} /> Uninstall
+                          {installing === app.id ? <RefreshCw size={16} className="spin" /> : <Download size={16} />}
+                          {installing === app.id ? 'Installing...' : 'Install App'}
                         </button>
-                      </>
-                    )}
+                      ) : (
+                        <>
+                          <a 
+                            href={`http://${window.location.hostname}:${app.uiPort}`} 
+                            target="_blank" 
+                            rel="noreferrer" 
+                            className="btn btn-primary"
+                            style={{ width: '100%', textDecoration: 'none', justifyContent: 'center' }}
+                          >
+                            <ExternalLink size={16} /> Open Web UI
+                          </a>
+                          <button 
+                            className="btn btn-ghost" 
+                            style={{ width: '100%', color: 'var(--accent-red)' }}
+                            onClick={() => setConfirm({
+                              open: true,
+                              title: `Uninstall ${app.name}`,
+                              message: `Are you sure you want to remove the ${app.name} container? All data in volumes will be preserved.`,
+                              action: () => containerAction(containerId, 'remove')
+                            })}
+                          >
+                            <Trash size={16} /> Uninstall
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         ) : tab === 'volumes' ? (
           <table className="data-table">

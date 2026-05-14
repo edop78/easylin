@@ -189,6 +189,51 @@ def list_networks():
         return jsonify({"error": str(e)}), 500
 
 
+@docker_bp.route("/containers/run", methods=["POST"])
+@jwt_required()
+def run_container():
+    """Run a custom container manually."""
+    client = get_client()
+    if not client:
+        return jsonify({"error": "Cannot connect to Docker daemon"}), 503
+
+    data = request.get_json()
+    image = data.get("image")
+    name = data.get("name")
+    ports_raw = data.get("ports", "") # format: "80:80, 443:443"
+    
+    if not image:
+        return jsonify({"error": "Image name is required"}), 400
+
+    # Parse ports
+    ports_dict = {}
+    if ports_raw:
+        try:
+            for p in ports_raw.split(","):
+                host_port, container_port = p.strip().split(":")
+                ports_dict[f"{container_port}/tcp"] = int(host_port)
+        except Exception:
+            return jsonify({"error": "Invalid ports format. Use host:container,host:container"}), 400
+
+    try:
+        # Pull and run
+        client.images.pull(image)
+        container = client.containers.run(
+            image,
+            name=name if name else None,
+            ports=ports_dict,
+            detach=True,
+            restart_policy={"Name": "unless-stopped"}
+        )
+        return jsonify({
+            "success": True, 
+            "container_id": container.short_id,
+            "message": f"Container {container.name} started successfully"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @docker_bp.route("/market/install", methods=["POST"])
 @jwt_required()
 def market_install():
