@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  easylin:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: easylin
+    restart: unless-stopped
+    ports:
+      - "5050:5050"
+    volumes:
+      - /:/host:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc:/host-etc
+      - easylin_data:/app/data
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - TZ=${TZ:-UTC}
+    privileged: true
+    pid: host
+    network_mode: host
+
+volumes:
+  easylin_data:
