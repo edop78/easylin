@@ -14,6 +14,9 @@ def check_ollama():
         "http://127.0.0.1:11434/",
         "http://localhost:11434/",
         "http://host.docker.internal:11434/",
+        "http://172.17.0.1:11434/",
+        "http://172.18.0.1:11434/",
+        "http://192.168.1.1:11434/", # Long shot for some setups
         "http://ollama:11434/"
     ]
     

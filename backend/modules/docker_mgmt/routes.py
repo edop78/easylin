@@ -553,6 +553,26 @@ def market_status():
         conn.close()
 
 
+@docker_bp.route("/debug/ollama", methods=["GET"])
+@jwt_required()
+def debug_ollama():
+    """Internal debug route to inspect Ollama state."""
+    client = get_client()
+    if not client:
+        return jsonify({"error": "No docker client"}), 500
+    try:
+        c = client.containers.get("ollama")
+        return jsonify({
+            "status": c.status,
+            "network_mode": c.attrs['HostConfig']['NetworkMode'],
+            "ip": c.attrs['NetworkSettings']['IPAddress'],
+            "ports": c.attrs['NetworkSettings']['Ports'],
+            "logs": c.logs(tail=30).decode('utf-8', errors='replace')
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @docker_bp.route("/market/logs/file", methods=["GET"])
 @jwt_required()
 def get_market_logs_file():
