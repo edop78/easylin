@@ -9,17 +9,32 @@ ai_bp = Blueprint("ai", __name__)
 OLLAMA_API = "http://127.0.0.1:11434/api"
 
 def check_ollama():
+    """Detect Ollama by probing multiple possible endpoints (Host, Container, Docker Bridge)."""
+    endpoints = [
+        "http://127.0.0.1:11434/",
+        "http://localhost:11434/",
+        "http://host.docker.internal:11434/",
+        "http://ollama:11434/"
+    ]
+    
+    # Try current known API first
     try:
-        # Try localhost/host-IP first
-        requests.get("http://127.0.0.1:11434/", timeout=1)
+        requests.get(f"{OLLAMA_API.replace('/api','')}/", timeout=0.5)
         return True
     except:
+        pass
+
+    for url in endpoints:
         try:
-            # Fallback to container name if bridged
-            requests.get("http://ollama:11434/", timeout=1)
+            requests.get(url, timeout=0.5)
+            # If successful, update the global API URL for this session
+            global OLLAMA_API
+            OLLAMA_API = f"{url.rstrip('/')}/api"
             return True
         except:
-            return False
+            continue
+            
+    return False
 
 @ai_bp.route("/status", methods=["GET"])
 @jwt_required()
