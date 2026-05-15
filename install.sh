@@ -60,26 +60,12 @@ check_compose() {
   fi
 }
 
-check_ollama() {
-  if ! command -v ollama &> /dev/null; then
-    echo -e "${YELLOW}Ollama is not installed (Required for local AI).${NC}"
-    read -p "Do you want to install Ollama now? (y/n) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-      echo -e "${GREEN}Installing Ollama...${NC}"
-      curl -fsSL https://ollama.com/install.sh | sh
-      echo -e "${GREEN}Ollama installed successfully.${NC}"
-    else
-      echo -e "${YELLOW}Skipping Ollama. AI features will be disabled until manually installed.${NC}"
-    fi
-  else
-    echo -e "${GREEN}✓ Ollama is already installed.${NC}"
-  fi
-}
+# check_ollama is now handled by the Docker App Store inside EasyLin.
+# Keeping it here as a commented optional step if someone prefers host-level install.
+# check_ollama
 
 check_docker
 check_compose
-check_ollama
 
 # 3. Setup Environment
 if [ ! -f .env ]; then
