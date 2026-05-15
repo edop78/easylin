@@ -16,19 +16,18 @@ network_bp = Blueprint("network", __name__)
 class NetworkDriver:
     @staticmethod
     def detect():
-        """Identify the active network management system on the host."""
-        # Check NetworkManager
+        """Identify the active network management system by checking services."""
+        # 1. NetworkManager (Desktop/Common)
         if run_host_command("systemctl is-active NetworkManager")["stdout"].strip() == "active":
             return "network-manager"
         
-        # Check Netplan (usually has files in /etc/netplan)
-        res = run_host_command("ls /etc/netplan/*.yaml")
-        if res["returncode"] == 0:
-            return "netplan"
-            
-        # Check ifupdown
-        if run_host_command("ls /etc/network/interfaces")["returncode"] == 0:
+        # 2. networking.service (ifupdown - Proxmox/Debian)
+        if run_host_command("systemctl is-active networking")["stdout"].strip() == "active":
             return "ifupdown"
+            
+        # 3. systemd-networkd (Netplan/Ubuntu Server)
+        if run_host_command("systemctl is-active systemd-networkd")["stdout"].strip() == "active":
+            return "netplan"
             
         return "generic"
 
@@ -193,12 +192,18 @@ def set_config(iface):
 
     # Execute the script
     script_res = run_host_command(f"bash -c {shlex_quote(apply_script)}")
-    log.append(f"Application Result: {script_res['stdout'] or script_res['stderr']}")
+    
+    if script_res["returncode"] != 0:
+        return jsonify({
+            "success": False,
+            "error": f"Application failed: {script_res['stderr'] or script_res['stdout']}",
+            "log": script_res["stdout"]
+        }), 500
 
     return jsonify({
         "success": True,
-        "message": "Network configuration applied.",
-        "log": "\n".join(log)
+        "message": "Network configuration applied successfully.",
+        "log": script_res["stdout"]
     })
 
 # Helper for shlex

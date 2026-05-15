@@ -40,9 +40,11 @@ export default function Network() {
     try {
       const res = await api.get(`/network/interfaces/${iface.name}/config`);
       setDiagData(res);
+      // PRIORITÀ ALLA REALTÀ (LIVE)
+      const liveParts = res.live.address.split('/');
       setForm({
-        dhcp: res.saved.dhcp,
-        address: res.saved.address || (iface.ip !== 'N/A' ? `${iface.ip}/24` : ''),
+        dhcp: res.live.address === 'N/A', // Se non ha IP live, probabilmente è in DHCP fail o down
+        address: res.live.address !== 'N/A' ? res.live.address : (res.saved.address || ''),
         gateway: res.saved.gateway || '',
         dns: res.saved.dns || '8.8.8.8, 1.1.1.1'
       });
