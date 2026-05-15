@@ -25,6 +25,7 @@ def get_run_command():
 
 run_host_command = get_run_command()
 
+@services_bp.route("", methods=["GET"])
 @services_bp.route("/", methods=["GET"])
 @jwt_required()
 def list_services():
@@ -39,17 +40,17 @@ def list_services():
     lines = res.get("stdout", "").strip().split("\n")
     
     for line in lines:
-        # Clean line from leading dots or symbols that systemctl might still include
         line = line.strip()
-        if line.startswith(('●', '*', '.', ' ')):
-            line = re.sub(r'^[●\*\.\s]+', '', line)
+        if not line: continue
+        
+        # Remove status symbols (●, *, etc.)
+        line = re.sub(r'^[●\*\.\s\?]+', '', line)
             
+        # systemctl list-units output: UNIT LOAD ACTIVE SUB [DESCRIPTION]
         parts = line.split(None, 4)
         if len(parts) >= 4:
             name = parts[0].replace(".service", "")
-            # Skip if name is empty or just a symbol (safety check)
-            if not name or len(name) < 2:
-                continue
+            if not name: continue
                 
             services.append({
                 "name": name,

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 
 export default function Services() {
-  const { data, loading, error, refetch } = useApi('/services');
+  const { data, loading, error, refetch } = useApi('/services/');
   const [filter, setFilter] = useState('');
   const [actionLoading, setActionLoading] = useState(null);
   const [logsModal, setLogsModal] = useState(null);
