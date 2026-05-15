@@ -118,6 +118,52 @@ def system_info():
     except:
         os_name = platform.system()
 
+    # CPU Temperature
+    temp = None
+    try:
+        # Metodo standard Linux sysfs
+        for i in range(10):
+            path = f"/sys/class/thermal/thermal_zone{i}/type"
+            if os.path.exists(path):
+                with open(path, 'r') as f:
+                    if 'pkg_temp' in f.read() or 'cpu' in f.read().lower():
+                        with open(f"/sys/class/thermal/thermal_zone{i}/temp", 'r') as tf:
+                            temp = int(tf.read().strip()) / 1000.0
+                            break
+        if temp is None and hasattr(psutil, "sensors_temperatures"):
+            temps = psutil.sensors_temperatures()
+            if 'coretemp' in temps:
+                temp = temps['coretemp'][0].current
+    except:
+        temp = None
+
+    # NTP & Timezone
+    timezone = "UTC"
+    ntp_active = False
+    try:
+        res_time = run_host_command("timedatectl show --property=Timezone,NTP")
+        time_data = res_time.get("stdout", "")
+        for line in time_data.split("\n"):
+            if line.startswith("Timezone="):
+                timezone = line.split("=")[1]
+            if line.startswith("NTP="):
+                ntp_active = line.split("=")[1] == "yes"
+    except:
+        pass
+
+    # Active Sessions (SSH/Local)
+    sessions = []
+    try:
+        for user in psutil.users():
+            sessions.append({
+                "name": user.name,
+                "terminal": user.terminal,
+                "host": user.host,
+                "started": datetime.datetime.fromtimestamp(user.started).strftime("%Y-%m-%d %H:%M")
+            })
+    except:
+        pass
+
     return jsonify({
         "hostname": socket.gethostname(),
         "os": os_name,
@@ -125,10 +171,36 @@ def system_info():
         "arch": platform.machine(),
         "uptime": uptime,
         "cpu_count": psutil.cpu_count(),
+        "cpu_temp": temp,
         "local_ip": local_ip,
         "public_ip": public_ip,
         "virtualization": virt,
-        "boot_time": bt
+        "boot_time": bt,
+        "timezone": timezone,
+        "ntp_active": ntp_active,
+        "active_sessions": sessions
+    })
+
+@system_bp.route("/power", methods=["POST"])
+@jwt_required()
+def power_action():
+    data = request.get_json()
+    action = data.get("action") # reboot or shutdown
+    delay = data.get("delay", 0) # minutes
+    
+    if action not in ["reboot", "shutdown"]:
+        return jsonify({"success": False, "error": "Invalid action"}), 400
+    
+    flag = "-r" if action == "reboot" else "-h"
+    time_arg = f"+{delay}" if delay > 0 else "now"
+    
+    cmd = f"shutdown {flag} {time_arg}"
+    res = run_host_command(cmd)
+    return jsonify({
+        "success": res.get("returncode") == 0,
+        "message": f"Power action {action} scheduled in {delay} minutes" if delay > 0 else f"Executing {action} now",
+        "stdout": res.get("stdout"),
+        "stderr": res.get("stderr")
     })
 
 @system_bp.route("/reboot", methods=["POST"])
