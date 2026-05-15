@@ -64,7 +64,8 @@ export default function Docker() {
   useEffect(() => {
     if (activeTaskLogs) {
       const currentLogs = marketTasks?.tasks?.[activeTaskLogs.id]?.logs || [];
-      if (currentLogs.length > persistedLogs.length) {
+      // Sync logs if they are different from what we have
+      if (currentLogs.length !== persistedLogs.length) {
         setPersistedLogs(currentLogs);
       }
     } else {
@@ -296,15 +297,22 @@ export default function Docker() {
                 fontSize: '13px',
                 lineHeight: 1.5
               }}>
-                {persistedLogs.map((line, i) => (
-                  <div key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '2px', marginBottom: '4px' }}>
-                    {line}
+                {persistedLogs.length > 0 ? (
+                  persistedLogs.map((line, i) => (
+                    <div key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '2px', marginBottom: '4px' }}>
+                      {line}
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ color: '#888', fontStyle: 'italic' }}>
+                    > Establishing console connection...<br/>
+                    > Waiting for installation output...
                   </div>
-                )) || 'Initializing logs...'}
+                )}
                 {marketTasks?.tasks?.[activeTaskLogs.id]?.status === 'installing' && (
                   <div style={{ color: '#3b82f6', marginTop: '10px' }}>
-                    <RotateCw size={12} className="spin" style={{ marginRight: '8px' }} />
-                    Waiting for more logs...
+                    <RefreshCw size={12} className="spin" style={{ marginRight: '8px' }} />
+                    Receiving real-time data...
                   </div>
                 )}
                 <div ref={logsEndRef} />
