@@ -164,6 +164,13 @@ def system_info():
     except:
         pass
 
+    # Get Timezone
+    try:
+        res_tz = run_host_command("timedatectl show --property=Timezone --value")
+        timezone = res_tz.get("stdout", "UTC").strip()
+    except:
+        timezone = "UTC"
+
     return jsonify({
         "hostname": socket.gethostname(),
         "os": os_name,
