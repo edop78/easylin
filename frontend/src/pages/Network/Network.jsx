@@ -19,6 +19,7 @@ export default function Network() {
   const [applying, setApplying] = useState(false);
   const [msg, setMsg] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [lastOutput, setLastOutput] = useState(null);
 
   const doPing = async () => {
     if (!pingHost) return;
@@ -68,16 +69,27 @@ export default function Network() {
         dns: config.dns.split(',').map(s => s.trim())
       });
       setMsg({ type: 'success', text: result.message });
-      setEditIface(null);
+      setLastOutput(result.output || "No output returned.");
+      // Non chiudere il modal subito per permettere di vedere l'output
       setTimeout(() => {
         refetchIfaces();
         refetchDns();
-      }, 2000);
+      }, 3000);
     } catch (err) {
       setMsg({ type: 'error', text: err.message });
+      setLastOutput(err.response?.data?.error || err.message);
     } finally {
       setApplying(false);
     }
+  };
+
+  const syncFromLive = () => {
+    if (!config.liveAddress) return;
+    setConfig({
+      ...config,
+      address: config.liveAddress,
+      dhcp: false
+    });
   };
 
   return (
@@ -192,6 +204,13 @@ export default function Network() {
               </div>
             </details>
 
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Configuration</div>
+              <button className="btn btn-ghost btn-sm" onClick={syncFromLive} style={{ fontSize: '10px', height: '24px' }}>
+                <RefreshCw size={10} style={{ marginRight: '4px' }} /> Sync from Live
+              </button>
+            </div>
+
             <div style={{ 
               background: 'rgba(255,255,255,0.03)', 
               padding: '20px', 
@@ -254,11 +273,33 @@ export default function Network() {
             </div>
 
             <div className="modal-actions" style={{ display: 'flex', gap: '12px' }}>
-              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setEditIface(null)}>Cancel</button>
+              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => { setEditIface(null); setLastOutput(null); }}>Cancel</button>
               <button className="btn btn-primary" style={{ flex: 2 }} onClick={() => setShowConfirm(true)} disabled={applying}>
                 {applying ? <RefreshCw className="spin" size={18} /> : "Save & Apply Configuration"}
               </button>
             </div>
+
+            {lastOutput && (
+              <div style={{ marginTop: '24px', animation: 'slideUp 0.3s ease-out' }}>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Info size={12} /> Execution Result:
+                </div>
+                <pre style={{ 
+                  margin: 0, 
+                  padding: '12px', 
+                  background: '#0a0a0a', 
+                  color: '#3b82f6', 
+                  borderRadius: '12px', 
+                  fontSize: '11px', 
+                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                  fontFamily: 'var(--font-mono)',
+                  overflowX: 'auto',
+                  maxHeight: '150px'
+                }}>
+                  {lastOutput}
+                </pre>
+              </div>
+            )}
           </div>
           
           <ConfirmModal 
