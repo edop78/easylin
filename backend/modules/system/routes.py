@@ -17,21 +17,32 @@ def get_version():
         root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
         version_file = os.path.join(root_dir, "version.json")
         
-        # Leggi Major/Minor
-        major, minor = 1, 0
+        # Default values
+        major, minor, patch, build = 1, 1, 0, 0
+        label = "stable"
+        
+        # 1. Carica dati dal file
         if os.path.exists(version_file):
             with open(version_file, 'r') as f:
                 v = json.load(f)
-                major = v.get('major', 1)
-                minor = v.get('minor', 0)
+                major = v.get('major', major)
+                minor = v.get('minor', minor)
+                patch = v.get('patch', patch)
+                build = v.get('build', build)
+                label = v.get('label', label)
         
-        # Calcola Patch basato sui commit Git
+        # 2. Tenta di usare Git per la patch (se disponibile e siamo in un repo)
         res = run_host_command("git rev-list --count HEAD")
-        patch = res.get("stdout", "0").strip() if res.get("returncode") == 0 else "0"
+        if res.get("returncode") == 0:
+            # Se siamo in locale con Git, la patch è il numero di commit
+            git_count = int(res.get("stdout", "0").strip())
+            # Usiamo il maggiore tra il build manuale e il git count per sicurezza
+            patch = max(patch, git_count)
         
         return jsonify({
             "version": f"v{major}.{minor}.{patch}",
-            "label": "stable"
+            "build": build,
+            "label": label
         })
     except Exception as e:
         return jsonify({"version": "v1.1.0", "label": "error", "error": str(e)})
