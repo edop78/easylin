@@ -9,8 +9,12 @@ import ConfirmModal from '../../components/Common/ConfirmModal';
 
 export default function System() {
   const { data, loading, error, refetch } = useApi('/system/info');
+  const { data: powerStatus, refetch: refetchPower } = useApi('/system/power/status', { refreshInterval: 5000 });
   const [msg, setMsg] = useState(null);
+  const [powerMode, setPowerMode] = useState('delay'); // delay, time, cron
   const [powerDelay, setPowerDelay] = useState(0);
+  const [powerTime, setPowerTime] = useState('00:00');
+  const [powerCron, setPowerCron] = useState('0 3 * * 0');
   const [confirm, setConfirm] = useState({ open: false, title: '', message: '', action: null });
 
   useEffect(() => {
@@ -23,8 +27,26 @@ export default function System() {
   const handlePowerAction = async (action) => {
     setConfirm({ ...confirm, open: false });
     try {
-      const res = await api.post('/system/power', { action, delay: powerDelay });
-      setMsg({ type: 'success', text: res.message || `Action ${action} initiated` });
+      const payload = { 
+        action, 
+        mode: powerMode,
+        delay: powerMode === 'delay' ? powerDelay : 0,
+        time: powerMode === 'time' ? powerTime : null,
+        cron: powerMode === 'cron' ? powerCron : null
+      };
+      const res = await api.post('/system/power', payload);
+      setMsg({ type: 'success', text: res.message });
+      setTimeout(refetchPower, 1000);
+    } catch (err) {
+      setMsg({ type: 'error', text: err.message });
+    }
+  };
+
+  const cancelPower = async () => {
+    try {
+      const res = await api.post('/system/power/cancel');
+      setMsg({ type: 'success', text: res.message });
+      setTimeout(refetchPower, 1000);
     } catch (err) {
       setMsg({ type: 'error', text: err.message });
     }
@@ -79,6 +101,21 @@ export default function System() {
         </button>
       </div>
 
+      {powerStatus?.active && (
+        <div className="alert alert-warning fade-in" style={{ marginBottom: '24px', border: '1px solid var(--accent-red)', background: 'rgba(239, 68, 68, 0.1)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+            <AlertCircle size={20} className="pulse" style={{ color: 'var(--accent-red)' }} />
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '14px' }}>System {powerStatus.action.toUpperCase()} Pending</div>
+              <div style={{ fontSize: '12px', opacity: 0.8 }}>Execution scheduled for: <strong>{powerStatus.time}</strong></div>
+            </div>
+          </div>
+          <button className="btn btn-sm btn-danger" onClick={cancelPower} style={{ marginLeft: '20px' }}>
+            <X size={14} /> Abort Operation
+          </button>
+        </div>
+      )}
+
       {msg && (
         <div className={`alert alert-${msg.type === 'error' ? 'error' : 'success'}`} style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -128,26 +165,47 @@ export default function System() {
           {/* POWER CARD */}
           <div className="card power-card">
             <div className="card-header"><div className="card-title"><Power size={16} /> Power Controls</div></div>
-            <div className="power-scheduler">
-              <div className="scheduler-header">
-                <span>Delayed Action</span>
-                <span className="delay-badge">{powerDelay > 0 ? `${powerDelay} min` : 'Now'}</span>
-              </div>
-              <input 
-                type="range" min="0" max="120" step="5" value={powerDelay} 
-                onChange={(e) => setPowerDelay(parseInt(e.target.value))} 
-                className="power-slider"
-              />
+            
+            <div className="tabs-mini" style={{ marginBottom: '16px' }}>
+              <button className={`tab-sm ${powerMode === 'delay' ? 'active' : ''}`} onClick={() => setPowerMode('delay')}>Delay</button>
+              <button className={`tab-sm ${powerMode === 'time' ? 'active' : ''}`} onClick={() => setPowerMode('time')}>At Time</button>
+              <button className={`tab-sm ${powerMode === 'cron' ? 'active' : ''}`} onClick={() => setPowerMode('cron')}>Cron</button>
             </div>
+
+            <div className="power-scheduler">
+              {powerMode === 'delay' && (
+                <>
+                  <div className="scheduler-header">
+                    <span>In Minutes</span>
+                    <span className="delay-badge">{powerDelay > 0 ? `${powerDelay} min` : 'Now'}</span>
+                  </div>
+                  <input type="range" min="0" max="120" step="5" value={powerDelay} onChange={(e) => setPowerDelay(parseInt(e.target.value))} className="power-slider" />
+                </>
+              )}
+              {powerMode === 'time' && (
+                <div className="form-group">
+                  <label className="form-label">Specific Time (HH:MM)</label>
+                  <input type="time" className="input-sm" value={powerTime} onChange={(e) => setPowerTime(e.target.value)} />
+                </div>
+              )}
+              {powerMode === 'cron' && (
+                <div className="form-group">
+                  <label className="form-label">Cron Expression</label>
+                  <input type="text" className="input-sm" value={powerCron} onChange={(e) => setPowerCron(e.target.value)} placeholder="0 3 * * 0" />
+                  <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>Ex: 0 3 * * 0 (Every Sunday at 03:00)</div>
+                </div>
+              )}
+            </div>
+            
             <div className="power-buttons">
               <button className="btn btn-danger" onClick={() => setConfirm({ 
-                open: true, title: 'Reboot', message: `Reboot system ${powerDelay > 0 ? `in ${powerDelay} min` : 'now'}?`, 
+                open: true, title: 'Reboot', message: `Confirm ${powerMode} reboot?`, 
                 action: () => handlePowerAction('reboot') 
               })}>
                 <RotateCw size={14} /> Reboot
               </button>
               <button className="btn btn-ghost shutdown-btn" onClick={() => setConfirm({ 
-                open: true, title: 'Shutdown', message: `Power off system ${powerDelay > 0 ? `in ${powerDelay} min` : 'now'}?`, 
+                open: true, title: 'Shutdown', message: `Confirm ${powerMode} shutdown?`, 
                 action: () => handlePowerAction('shutdown') 
               })}>
                 <Power size={14} /> Shutdown
@@ -192,6 +250,14 @@ export default function System() {
         .power-buttons { display: flex; gap: 12px; }
         .power-buttons .btn { flex: 1; height: 40px; }
         .shutdown-btn { color: var(--accent-red) !important; }
+
+        .tabs-mini { display: flex; gap: 4px; background: var(--bg-lighter); padding: 4px; border-radius: 8px; }
+        .tab-sm { flex: 1; border: none; background: transparent; color: var(--text-muted); padding: 6px; font-size: 11px; font-weight: 600; cursor: pointer; border-radius: 6px; transition: 0.2s; }
+        .tab-sm.active { background: var(--bg-card); color: var(--accent-blue); box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+        .input-sm { width: 100%; background: var(--bg-lighter); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 6px; font-size: 13px; outline: none; }
+        .input-sm:focus { border-color: var(--accent-blue); }
+        .pulse { animation: pulse-red 2s infinite; }
+        @keyframes pulse-red { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
       `}} />
     </div>
   );

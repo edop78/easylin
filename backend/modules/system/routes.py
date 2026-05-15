@@ -181,24 +181,74 @@ def system_info():
         "active_sessions": sessions
     })
 
+@system_bp.route("/power/status", methods=["GET"])
+@jwt_required()
+def get_power_status():
+    scheduled_file = "/run/systemd/shutdown/scheduled"
+    if os.path.exists(scheduled_file):
+        try:
+            with open(scheduled_file, 'r') as f:
+                content = f.read()
+                # Il file contiene USEC=... e ACTION=...
+                data = {}
+                for line in content.split("\n"):
+                    if "=" in line:
+                        k, v = line.split("=", 1)
+                        data[k] = v
+                
+                # Convertiamo USEC (microsecondi da epoca) in data leggibile
+                usec = int(data.get("USEC", 0))
+                dt = datetime.datetime.fromtimestamp(usec / 1000000)
+                return jsonify({
+                    "active": True,
+                    "action": data.get("ACTION", "shutdown"),
+                    "time": dt.strftime("%Y-%m-%d %H:%M:%S"),
+                    "timestamp": usec / 1000000
+                })
+        except:
+            pass
+    return jsonify({"active": False})
+
+@system_bp.route("/power/cancel", methods=["POST"])
+@jwt_required()
+def cancel_power():
+    res = run_host_command("shutdown -c")
+    return jsonify({"success": res.get("returncode") == 0, "message": "Scheduled operation cancelled"})
+
 @system_bp.route("/power", methods=["POST"])
 @jwt_required()
 def power_action():
     data = request.get_json()
     action = data.get("action") # reboot or shutdown
-    delay = data.get("delay", 0) # minutes
+    mode = data.get("mode", "delay") # delay, time, cron
     
     if action not in ["reboot", "shutdown"]:
         return jsonify({"success": False, "error": "Invalid action"}), 400
     
     flag = "-r" if action == "reboot" else "-h"
-    time_arg = f"+{delay}" if delay > 0 else "now"
     
-    cmd = f"shutdown {flag} {time_arg}"
+    if mode == "delay":
+        delay = data.get("delay", 0)
+        time_arg = f"+{delay}" if delay > 0 else "now"
+        cmd = f"shutdown {flag} {time_arg}"
+    elif mode == "time":
+        target_time = data.get("time") # HH:MM
+        cmd = f"shutdown {flag} {target_time}"
+    elif mode == "cron":
+        cron_expr = data.get("cron") # e.g. "0 3 * * 0" (ogni domenica alle 3)
+        # Per cron dobbiamo creare un job che esegua reboot/shutdown
+        system_cmd = "reboot" if action == "reboot" else "shutdown -h now"
+        # Usiamo un commento identificativo per poterlo rimuovere in futuro se necessario
+        cron_line = f"{cron_expr} root {system_cmd} # EASYLIN_POWER_JOB"
+        # Aggiungiamo al crontab di sistema o in /etc/cron.d/easylin_power
+        cmd = f'echo "{cron_line}" > /etc/cron.d/easylin_power_{action}'
+    else:
+        return jsonify({"success": False, "error": "Invalid mode"}), 400
+    
     res = run_host_command(cmd)
     return jsonify({
         "success": res.get("returncode") == 0,
-        "message": f"Power action {action} scheduled in {delay} minutes" if delay > 0 else f"Executing {action} now",
+        "message": f"Power action {action} scheduled successfully",
         "stdout": res.get("stdout"),
         "stderr": res.get("stderr")
     })
