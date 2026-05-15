@@ -116,7 +116,7 @@ def docker_info():
     try:
         info = client.info()
         return jsonify({
-            "version": f"{info.get('ServerVersion', '')} (NUCLEAR)",
+            "version": info.get("ServerVersion", ""),
             "containers": info.get("Containers", 0),
             "running": info.get("ContainersRunning", 0),
             "paused": info.get("ContainersPaused", 0),

@@ -206,16 +206,37 @@ export default function Docker() {
     return containersData?.containers?.find(c => c.name === containerName)?.id;
   };
 
-  if (info?.error) {
-    return (
-      <div className="page fade-in">
-        <div className="page-header">
-          <div className="page-title"><Container size={28} /><h1>Docker</h1></div>
-        </div>
-        <div className="alert alert-warning">Docker daemon is not available. Make sure Docker is installed and the socket is mounted.</div>
-      </div>
-    );
-  }
+  // Ensure stats don't crash
+  const stats = [
+    { 
+      label: 'Containers', 
+      value: info?.containers ?? containersData?.containers?.length ?? 0, 
+      icon: Container, 
+      color: 'blue',
+      sub: `${info?.running || 0} Running`
+    },
+    { 
+      label: 'Images', 
+      value: info?.images ?? imagesData?.images?.length ?? 0, 
+      icon: Image, 
+      color: 'purple',
+      sub: 'Stored locally'
+    },
+    { 
+      label: 'Volumes', 
+      value: info?.volumes ?? volumesData?.volumes?.length ?? 0, 
+      icon: HardDrive, 
+      color: 'amber',
+      sub: 'Persisted data'
+    },
+    { 
+      label: 'Networks', 
+      value: networksData?.networks?.length ?? 0, 
+      icon: Network, 
+      color: 'emerald',
+      sub: 'Docker bridges'
+    }
+  ];
 
   return (
     <div className="page fade-in">
@@ -240,36 +261,18 @@ export default function Docker() {
         </div>
       )}
 
-      {info && (
-        <div className="stat-grid" style={{ marginBottom: 'var(--space-lg)' }}>
-          <div className="stat-card">
-            <div className="stat-icon blue"><Container size={20} /></div>
+      <div className="stat-grid" style={{ marginBottom: 'var(--space-lg)' }}>
+        {stats.map((s, i) => (
+          <div key={i} className="stat-card">
+            <div className={`stat-icon ${s.color}`}><s.icon size={20} /></div>
             <div className="stat-info">
-              <div className="stat-label">Containers</div>
-              <div className="stat-value">{info.containers}</div>
-              <div className="stat-sub">
-                <span style={{ color: 'var(--accent-green)' }}>{info.running} running</span>
-                {' · '}{info.stopped} stopped
-              </div>
+              <div className="stat-label">{s.label}</div>
+              <div className="stat-value">{s.value}</div>
+              <div className="stat-sub">{s.sub}</div>
             </div>
           </div>
-          <div className="stat-card">
-            <div className="stat-icon purple"><Image size={20} /></div>
-            <div className="stat-info">
-              <div className="stat-label">Images</div>
-              <div className="stat-value">{info.images}</div>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon cyan"><Cog size={20} /></div>
-            <div className="stat-info">
-              <div className="stat-label">Docker Version</div>
-              <div className="stat-value" style={{ fontSize: '1rem' }}>{info?.version || 'Loading...'}</div>
-              <div className="stat-sub">Driver: {info?.driver}</div>
-            </div>
-          </div>
-        </div>
-      )}
+        ))}
+      </div>
 
       {logsModal && (
         <div className="modal-overlay" onClick={() => setLogsModal(null)}>
