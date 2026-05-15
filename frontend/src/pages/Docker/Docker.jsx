@@ -472,16 +472,18 @@ export default function Docker() {
                     )}
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {isInstalling || (hasError && !installed) ? (
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button className="btn btn-primary" style={{ flex: 2 }} onClick={() => setActiveTaskLogs({ id: app.id, name: app.name })}><ScrollText size={16} /> View Logs</button>
-                          {hasError && <button className="btn btn-ghost" style={{ flex: 1, color: 'var(--accent-red)' }} onClick={() => clearTask(app.id)}><Trash size={16} /> Retry</button>}
-                        </div>
-                      ) : !installed ? (
+                      {/* Show View Logs if installing, error, or if a task exists even if installed */}
+                      {(isInstalling || hasError || (installed && task)) && (
+                        <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => setActiveTaskLogs({ id: app.id, name: app.name })}>
+                          <ScrollText size={16} /> {isInstalling ? 'View Progress' : 'View Installation Logs'}
+                        </button>
+                      )}
+
+                      {!installed ? (
                         <button 
                           className="btn btn-primary" 
                           style={{ width: '100%' }} 
-                          disabled={installing === app.id} 
+                          disabled={installing === app.id || isInstalling} 
                           onClick={() => setConfirm({ 
                             open: true, 
                             title: `Install ${app.name}`, 
@@ -489,13 +491,24 @@ export default function Docker() {
                             action: () => installApp(app.id) 
                           })}
                         >
-                          {installing === app.id ? <RefreshCw size={16} className="spin" /> : <Download size={16} />} Install App
+                          {installing === app.id || isInstalling ? <RefreshCw size={16} className="spin" /> : <Download size={16} />} 
+                          {isInstalling ? 'Installing...' : 'Install App'}
                         </button>
                       ) : (
-                        <>
-                          <a href={`http://${window.location.hostname}:${app.uiPort}`} target="_blank" rel="noreferrer" className="btn btn-primary" style={{ width: '100%', textDecoration: 'none', justifyContent: 'center' }}><ExternalLink size={16} /> Open Web UI</a>
-                          <button className="btn btn-ghost" style={{ width: '100%', color: 'var(--accent-red)' }} onClick={() => setConfirm({ open: true, title: `Uninstall ${app.name}`, message: `Are you sure you want to remove the ${app.name} container? All data in volumes will be preserved.`, action: () => containerAction(containerId, 'remove') })}><Trash size={16} /> Uninstall</button>
-                        </>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                          <a href={`http://${window.location.hostname}:${app.uiPort}`} target="_blank" rel="noreferrer" className="btn btn-primary" style={{ flex: 1, textDecoration: 'none', justifyContent: 'center' }}>
+                            <ExternalLink size={16} /> Web UI
+                          </a>
+                          <button className="btn btn-ghost" style={{ flex: 1, color: 'var(--accent-red)' }} onClick={() => setConfirm({ open: true, title: `Uninstall ${app.name}`, message: `Are you sure you want to remove the ${app.name} container? All data in volumes will be preserved.`, action: () => containerAction(containerId, 'remove') })}>
+                            <Trash size={16} /> Uninstall
+                          </button>
+                        </div>
+                      )}
+
+                      {hasError && !installed && (
+                        <button className="btn btn-ghost" style={{ width: '100%', color: 'var(--accent-red)' }} onClick={() => clearTask(app.id)}>
+                          <Trash size={16} /> Clear Status
+                        </button>
                       )}
                     </div>
                   </div>
