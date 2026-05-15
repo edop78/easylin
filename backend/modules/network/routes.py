@@ -106,25 +106,28 @@ def list_connections():
 @network_bp.route("/interfaces/<iface>/config", methods=["GET"])
 @jwt_required()
 def get_interface_config(iface):
-    """Get both LIVE and SAVED configuration for an interface."""
-    # 1. LIVE DATA (from psutil/OS)
+    """Get the absolute reality from the host."""
+    # 1. RAW DATA (The "Naked Truth")
+    raw_ip = run_host_command(f"ip addr show {iface}")
+    raw_route = run_host_command(f"ip route show dev {iface}")
+    
+    # 2. LIVE DATA (Parsed)
     addrs = psutil.net_if_addrs().get(iface, [])
     live_ip = ""
     for addr in addrs:
         if addr.family.name == 'AF_INET':
-            live_ip = f"{addr.address}/{addr.netmask}" # Semplificato
+            live_ip = f"{addr.address}/{addr.netmask}"
             break
             
-    # 2. SAVED DATA (from Netplan/NetworkManager)
-    saved = {"dhcp": True, "address": "", "gateway": "", "dns": ""}
-    manager = get_active_manager()
+    # 3. SAVED DATA (Search in Netplan AND /etc/network/interfaces)
+    saved = {"dhcp": True, "address": "", "gateway": "", "dns": "", "source": "unknown"}
     
-    try:
-        import yaml
-        # Controlliamo i file netplan in ordine di priorità
-        for f in ["/etc/netplan/99-easylin.yaml", "/etc/netplan/01-netcfg.yaml", "/etc/netplan/50-cloud-init.yaml"]:
-            res = run_host_command(f"cat {f}")
-            if res["returncode"] == 0:
+    # Check Netplan
+    import yaml
+    for f in ["/etc/netplan/99-easylin.yaml", "/etc/netplan/01-netcfg.yaml", "/etc/netplan/50-cloud-init.yaml"]:
+        res = run_host_command(f"cat {f}")
+        if res["returncode"] == 0:
+            try:
                 cfg = yaml.safe_load(res["stdout"])
                 if "network" in cfg and "ethernets" in cfg["network"] and iface in cfg["network"]["ethernets"]:
                     ifc = cfg["network"]["ethernets"][iface]
@@ -132,16 +135,34 @@ def get_interface_config(iface):
                         "dhcp": ifc.get("dhcp4") == "yes" or ifc.get("dhcp4", True) is True,
                         "address": ifc.get("addresses", [""])[0],
                         "gateway": ifc.get("routes", [{}])[0].get("via", "") if ifc.get("routes") else "",
-                        "dns": ", ".join(ifc.get("nameservers", {}).get("addresses", []))
+                        "dns": ", ".join(ifc.get("nameservers", {}).get("addresses", [])),
+                        "source": f"Netplan ({f})"
                     }
                     break
-    except:
-        pass
+            except: continue
+
+    # Check /etc/network/interfaces (Legacy Debian/Proxmox)
+    if saved["source"] == "unknown":
+        res = run_host_command("cat /etc/network/interfaces")
+        if res["returncode"] == 0:
+            import re
+            content = res["stdout"]
+            if f"iface {iface}" in content:
+                is_dhcp = f"iface {iface} inet dhcp" in content
+                addr_match = re.search(fr"iface {iface} inet static\s+address\s+([^\s]+)", content)
+                gw_match = re.search(r"gateway\s+([^\s]+)", content)
+                saved = {
+                    "dhcp": is_dhcp,
+                    "address": addr_match.group(1) if addr_match else "",
+                    "gateway": gw_match.group(1) if gw_match else "",
+                    "dns": "",
+                    "source": "/etc/network/interfaces"
+                }
 
     return jsonify({
-        "live": {"address": live_ip},
+        "live": {"address": live_ip, "raw": raw_ip["stdout"], "route": raw_route["stdout"]},
         "saved": saved,
-        "manager": manager
+        "manager": get_active_manager()
     })
 
 

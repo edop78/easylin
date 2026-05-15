@@ -46,7 +46,10 @@ export default function Network() {
         address: saved.address || (iface.addresses?.find(a => a.family === 'AF_INET')?.address ? `${iface.addresses?.find(a => a.family === 'AF_INET').address}/24` : ''),
         gateway: saved.gateway || '',
         dns: saved.dns || '8.8.8.8, 1.1.1.1',
-        liveAddress: live.address
+        liveAddress: live.address,
+        raw: live.raw,
+        route: live.route,
+        source: saved.source
       });
     } catch (err) {
       console.error("Failed to fetch current config", err);
@@ -169,12 +172,25 @@ export default function Network() {
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: '#10b981' }}>{config.liveAddress || 'Unknown'}</div>
               </div>
               <div className="stat-box" style={{ flex: 1, background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Saved Config</div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: config.liveAddress?.split('/')[0] === config.address?.split('/')[0] ? 'var(--text-primary)' : '#f59e0b' }}>
-                  {config.address || 'DHCP'}
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Config Source</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--accent-blue)' }}>
+                  {config.source || 'Unknown'}
                 </div>
               </div>
             </div>
+
+            <details style={{ marginBottom: '24px', background: 'rgba(0,0,0,0.3)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <summary style={{ padding: '12px', cursor: 'pointer', fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Info size={14} /> View Raw Kernel Diagnostics (The Naked Truth)
+              </summary>
+              <div style={{ padding: '0 12px 12px 12px' }}>
+                <pre style={{ margin: 0, padding: '12px', background: '#000', color: '#10b981', borderRadius: '8px', fontSize: '11px', overflowX: 'auto', border: '1px solid #10b98133' }}>
+                  {config.raw || 'No raw data available'}
+                  {"\n\n--- ROUTES ---\n"}
+                  {config.route || 'No route data available'}
+                </pre>
+              </div>
+            </details>
 
             <div style={{ 
               background: 'rgba(255,255,255,0.03)', 
