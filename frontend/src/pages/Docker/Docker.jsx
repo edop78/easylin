@@ -62,20 +62,26 @@ export default function Docker() {
   const logsEndRef = useRef(null);
 
   useEffect(() => {
+    let interval;
     if (activeTaskLogs) {
-      const task = marketTasks?.tasks?.[activeTaskLogs.id];
-      const newLogs = task?.logs || [];
-      
-      if (newLogs.length > 0) {
-        setPersistedLogs(newLogs);
-      } else if (persistedLogs.length === 0) {
-        // Initial feedback if no logs yet from server
-        setPersistedLogs(['> System: Initializing deployment sequence...', '> System: Connecting to Docker daemon...']);
-      }
+      const fetchFileLogs = async () => {
+        try {
+          const res = await api.get('/docker/market/logs/file');
+          if (res.logs && res.logs.length > 0) {
+            setPersistedLogs(res.logs);
+          }
+        } catch (err) {
+          console.error("Failed to fetch file logs", err);
+        }
+      };
+
+      fetchFileLogs();
+      interval = setInterval(fetchFileLogs, 2000);
     } else {
       setPersistedLogs([]);
     }
-  }, [marketTasks, activeTaskLogs]);
+    return () => clearInterval(interval);
+  }, [activeTaskLogs]);
 
   useEffect(() => {
     if (activeTaskLogs && logsEndRef.current) {

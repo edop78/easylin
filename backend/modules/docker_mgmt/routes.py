@@ -12,19 +12,17 @@ from database import get_db
 
 docker_bp = Blueprint("docker", __name__)
 
-# Global in-memory logs for real-time terminal output (bypasses DB latency)
-GLOBAL_LOGS = {}
-LAST_DB_UPDATE = {}
+# Fail-safe file logging for terminal output
+LOG_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "install_log.txt")
 
 def update_task_db(app_id, status=None, message=None, error=None, log_entry=None, logs_list=None):
-    """Update task status in DB and in-memory log buffer."""
-    if app_id not in GLOBAL_LOGS:
-        GLOBAL_LOGS[app_id] = []
-    
+    """Update task status in DB and write to physical log file."""
     if log_entry:
-        GLOBAL_LOGS[app_id].append(log_entry)
-        if len(GLOBAL_LOGS[app_id]) > 200:
-            GLOBAL_LOGS[app_id].pop(0)
+        try:
+            with open(LOG_FILE, "a") as f:
+                f.write(f"{log_entry}\n")
+        except:
+            pass
             
     conn = get_db()
     try:
@@ -445,8 +443,16 @@ def market_install():
         update_task_db(app_id, status="installing", message="Initializing...", logs_list=[])
 
         # Start installation in background
+        # Clear log file for new installation
+        try:
+            with open(LOG_FILE, "w") as f:
+                f.write(f"--- Deployment Started: {app_config['name']} ---\n")
+                f.write(f"--- Time: {time.ctime()} ---\n")
+        except:
+            pass
+
         # Create initial status BEFORE thread starts to avoid UI race condition
-        update_task_db(app_id, status="installing", message="Starting installation...", log_entry=f"--- Starting deployment for {app_config['name']} ---")
+        update_task_db(app_id, status="installing", message="Starting installation...", log_entry=f"Initializing backend deployment thread...")
         
         thread = threading.Thread(
             target=background_install, 
@@ -526,6 +532,21 @@ def market_status():
         return jsonify({"tasks": tasks})
     finally:
         conn.close()
+
+
+@docker_bp.route("/market/logs/file", methods=["GET"])
+@jwt_required()
+def get_market_logs_file():
+    """Get real-time logs from the physical file."""
+    if not os.path.exists(LOG_FILE):
+        return jsonify({"logs": ["--- No log file found yet. Waiting for installation to start... ---"]})
+    
+    try:
+        with open(LOG_FILE, "r") as f:
+            lines = f.readlines()
+            return jsonify({"logs": [line.strip() for line in lines]})
+    except Exception as e:
+        return jsonify({"logs": [f"--- Error reading log file: {str(e)} ---"]})
 
 
 @docker_bp.route("/market/clear/<app_id>", methods=["POST"])
