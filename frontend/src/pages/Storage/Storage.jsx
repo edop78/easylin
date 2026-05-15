@@ -109,8 +109,8 @@ export default function Storage() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <button className="btn btn-ghost" onClick={() => { refetchDisks(); refetchLVM(); }}>
-            <RefreshCw size={18} /> Refresh
+          <button className="btn btn-ghost" onClick={() => { refetchDisks(); refetchLVM(); }} disabled={loadingDisks || loadingLVM}>
+            <RefreshCw size={18} className={loadingDisks || loadingLVM ? 'spin' : ''} /> Refresh
           </button>
           <button className="btn btn-primary" onClick={() => setShowNASWizard(true)}>
             <Plus size={18} /> Mount NAS
