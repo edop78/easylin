@@ -37,5 +37,5 @@ RUN mkdir -p /app/data
 
 EXPOSE 5050
 
-# Start with Gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:5050", "--workers", "4", "app:create_app()"]
+# Start with Gunicorn (extended timeout for heavy docker pulls)
+CMD ["gunicorn", "--bind", "0.0.0.0:5050", "--workers", "1", "--timeout", "3600", "app:create_app()"]
