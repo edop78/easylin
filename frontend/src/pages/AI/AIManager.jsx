@@ -112,8 +112,8 @@ export default function AIManager() {
         <div className="alert alert-error" style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
           <Info size={24} />
           <div style={{ flex: 1 }}>
-            <strong style={{ display: 'block', marginBottom: '4px' }}>Ollama non rilevato</strong> 
-            Per usare le funzionalità IA, devi installare il motore Ollama. Puoi farlo con un click dalla sezione <strong>Docker App Store</strong>.
+            <strong style={{ display: 'block', marginBottom: '4px' }}>{status?.message || 'Ollama non rilevato'}</strong> 
+            {status?.detected_ip ? `Indirizzo IP rilevato: ${status.detected_ip}` : 'Verifica che il motore Ollama sia installato e attivo nella sezione Docker App Store.'}
           </div>
           <Link to="/docker" className="btn btn-sm btn-primary" style={{ whiteSpace: 'nowrap', textDecoration: 'none' }}>
             Vai allo Store
