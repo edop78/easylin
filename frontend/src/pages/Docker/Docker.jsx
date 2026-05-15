@@ -57,6 +57,7 @@ export default function Docker() {
   const [confirm, setConfirm] = useState({ open: false, title: '', message: '', action: null });
   
   const [customApp, setCustomApp] = useState({ type: 'image', image: '', name: '', ports: '' });
+  const [activeTaskLogs, setActiveTaskLogs] = useState(null);
 
   useEffect(() => {
     if (msg) {
@@ -112,17 +113,21 @@ export default function Docker() {
     try {
       const res = await api.post('/docker/market/install', { app_id: appId });
       setMsg({ type: 'success', text: res.message });
-      
-      // Auto-refresh every 5s for the next minute to catch the new container
-      const refreshInterval = setInterval(refetchContainers, 5000);
-      setTimeout(() => clearInterval(refreshInterval), 60000);
-      
       refetchContainers();
       setTab('containers');
     } catch (err) {
       setMsg({ type: 'error', text: err.message });
     } finally {
       setInstalling(null);
+    }
+  };
+
+  const clearTask = async (appId) => {
+    try {
+      await api.post(`/docker/market/clear/${appId}`);
+      // marketTasks will refetch automatically via useApi interval
+    } catch (err) {
+      setMsg({ type: 'error', text: err.message });
     }
   };
 
@@ -235,6 +240,44 @@ export default function Docker() {
             <pre className="code-block" style={{ maxHeight: '500px' }}>{logsModal.logs || 'No logs available'}</pre>
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setLogsModal(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTaskLogs && (
+        <div className="modal-overlay" onClick={() => setActiveTaskLogs(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', width: '90%' }}>
+            <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <RotateCw size={18} className={marketTasks?.tasks?.[activeTaskLogs.id]?.status === 'installing' ? 'spin' : ''} />
+              Installation Logs: {activeTaskLogs.name}
+            </h3>
+            <div style={{ backgroundColor: '#000', borderRadius: '8px', padding: '15px', marginTop: '15px' }}>
+              <pre style={{ 
+                maxHeight: '400px', 
+                overflowY: 'auto', 
+                margin: 0, 
+                color: '#22c55e', 
+                fontFamily: 'monospace',
+                fontSize: '13px',
+                lineHeight: 1.5
+              }}>
+                {marketTasks?.tasks?.[activeTaskLogs.id]?.logs?.map((line, i) => (
+                  <div key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '2px', marginBottom: '4px' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.3)', marginRight: '10px' }}>[{i+1}]</span>
+                    {line}
+                  </div>
+                )) || 'Initializing logs...'}
+                {marketTasks?.tasks?.[activeTaskLogs.id]?.status === 'installing' && (
+                  <div style={{ color: '#3b82f6', marginTop: '10px' }}>
+                    <RotateCw size={12} className="spin" style={{ marginRight: '8px' }} />
+                    Waiting for more logs...
+                  </div>
+                )}
+              </pre>
+            </div>
+            <div className="modal-actions" style={{ marginTop: '20px' }}>
+              <button className="btn btn-ghost" onClick={() => setActiveTaskLogs(null)}>Close</button>
             </div>
           </div>
         </div>
@@ -380,11 +423,16 @@ export default function Docker() {
                     )}
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {!installed ? (
+                      {isInstalling || (hasError && !installed) ? (
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button className="btn btn-primary" style={{ flex: 2 }} onClick={() => setActiveTaskLogs({ id: app.id, name: app.name })}><ScrollText size={16} /> View Logs</button>
+                          {hasError && <button className="btn btn-ghost" style={{ flex: 1, color: 'var(--accent-red)' }} onClick={() => clearTask(app.id)}><Trash size={16} /> Retry</button>}
+                        </div>
+                      ) : !installed ? (
                         <button 
                           className="btn btn-primary" 
                           style={{ width: '100%' }} 
-                          disabled={installing === app.id || isInstalling} 
+                          disabled={installing === app.id} 
                           onClick={() => setConfirm({ 
                             open: true, 
                             title: `Install ${app.name}`, 
@@ -392,8 +440,7 @@ export default function Docker() {
                             action: () => installApp(app.id) 
                           })}
                         >
-                          {installing === app.id || isInstalling ? <RefreshCw size={16} className="spin" /> : <Download size={16} />} 
-                          {isInstalling ? 'Installing...' : 'Install App'}
+                          {installing === app.id ? <RefreshCw size={16} className="spin" /> : <Download size={16} />} Install App
                         </button>
                       ) : (
                         <>

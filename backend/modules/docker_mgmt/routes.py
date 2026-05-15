@@ -9,7 +9,7 @@ import threading
 docker_bp = Blueprint("docker", __name__)
 
 # Track background installation tasks
-# Format: { "app_id": { "status": "installing" | "success" | "error", "message": str, "error": str | None, "timestamp": float } }
+# Format: { "app_id": { "status": "installing" | "success" | "error", "message": str, "error": str | None, "logs": [], "timestamp": float } }
 INSTALLATION_TASKS = {}
 
 
@@ -279,28 +279,36 @@ def market_install():
         return jsonify({"error": "Unknown app"}), 400
 
     def background_install(app_id, app_config, flask_app):
+        def log_msg(msg):
+            if app_id in INSTALLATION_TASKS:
+                INSTALLATION_TASKS[app_id]["logs"].append(msg)
+                if len(INSTALLATION_TASKS[app_id]["logs"]) > 100:
+                    INSTALLATION_TASKS[app_id]["logs"].pop(0)
+                INSTALLATION_TASKS[app_id]["message"] = msg
+
         with flask_app.app_context():
             try:
+                log_msg("Initializing Docker client...")
                 client = docker.from_env()
                 # Check if already exists
                 try:
                     client.containers.get(app_config["name"])
-                    INSTALLATION_TASKS[app_id] = {"status": "success", "message": "Already installed", "error": None}
+                    INSTALLATION_TASKS[app_id].update({"status": "success", "message": "Already installed", "error": None})
+                    log_msg("Container already exists. Task finished.")
                     return
                 except Exception:
                     pass
 
                 # Pull with progress tracking
-                INSTALLATION_TASKS[app_id]["message"] = "Starting download..."
+                log_msg(f"Starting pull for {app_config['image']}...")
                 for line in client.api.pull(app_config["image"], stream=True, decode=True):
                     status = line.get("status", "")
                     progress = line.get("progress", "")
                     if status:
-                        msg = f"{status} {progress}".strip()
-                        INSTALLATION_TASKS[app_id]["message"] = msg
+                        log_msg(f"{status} {progress}".strip())
 
                 # Run
-                INSTALLATION_TASKS[app_id]["message"] = "Creating container..."
+                log_msg("Creating container...")
                 client.containers.run(
                     app_config["image"],
                     name=app_config["name"],
@@ -309,17 +317,18 @@ def market_install():
                     restart_policy=app_config["restart_policy"],
                     detach=True
                 )
-                INSTALLATION_TASKS[app_id] = {"status": "success", "message": "Installed successfully", "error": None}
+                INSTALLATION_TASKS[app_id].update({"status": "success", "message": "Installed successfully", "error": None})
+                log_msg("Installation completed successfully.")
             except Exception as e:
+                import traceback
+                error_details = traceback.format_exc()
                 error_msg = str(e)
-                # Clean up error message if it's a known Docker API error
                 if "port is already allocated" in error_msg.lower():
-                    error_msg = "Port conflict: Port 11434 is already in use by another process."
-                elif "repository does not exist" in error_msg.lower():
-                    error_msg = f"Image {app_config['image']} not found on Docker Hub."
+                    error_msg = "Port conflict: Port 11434 is already in use."
                 
-                print(f"Background install error for {app_config['name']}: {error_msg}")
-                INSTALLATION_TASKS[app_id] = {"status": "error", "message": "Failed", "error": error_msg}
+                log_msg(f"ERROR: {error_msg}")
+                log_msg(error_details)
+                INSTALLATION_TASKS[app_id].update({"status": "error", "message": "Failed", "error": error_msg})
 
     try:
         # Check if already exists (immediate check)
@@ -330,7 +339,13 @@ def market_install():
             pass
 
         # Initialize task status
-        INSTALLATION_TASKS[app_id] = {"status": "installing", "message": "Initializing...", "error": None}
+        INSTALLATION_TASKS[app_id] = {
+            "status": "installing", 
+            "message": "Initializing...", 
+            "error": None, 
+            "logs": [],
+            "timestamp": __import__("time").time()
+        }
 
         # Start installation in background
         thread = threading.Thread(
@@ -353,6 +368,15 @@ def market_install():
 def market_status():
     """Get status of background installations."""
     return jsonify({"tasks": INSTALLATION_TASKS})
+
+
+@docker_bp.route("/market/clear/<app_id>", methods=["POST"])
+@jwt_required()
+def market_clear(app_id):
+    """Clear a task status."""
+    if app_id in INSTALLATION_TASKS:
+        del INSTALLATION_TASKS[app_id]
+    return jsonify({"success": True})
 
 
 @docker_bp.route("/images/<image_id>", methods=["DELETE"])
