@@ -461,20 +461,50 @@ def market_install():
 @docker_bp.route("/market/status", methods=["GET"])
 @jwt_required()
 def market_status():
-    """Get status of background installations and cleanup stale ones."""
-    # Cleanup tasks older than 1 hour that are still in 'installing'
+    """Get status of background installations with smart detection."""
     conn = get_db()
     try:
-        conn.execute("""
-            DELETE FROM task_status 
-            WHERE status = 'installing' 
-            AND updated_at < datetime('now', '-5 minutes')
-        """)
+        # Cleanup stale tasks (older than 10 mins)
+        conn.execute("DELETE FROM task_status WHERE status = 'installing' AND updated_at < datetime('now', '-10 minutes')")
         conn.commit()
+        
+        cursor = conn.execute("SELECT app_id, status, message, error, logs, updated_at FROM task_status")
+        rows = cursor.fetchall()
+        
+        # Get actual containers to cross-reference
+        existing_containers = []
+        try:
+            client = get_client()
+            if client:
+                existing_containers = [c.name for c in client.containers.list(all=True)]
+        except:
+            pass
+
+        tasks = {}
+        for row in rows:
+            app_id, status, message, error, logs_json, updated_at = row
+            
+            # Smart detection: if installing but container is already there
+            container_name = app_id
+            for app_cfg in MARKET_APPS:
+                if app_cfg['id'] == app_id:
+                    container_name = app_cfg['containerName']
+                    break
+            
+            if status == 'installing' and container_name in existing_containers:
+                status = 'installed'
+                message = 'Completed (Detected)'
+
+            tasks[app_id] = {
+                "status": status,
+                "message": message or "Initializing...",
+                "error": error,
+                "logs": json.loads(logs_json) if logs_json else [],
+                "updated_at": updated_at
+            }
+        return jsonify({"tasks": tasks})
     finally:
         conn.close()
-        
-    return jsonify({"tasks": get_tasks_db()})
 
 
 @docker_bp.route("/market/clear/<app_id>", methods=["POST"])
