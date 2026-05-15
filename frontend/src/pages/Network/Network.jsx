@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useApi } from '../../hooks/useApi';
 import api from '../../api/client';
-import { Network as NetworkIcon, RefreshCw, Wifi, Globe, Send, CheckCircle, AlertCircle, Edit2, ShieldAlert } from 'lucide-react';
+import { Network as NetworkIcon, RefreshCw, Wifi, Globe, Send, CheckCircle, AlertCircle, Edit2, ShieldAlert, X, Info } from 'lucide-react';
+import ConfirmModal from '../../components/Common/ConfirmModal';
 
 export default function Network() {
   const { data: ifaceData, loading, refetch: refetchIfaces } = useApi('/network/interfaces');
@@ -17,6 +18,7 @@ export default function Network() {
   const [config, setConfig] = useState({ dhcp: true, address: '', gateway: '', dns: '8.8.8.8, 1.1.1.1' });
   const [applying, setApplying] = useState(false);
   const [msg, setMsg] = useState(null);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const doPing = async () => {
     if (!pingHost) return;
@@ -34,14 +36,17 @@ export default function Network() {
 
   const openEdit = async (iface) => {
     setEditIface(iface.name);
-    setApplying(true); // Usa applying come loading per il fetch iniziale
+    setApplying(true);
     try {
-      const current = await api.get(`/network/interfaces/${iface.name}/config`);
+      const res = await api.get(`/network/interfaces/${iface.name}/config`);
+      const { live, saved } = res;
+      
       setConfig({
-        dhcp: current.dhcp,
-        address: current.address || (iface.addresses?.find(a => a.family === 'AF_INET')?.address ? `${iface.addresses?.find(a => a.family === 'AF_INET').address}/24` : ''),
-        gateway: current.gateway || '',
-        dns: current.dns || '8.8.8.8, 1.1.1.1'
+        dhcp: saved.dhcp,
+        address: saved.address || (iface.addresses?.find(a => a.family === 'AF_INET')?.address ? `${iface.addresses?.find(a => a.family === 'AF_INET').address}/24` : ''),
+        gateway: saved.gateway || '',
+        dns: saved.dns || '8.8.8.8, 1.1.1.1',
+        liveAddress: live.address
       });
     } catch (err) {
       console.error("Failed to fetch current config", err);
@@ -51,8 +56,7 @@ export default function Network() {
   };
 
   const applyConfig = async () => {
-    if (!confirm("WARNING: Applying new network settings may disconnect your current session. If you set a wrong IP, you might lose access to the server. Continue?")) return;
-
+    setShowConfirm(false);
     setApplying(true);
     setMsg(null);
     try {
@@ -159,6 +163,19 @@ export default function Network() {
               </div>
             </div>
 
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
+              <div className="stat-box" style={{ flex: 1, background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Live IP (Active)</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: '#10b981' }}>{config.liveAddress || 'Unknown'}</div>
+              </div>
+              <div className="stat-box" style={{ flex: 1, background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Saved Config</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: config.liveAddress?.split('/')[0] === config.address?.split('/')[0] ? 'var(--text-primary)' : '#f59e0b' }}>
+                  {config.address || 'DHCP'}
+                </div>
+              </div>
+            </div>
+
             <div style={{ 
               background: 'rgba(255,255,255,0.03)', 
               padding: '20px', 
@@ -222,11 +239,22 @@ export default function Network() {
 
             <div className="modal-actions" style={{ display: 'flex', gap: '12px' }}>
               <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setEditIface(null)}>Cancel</button>
-              <button className="btn btn-primary" style={{ flex: 2 }} onClick={applyConfig} disabled={applying}>
+              <button className="btn btn-primary" style={{ flex: 2 }} onClick={() => setShowConfirm(true)} disabled={applying}>
                 {applying ? <RefreshCw className="spin" size={18} /> : "Save & Apply Configuration"}
               </button>
             </div>
           </div>
+          
+          <ConfirmModal 
+            isOpen={showConfirm}
+            title="Confirm Network Change"
+            message="WARNING: Applying new network settings may disconnect your current session. If you set a wrong IP, you might lose access to the server. Continue?"
+            onConfirm={applyConfig}
+            onCancel={() => setShowConfirm(false)}
+            confirmText="Apply & Reconnect"
+            type="warning"
+          />
+
           <style dangerouslySetInnerHTML={{ __html: `
             .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
             .switch input { opacity: 0; width: 0; height: 0; }

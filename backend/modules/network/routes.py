@@ -106,28 +106,43 @@ def list_connections():
 @network_bp.route("/interfaces/<iface>/config", methods=["GET"])
 @jwt_required()
 def get_interface_config(iface):
-    """Attempt to read current configuration for an interface from netplan."""
-    # This is a bit complex as there might be multiple files, 
-    # but we check our own file first, then others.
+    """Get both LIVE and SAVED configuration for an interface."""
+    # 1. LIVE DATA (from psutil/OS)
+    addrs = psutil.net_if_addrs().get(iface, [])
+    live_ip = ""
+    for addr in addrs:
+        if addr.family.name == 'AF_INET':
+            live_ip = f"{addr.address}/{addr.netmask}" # Semplificato
+            break
+            
+    # 2. SAVED DATA (from Netplan/NetworkManager)
+    saved = {"dhcp": True, "address": "", "gateway": "", "dns": ""}
+    manager = get_active_manager()
+    
     try:
         import yaml
-        files = ["/etc/netplan/99-easylin.yaml", "/etc/netplan/01-netcfg.yaml", "/etc/netplan/50-cloud-init.yaml"]
-        for f in files:
+        # Controlliamo i file netplan in ordine di priorità
+        for f in ["/etc/netplan/99-easylin.yaml", "/etc/netplan/01-netcfg.yaml", "/etc/netplan/50-cloud-init.yaml"]:
             res = run_host_command(f"cat {f}")
             if res["returncode"] == 0:
                 cfg = yaml.safe_load(res["stdout"])
                 if "network" in cfg and "ethernets" in cfg["network"] and iface in cfg["network"]["ethernets"]:
                     ifc = cfg["network"]["ethernets"][iface]
-                    return jsonify({
+                    saved = {
                         "dhcp": ifc.get("dhcp4") == "yes" or ifc.get("dhcp4", True) is True,
                         "address": ifc.get("addresses", [""])[0],
                         "gateway": ifc.get("routes", [{}])[0].get("via", "") if ifc.get("routes") else "",
                         "dns": ", ".join(ifc.get("nameservers", {}).get("addresses", []))
-                    })
+                    }
+                    break
     except:
         pass
-    
-    return jsonify({"dhcp": True, "address": "", "gateway": "", "dns": "8.8.8.8, 1.1.1.1"})
+
+    return jsonify({
+        "live": {"address": live_ip},
+        "saved": saved,
+        "manager": manager
+    })
 
 
 @network_bp.route("/interfaces/<iface>/config", methods=["POST"])
@@ -176,7 +191,6 @@ def configure_interface(iface):
         })
 
     # --- STRATEGY 2: Netplan ---
-    # Detect renderer for netplan
     renderer = "NetworkManager" if manager == "NetworkManager" else "networkd"
     
     config = {
@@ -185,7 +199,8 @@ def configure_interface(iface):
             "renderer": renderer,
             "ethernets": {
                 iface: {
-                    "dhcp4": "yes" if use_dhcp else "no"
+                    "dhcp4": "yes" if use_dhcp else "no",
+                    "critical": True # Forza l'applicazione anche se rischioso
                 }
             }
         }
@@ -200,17 +215,25 @@ def configure_interface(iface):
 
     import yaml
     yaml_content = yaml.dump(config, default_flow_style=False)
+    
+    # Rimuoviamo eventuali file cloud-init che potrebbero andare in conflitto
+    run_host_command("rm -f /etc/netplan/50-cloud-init.yaml")
+    
     file_path = "/etc/netplan/99-easylin.yaml"
     write_res = run_host_command(f"cat > {file_path} << 'EOF'\n{yaml_content}\nEOF")
 
     if write_res["returncode"] != 0:
         return jsonify({"error": f"Failed to write netplan: {write_res['stderr']}"}), 500
 
-    apply_res = run_host_command("netplan apply", timeout=15)
+    # Applichiamo e forziamo il riavvio del servizio di rete per essere sicuri
+    apply_res = run_host_command("netplan generate && netplan apply", timeout=15)
+    
+    # Fallback estremo: se l'IP non è cambiato, proviamo a riavviare il demone
+    run_host_command("systemctl restart systemd-networkd", timeout=10)
     
     return jsonify({
         "success": True,
-        "message": "Configuration saved to netplan and applied.",
+        "message": "Configuration saved and forced. If IP was changed, reconnection might be needed.",
         "output": apply_res["stdout"]
     })
 
