@@ -62,9 +62,9 @@ def create_app():
         ("modules.logs.routes", "logs_bp", "/api/logs"),
         ("modules.git_projects.routes", "git_projects_bp", "/api/git"),
         ("modules.storage.routes", "storage_bp", "/api/storage"),
-        ("modules.ai.routes", "ai_bp", "/api/ai"),
     ]
 
+    # Caricamento moduli dinamico
     for module_path, bp_name, prefix in modules:
         try:
             mod = __import__(module_path, fromlist=[bp_name])
@@ -72,6 +72,14 @@ def create_app():
             app.register_blueprint(bp, url_prefix=prefix)
         except Exception as e:
             print(f"Warning: Could not load module {module_path}: {e}")
+
+    # Registrazione AI esplicita per evitare errori silenziosi
+    try:
+        from modules.ai.routes import ai_bp
+        app.register_blueprint(ai_bp, url_prefix="/api/ai")
+        print("AI MODULE LOADED SUCCESS - API AT /api/ai")
+    except Exception as e:
+        print(f"CRITICAL ERROR: Could not load AI module: {e}")
 
     @app.route("/api/health")
     def health():

@@ -96,9 +96,8 @@ export default function AIManager() {
   return (
     <div className="page fade-in">
       <div className="page-header">
-        <div className="page-title"><Bot size={28} /><h1>AI Manager <small style={{ fontSize: '0.5em', opacity: 0.6 }}>(v1.2.0 - REVOLUTION)</small></h1></div>
+        <div className="page-title"><Bot size={28} /><h1>AI Manager</h1></div>
         <div className="header-actions">
-           {status && console.log("AI Status Debug:", status)}
            <div className={`status-badge ${status?.active ? 'active' : 'offline'}`}>
               {status?.active ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
               {status?.active ? 'Ollama Online' : 'Ollama Offline'}
