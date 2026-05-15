@@ -264,7 +264,7 @@ export default function Docker() {
             <div className="stat-icon cyan"><Cog size={20} /></div>
             <div className="stat-info">
               <div className="stat-label">Docker Version</div>
-              <div className="stat-value" style={{ fontSize: '1rem' }}>{info.version}</div>
+              <div className="stat-value" style={{ fontSize: '1rem' }}>{info.version} (NUCLEAR)</div>
               <div className="stat-sub">Driver: {info.driver}</div>
             </div>
           </div>
