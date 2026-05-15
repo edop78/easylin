@@ -6,13 +6,11 @@ import os
 class Config:
     """Application configuration."""
 
-    SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-change-me")
-    JWT_SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-change-me")
-    JWT_ACCESS_TOKEN_EXPIRES = 3600  # 1 hour
-    JWT_TOKEN_LOCATION = ["headers", "cookies"]
-    JWT_COOKIE_SECURE = False
-    JWT_COOKIE_CSRF_PROTECT = False
-
+    # Security
+    SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-change-me-at-all-costs")
+    JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", SECRET_KEY)
+    JWT_ACCESS_TOKEN_EXPIRES = 86400  # 24 hours
+    
     # Database
     DATABASE_PATH = os.environ.get("DATABASE_PATH", "/app/data/easylin.db")
 
@@ -20,4 +18,4 @@ class Config:
     HOST_ROOT = os.environ.get("HOST_ROOT", "/host")
 
     # Running in Docker?
-    IN_DOCKER = os.path.exists("/.dockerenv")
+    IN_DOCKER = os.path.exists("/.dockerenv") or os.environ.get("IN_DOCKER") == "true"

@@ -68,9 +68,15 @@ if [ ! -f .env ]; then
   echo -e "${GREEN}Creating .env file...${NC}"
   if [ -f .env.example ]; then
     cp .env.example .env
+    # Generate random keys
     SECRET=$(openssl rand -hex 32)
-    sed -i "s/generate-a-strong-secret-key-here/$SECRET/" .env
-    echo -e "${GREEN}✓ .env file created with a fresh secret key.${NC}"
+    JWT_SECRET=$(openssl rand -hex 32)
+    
+    # Replace placeholders in .env
+    sed -i "s/change-me-to-something-very-long-and-secure/$SECRET/" .env
+    sed -i "s/change-me-to-something-else-very-secure/$JWT_SECRET/" .env
+    
+    echo -e "${GREEN}✓ .env file created with unique security keys.${NC}"
   else
     echo -e "${RED}Error: .env.example not found!${NC}"
     exit 1

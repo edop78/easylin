@@ -37,4 +37,5 @@ RUN mkdir -p /app/data
 
 EXPOSE 5050
 
-CMD ["python", "app.py"]
+# Start with Gunicorn
+CMD ["gunicorn", "--bind", "0.0.0.0:5050", "--workers", "4", "app:create_app()"]

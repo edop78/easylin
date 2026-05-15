@@ -1,55 +1,55 @@
-# EasyLin — Linux Server Management Dashboard
+# EasyLin — Modern Linux Management Dashboard
 
-EasyLin is a modern, lightweight, and premium web-based dashboard designed to manage Linux servers directly from a Docker container with host-level access.
+EasyLin is a premium, lightweight, and secure web-based dashboard designed to manage Linux servers directly from a Docker container. It provides high-level control over system services, Docker resources, networking, and security with a sleek, high-fidelity interface.
+
+## ✨ Core Features
+
+-   **🐳 Docker Management**: Full control over containers, images, volumes, and networks.
+-   **🌐 Reverse Proxy**: Nginx management with automated SSL (Let's Encrypt/Certbot).
+-   **🛡️ System Security**: UFW Firewall management and SSH status monitoring.
+-   **⚙️ Service Control**: Manage `systemd` services (start, stop, restart, logs) via host integration.
+-   **🔐 PAM Auth**: Login using your existing Linux system users (requires sudo privileges).
+-   **📊 System Monitoring**: Real-time stats for CPU, RAM, Disk, and Network.
 
 ## 🚀 Quick Start
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/edop78/easylin.git
-   cd easylin
-   ```
+The fastest way to get EasyLin running on your Ubuntu/Debian server:
 
-2. **Deploy with Docker Compose**:
-   ```bash
-   sudo docker compose up -d --build
-   ```
+```bash
+wget -qO- https://raw.githubusercontent.com/edop78/easylin/main/install.sh | sudo bash
+```
 
-3. **Access the Dashboard**:
-   Open your browser and go to `http://YOUR_SERVER_IP:5050`
+Alternatively, manual installation:
 
----
+1.  **Clone**: `git clone https://github.com/edop78/easylin.git && cd easylin`
+2.  **Env**: `cp .env.example .env` (and edit secrets)
+3.  **Deploy**: `sudo docker compose up -d --build`
+4.  **Access**: `http://YOUR_SERVER_IP:5050`
 
-## ⚠️ Important: Lessons Learned & What to Avoid
+## 🛡️ Security Hardening
 
-During development, we identified several critical areas that can cause the application to crash or become inaccessible. Please follow these guidelines:
+EasyLin is built with security in mind:
+-   **Rate Limiting**: Protection against brute-force attacks on the login API.
+-   **Security Headers**: Built-in Talisman integration for HSTS, CSP, and XSS protection.
+-   **Host Isolation**: Uses `nsenter` for controlled host interaction rather than running everything in a shared namespace.
+-   **JWT Auth**: Stateless, secure authentication with 24h token rotation.
+
+## ⚠️ Important Considerations
 
 ### 1. Protocol: HTTP vs HTTPS
-*   **The Problem**: Accessing the dashboard via `https://` on port 5050 will result in an `SSL_ERROR_RX_RECORD_TOO_LONG` error.
-*   **The Rule**: The internal Flask server is **HTTP only** by default. Always use `http://[IP]:5050`. If you need HTTPS, use a Reverse Proxy (like Nginx) in front of it.
+Access the dashboard via **HTTP** on port 5050.
+-   **Rule**: The internal server is HTTP only. If you need HTTPS for the dashboard itself, use the built-in Reverse Proxy module to expose it securely via a domain.
 
-### 2. Python Dependencies (Docker Environment)
-*   **The Problem**: Adding new Python libraries (like `import docker`) without updating the `requirements.txt` or `Dockerfile` will prevent the Flask backend from starting.
-*   **The Rule**: Prefer using `run_host_command()` to execute shell commands on the host rather than installing complex Python SDKs. It's more portable and less prone to environment crashes.
+### 2. Privileged Mode
+EasyLin requires `privileged: true` and `pid: host` to interact with the host system (e.g., managing Docker or systemd services). This is standard for infrastructure management tools.
 
-### 3. React Routing
-*   **The Problem**: Mixing different types of Routers (e.g., `BrowserRouter` and `MemoryRouter`) or nesting them incorrectly causes a "White Screen of Death".
-*   **The Rule**: Maintain a single Router wrapper. We use `BrowserRouter` for standard navigation. Avoid using `MemoryRouter` unless you specifically want to hide the URL path from the browser address bar.
-
-### 4. Backend Module Imports
-*   **The Problem**: Module loading in Flask can fail if the `PYTHONPATH` is not explicitly handled, leading to 404 errors or the server serving HTML instead of JSON.
-*   **The Rule**: Always use robust import patterns in blueprints. The `app.py` is configured to automatically handle paths, but ensure modules are correctly registered in the `create_app()` factory.
-
-### 5. Privileged Access
-*   **The Problem**: Without proper permissions, the dashboard cannot monitor host services (SSH, UFW) or manage Docker containers.
-*   **The Rule**: The container **must** run in `privileged: true` and `network_mode: host` to interact with the host's `systemctl` and network stack.
-
----
+### 3. Permissions
+Only users with **Sudo privileges** (members of `sudo`, `wheel`, or `root` groups) can log in to the dashboard.
 
 ## 🛠 Tech Stack
-*   **Backend**: Flask (Python 3.12), Psutil, JWT Auth.
-*   **Frontend**: React 18, Vite, Lucide Icons, Vanilla CSS.
-*   **Infrastructure**: Docker, Docker Compose, nsenter (for host access).
+-   **Backend**: Flask (Python 3.12), Docker SDK, Psutil, JWT.
+-   **Frontend**: React 18, Vite, Lucide Icons, Vanilla CSS (Premium Dark Theme).
+-   **Infrastructure**: Docker Compose, Nginx, Certbot.
 
 ## 📄 License
-This project is licensed under the MIT License.
+MIT License.

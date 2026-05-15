@@ -1,6 +1,9 @@
 """PAM-style authentication against host system users."""
 
-import crypt
+try:
+    import crypt
+except ImportError:
+    crypt = None
 import subprocess
 from config import Config
 
@@ -11,6 +14,9 @@ def authenticate_user(username, password):
     Returns True if credentials are valid, False otherwise.
     """
     shadow_path = f"{Config.HOST_ROOT}/etc/shadow" if Config.IN_DOCKER else "/etc/shadow"
+
+    if not crypt:
+        return False
 
     try:
         with open(shadow_path, "r") as f:

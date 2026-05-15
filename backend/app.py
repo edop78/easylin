@@ -3,18 +3,44 @@ import sys
 from flask import Flask, send_from_directory, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_talisman import Talisman
 
 # Aggiungi la root al path per sicurezza assoluta
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from config import Config
+from database import init_db
 
 def create_app():
     static_dir = os.path.join(os.path.dirname(__file__), "static")
     app = Flask(__name__, static_folder=static_dir, static_url_path="")
     
     # Configurazione
-    app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-key")
-    app.config["JWT_SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-key")
-    app.config["JWT_ACCESS_TOKEN_EXPIRES"] = 86400 # 24 ore
+    app.config.from_object(Config)
+    
+    # Sicurezza: HTTPS (se possibile) e Headers
+    Talisman(app, 
+             content_security_policy=None, # Disabilitato per semplicità SPA, da affinare in prod
+             force_https=False) # Gestito solitamente dal proxy inverso
+
+    # Rate Limiting
+    limiter = Limiter(
+        key_func=get_remote_address,
+        app=app,
+        default_limits=["200 per day", "50 per hour"],
+        storage_uri="memory://",
+    )
+    
+    # Rendi il limiter accessibile globalmente se necessario (opzionale)
+    app.limiter = limiter
+
+    # Inizializza database
+    try:
+        init_db()
+    except Exception as e:
+        print(f"Error initializing database: {e}")
     
     CORS(app, supports_credentials=True)
     JWTManager(app)

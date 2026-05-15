@@ -78,6 +78,11 @@ def create_site():
     if not domain:
         return jsonify({"error": "Domain is required"}), 400
 
+    # Sanitize domain to prevent shell injection or path traversal
+    import re
+    if not re.match(r'^[a-zA-Z0-9.-]+$', domain):
+        return jsonify({"error": "Invalid domain format"}), 400
+
     # Professional Nginx Template
     config = f"""server {{
     listen 80;
