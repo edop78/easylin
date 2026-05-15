@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { useApi } from '../../hooks/useApi';
 import api from '../../api/client';
 import { 
@@ -97,12 +98,15 @@ export default function AIManager() {
       </div>
 
       {!status?.active && (
-        <div className="alert alert-error" style={{ marginBottom: '20px' }}>
-          <Info size={20} />
-          <div>
-            <strong>Ollama non rilevato:</strong> Per usare questa sezione devi installare Ollama sul server. 
-            Esegui <code>curl -fsSL https://ollama.com/install.sh | sh</code> nel terminale.
+        <div className="alert alert-error" style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <Info size={24} />
+          <div style={{ flex: 1 }}>
+            <strong style={{ display: 'block', marginBottom: '4px' }}>Ollama non rilevato</strong> 
+            Per usare le funzionalità IA, devi installare il motore Ollama. Puoi farlo con un click dalla sezione <strong>Docker App Store</strong>.
           </div>
+          <Link to="/docker" className="btn btn-sm btn-primary" style={{ whiteSpace: 'nowrap', textDecoration: 'none' }}>
+            Vai allo Store
+          </Link>
         </div>
       )}
 
