@@ -27,19 +27,25 @@ def update_task_db(app_id, status=None, message=None, error=None, log_entry=None
         if logs_list is not None:
             current_logs = logs_list
         elif log_entry:
-            # Check if this is a layer progress update (e.g., "[id] Extracting...")
-            # If so, update the last line if it's the same layer
+            # Aggressive de-duplication: if identical to last line, ignore
+            if current_logs and log_entry == current_logs[-1]:
+                return
+
+            # Layer-aware progress update
             is_progress = log_entry.startswith('[') and ']' in log_entry
             if is_progress:
-                layer_id = log_entry.split(']')[0] + ']'
-                if current_logs and current_logs[-1].startswith(layer_id):
+                layer_tag = log_entry.split(']')[0] + ']'
+                if current_logs and current_logs[-1].startswith(layer_tag):
                     current_logs[-1] = log_entry
                 else:
                     current_logs.append(log_entry)
             else:
+                # If it's a generic message (like "Extracting") and the last one was also generic and same
+                if current_logs and log_entry == current_logs[-1]:
+                    return
                 current_logs.append(log_entry)
             
-            if len(current_logs) > 200:
+            if len(current_logs) > 100: # Limit to 100 lines for even more speed
                 current_logs.pop(0)
         
         new_status = status or (row['status'] if row else 'installing')
