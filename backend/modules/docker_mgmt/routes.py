@@ -557,7 +557,10 @@ def market_status():
 def get_market_logs_file():
     """Get real-time logs from the physical file."""
     if not os.path.exists(LOG_FILE):
-        return jsonify({"logs": ["--- No log file found yet. Waiting for installation to start... ---"]})
+        return jsonify({"logs": [
+            "--- EasyLin Terminal System Ready ---",
+            "--- Waiting for new deployment to start... ---"
+        ]})
     
     try:
         with open(LOG_FILE, "r") as f:
