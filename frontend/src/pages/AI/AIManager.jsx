@@ -298,7 +298,16 @@ export default function AIManager() {
         .typing-dots span { width: 6px; height: 6px; background: var(--text-muted); border-radius: 50%; animation: typing 1.4s infinite; opacity: 0.4; }
         .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
         .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes typing { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+        @media (max-width: 992px) {
+          .ai-grid { grid-template-columns: 1fr; height: auto; display: flex; flex-direction: column; gap: 20px; }
+          .ai-sidebar { order: 2; overflow-y: visible; }
+          .ai-chat-container { order: 1; height: 500px; }
+        }
+        @media (max-width: 576px) {
+          .chat-bubble { max-width: 90%; }
+          .page-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+          .header-actions { width: 100%; justify-content: space-between; }
+        }
       `}} />
     </div>
   );

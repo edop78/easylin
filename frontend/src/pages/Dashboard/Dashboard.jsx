@@ -82,14 +82,22 @@ export default function Dashboard() {
   return (
     <div className="page fade-in">
       <div className="page-header">
-        <div className="page-title"><LayoutDashboard size={28} /><h1>Dashboard <small style={{ fontSize: '0.5em', opacity: 0.6 }}>(v1.2.0 - REVOLUTION)</small></h1></div>
+        <div className="page-title"><LayoutDashboard size={28} /><h1>Dashboard</h1></div>
       </div>
 
-      <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+      <div className="stat-grid dashboard-stats-grid">
         <StatCard title="CPU Usage" value={`${cpu}%`} percent={cpu} sub={`Load Avg: ${Number(load[0] || 0).toFixed(2)}`} icon={Cpu} color="blue" />
         <StatCard title="Memory (RAM)" value={`${ram.percent}%`} percent={ram.percent} details={[`U: ${formatBytes(ram.used)}`, `F: ${formatBytes(ram.free)}`, `T: ${ram.display_total}`]} icon={Activity} color="purple" />
         <StatCard title="Disk Storage" value={`${disk.percent}%`} percent={disk.percent} details={[`U: ${formatBytes(disk.used)}`, `F: ${formatBytes(disk.free)}`, `T: ${disk.display_total}`]} icon={HardDrive} color="cyan" />
       </div>
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        .dashboard-stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-md); }
+        @media (max-width: 992px) {
+          .dashboard-stats-grid { grid-template-columns: 1fr; }
+          .grid-2 { grid-template-columns: 1fr !important; }
+        }
+      `}} />
 
       <div className="grid-2" style={{ marginTop: 'var(--space-lg)', alignItems: 'stretch' }}>
         <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
