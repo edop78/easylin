@@ -63,10 +63,14 @@ export default function Docker() {
 
   useEffect(() => {
     if (activeTaskLogs) {
-      const currentLogs = marketTasks?.tasks?.[activeTaskLogs.id]?.logs || [];
-      // Sync logs if they are different from what we have
-      if (currentLogs.length !== persistedLogs.length) {
-        setPersistedLogs(currentLogs);
+      const task = marketTasks?.tasks?.[activeTaskLogs.id];
+      const newLogs = task?.logs || [];
+      
+      if (newLogs.length > 0) {
+        setPersistedLogs(newLogs);
+      } else if (persistedLogs.length === 0) {
+        // Initial feedback if no logs yet from server
+        setPersistedLogs(['> System: Initializing deployment sequence...', '> System: Connecting to Docker daemon...']);
       }
     } else {
       setPersistedLogs([]);
@@ -323,8 +327,8 @@ export default function Docker() {
                   ))
                 ) : (
                   <div style={{ color: '#888', fontStyle: 'italic' }}>
-                    > Establishing console connection...<br/>
-                    > Waiting for installation output...
+                    > Waiting for console handshake...<br/>
+                    > [Check backend logs if this persists]
                   </div>
                 )}
                 <div ref={logsEndRef} />
