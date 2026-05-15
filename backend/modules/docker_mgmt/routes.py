@@ -384,17 +384,23 @@ def market_install():
 
                 # Pull with progress tracking
                 log_msg(f"Starting pull for {app_config['image']}...")
+                last_logged_status = {}
+                
                 for line in client.api.pull(app_config["image"], stream=True, decode=True):
                     if "error" in line:
                         error_detail = line.get("errorDetail", {}).get("message", line["error"])
                         raise Exception(f"Pull failed: {error_detail}")
                     
                     status = line.get("status", "")
-                    progress = line.get("progress", "")
-                    layer_id = line.get("id")
-                    if status:
-                        prefix = f"[{layer_id}] " if layer_id else ""
-                        log_msg(f"{prefix}{status} {progress}".strip())
+                    layer_id = line.get("id", "no-id")
+                    
+                    # Filter: Only log if status is NOT "Downloading" or "Extracting" 
+                    # OR if it's the FIRST time we see this layer.
+                    # This prevents 10,000 lines of progress.
+                    if status not in ["Downloading", "Extracting"] or last_logged_status.get(layer_id) != status:
+                        prefix = f"[{layer_id}] " if layer_id != "no-id" else ""
+                        log_msg(f"{prefix}{status}")
+                        last_logged_status[layer_id] = status
 
                 # Verify image exists before running
                 log_msg("Verifying image...")
