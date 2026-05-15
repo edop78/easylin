@@ -31,25 +31,36 @@ run_host_command = get_run_command()
 def get_metrics():
     """Get system metrics for dashboard."""
     try:
-        # CPU
-        cpu = psutil.cpu_percent(interval=0.1)
+        # CPU - Intervallo più lungo per catturare la realtà
+        cpu = psutil.cpu_percent(interval=0.5)
         
-        # RAM
+        # RAM - Arrotondamento "Umano" per il totale
         ram_obj = psutil.virtual_memory()
+        # Se siamo vicini a un GB pieno, mostriamo quello per coerenza hardware
+        total_gb = ram_obj.total / (1024**3)
+        commercial_total = round(total_gb) if abs(total_gb - round(total_gb)) < 0.3 else total_gb
+        
         ram = {
             "percent": ram_obj.percent,
             "used": ram_obj.used,
             "free": ram_obj.available,
-            "total": ram_obj.total
+            "total": ram_obj.total,
+            "display_total": f"{commercial_total:.1f} GB" if commercial_total % 1 != 0 else f"{int(commercial_total)} GB"
         }
         
-        # Disk
+        # Disk - Calcolo dello spazio fisico stimato
         disk_obj = psutil.disk_usage('/')
+        total_disk_gb = disk_obj.total / (1024**3)
+        # Il disco ha spesso partizioni o overhead, arrotondiamo alla taglia commerciale più vicina (8, 16, 32, 64...)
+        possible_sizes = [8, 16, 32, 64, 128, 256, 512, 1024]
+        commercial_disk = min(possible_sizes, key=lambda x: abs(x - total_disk_gb)) if total_disk_gb < 1024 else total_disk_gb
+        
         disk = {
             "percent": disk_obj.percent,
             "used": disk_obj.used,
             "free": disk_obj.free,
-            "total": disk_obj.total
+            "total": disk_obj.total,
+            "display_total": f"{int(commercial_disk)} GB"
         }
         
         # Network
