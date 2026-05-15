@@ -199,15 +199,3 @@ export default function System() {
     </div>
   );
 }
-
-      <ConfirmModal 
-        isOpen={confirm.open}
-        title={confirm.title}
-        message={confirm.message}
-        onConfirm={confirm.action}
-        onCancel={() => setConfirm({ ...confirm, open: false })}
-        type={confirm.type || 'danger'}
-      />
-    </div>
-  );
-}
