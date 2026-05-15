@@ -54,10 +54,13 @@ export default function Network() {
 
   const handleApply = async () => {
     setShowConfirm(false);
+    // Validazione
+    if (!form.dhcp && !form.gateway) {
+      setMessage({ type: 'error', text: "Gateway is mandatory for static IP to maintain internet connectivity." });
+      return;
+    }
+
     setIsApplying(true);
-    setApplyLog("Initializing atomic network update...\n");
-    
-    // Helper per convertire Netmask in CIDR se necessario
     const maskToCidr = (mask) => {
       if (!mask.includes('.')) return mask; // Già CIDR
       return mask.split('.').reduce((c, o) => c + (Number(o).toString(2).match(/1/g) || []).length, 0);
@@ -210,14 +213,21 @@ export default function Network() {
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
                     <div className="form-group">
-                      <label className="form-label">Gateway</label>
+                      <label className="form-label">Gateway <span style={{ color: 'var(--accent-red)' }}>*</span></label>
                       <input className="input" type="text" value={form.gateway} onChange={e => setForm({...form, gateway: e.target.value})} placeholder="192.168.1.1" />
                     </div>
                     <div className="form-group">
-                      <label className="form-label">DNS Servers</label>
+                      <label className="form-label">DNS Servers <span style={{ color: 'var(--accent-red)' }}>*</span></label>
                       <input className="input" type="text" value={form.dns} onChange={e => setForm({...form, dns: e.target.value})} placeholder="8.8.8.8, 1.1.1.1" />
                     </div>
                   </div>
+
+                  {!form.gateway && (
+                    <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '12px', borderRadius: '8px', marginBottom: '20px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <AlertTriangle size={14} style={{ color: 'var(--accent-red)' }} />
+                      <span style={{ fontSize: '11px', color: 'var(--accent-red)' }}>Warning: Missing gateway will break internet access (GitHub, Updates).</span>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -244,7 +254,12 @@ export default function Network() {
             {/* Footer */}
             <div style={{ padding: '24px', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '12px', background: 'rgba(255,255,255,0.01)' }}>
               <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setEditingIface(null)} disabled={isApplying}>Cancel</button>
-              <button className="btn btn-primary" style={{ flex: 2 }} onClick={() => setShowConfirm(true)} disabled={isApplying}>
+              <button 
+                className="btn btn-primary" 
+                style={{ flex: 2 }} 
+                onClick={() => setShowConfirm(true)} 
+                disabled={isApplying || (!form.dhcp && (!form.address || !form.gateway))}
+              >
                 {isApplying ? <RefreshCw className="spin" size={18} /> : "Apply Settings"}
               </button>
             </div>
