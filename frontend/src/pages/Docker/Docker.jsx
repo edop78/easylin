@@ -4,7 +4,7 @@ import api from '../../api/client';
 import { 
   Container, Play, Square, RotateCw, Trash2, RefreshCw, 
   Image, HardDrive, Network, ScrollText, Cog, ShoppingCart, 
-  Download, ExternalLink, Globe, Trash, CheckCircle, AlertCircle, Copy, Plus, Github, Lock, Bot
+  Download, ExternalLink, Globe, Trash, CheckCircle, AlertCircle, Copy, Plus, Github, Lock, Bot, X
 } from 'lucide-react';
 import ConfirmModal from '../../components/Common/ConfirmModal';
 
