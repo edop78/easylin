@@ -259,6 +259,7 @@ export default function AIManager() {
         .ai-grid { display: grid; grid-template-columns: 320px 1fr; gap: 20px; height: calc(100vh - 180px); }
         .ai-sidebar { display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
         
+        .header-actions { display: flex; align-items: center; gap: 12px; }
         .status-badge { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 20px; background: rgba(255,255,255,0.05); }
         .status-badge.active { color: #10b981; background: rgba(16, 185, 129, 0.1); }
         .status-badge.offline { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
