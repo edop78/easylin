@@ -24,7 +24,7 @@ export default function Network() {
   
   const [activeTab, setActiveTab] = useState('interfaces');
   const [editingIface, setEditingIface] = useState(null);
-  const [form, setForm] = useState({ dhcp: true, address: '', gateway: '', dns: '8.8.8.8, 1.1.1.1' });
+  const [form, setForm] = useState({ dhcp: true, address: '', netmask: '255.255.255.0', gateway: '', dns: '8.8.8.8, 1.1.1.1' });
   const [isApplying, setIsApplying] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [diagData, setDiagData] = useState(null);
@@ -43,6 +43,7 @@ export default function Network() {
       setForm({
         dhcp: res.live.address === 'N/A',
         address: res.live.address !== 'N/A' ? res.live.address : (res.saved.address || ''),
+        netmask: res.live.netmask !== 'N/A' ? res.live.netmask : (res.saved.netmask || '255.255.255.0'),
         gateway: res.saved.gateway || '',
         dns: res.saved.dns || '8.8.8.8, 1.1.1.1'
       });
@@ -56,9 +57,18 @@ export default function Network() {
     setIsApplying(true);
     setApplyLog("Initializing atomic network update...\n");
     
+    // Helper per convertire Netmask in CIDR se necessario
+    const maskToCidr = (mask) => {
+      if (!mask.includes('.')) return mask; // Già CIDR
+      return mask.split('.').reduce((c, o) => c + (Number(o).toString(2).match(/1/g) || []).length, 0);
+    };
+
+    const fullAddress = `${form.address}/${maskToCidr(form.netmask)}`;
+    
     try {
       const res = await api.post(`/network/interfaces/${editingIface.name}/config`, {
         ...form,
+        address: fullAddress,
         dns: form.dns.split(',').map(s => s.trim())
       });
       
@@ -162,12 +172,14 @@ export default function Network() {
                 <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
                   <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>Live State</div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: '#10b981' }}>{diagData?.live?.address || 'Detecting...'}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Mask: {diagData?.live?.netmask}</div>
                 </div>
                 <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
                   <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>Source: {diagData?.saved?.driver}</div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: diagData?.live?.address?.split('/')[0] === diagData?.saved?.address?.split('/')[0] ? 'inherit' : '#f59e0b' }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: diagData?.live?.address === diagData?.saved?.address ? 'inherit' : '#f59e0b' }}>
                     {diagData?.saved?.address || 'DHCP'}
                   </div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Mask: {diagData?.saved?.netmask}</div>
                 </div>
               </div>
 
@@ -186,9 +198,15 @@ export default function Network() {
               {/* Static Fields */}
               {!form.dhcp && (
                 <div className="fade-in">
-                  <div className="form-group" style={{ marginBottom: '20px' }}>
-                    <label className="form-label">IPv4 Address / CIDR</label>
-                    <input className="input" type="text" value={form.address} onChange={e => setForm({...form, address: e.target.value})} placeholder="e.g. 192.168.1.100/24" />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '16px', marginBottom: '20px' }}>
+                    <div className="form-group">
+                      <label className="form-label">IPv4 Address</label>
+                      <input className="input" type="text" value={form.address} onChange={e => setForm({...form, address: e.target.value})} placeholder="e.g. 192.168.1.100" />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Subnet Mask</label>
+                      <input className="input" type="text" value={form.netmask} onChange={e => setForm({...form, netmask: e.target.value})} placeholder="255.255.255.0" />
+                    </div>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
                     <div className="form-group">

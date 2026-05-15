@@ -82,11 +82,17 @@ def list_interfaces():
 def get_config(iface):
     # THE TRUTH (Live)
     addrs = psutil.net_if_addrs().get(iface, [])
-    live_ip = next((f"{a.address}/{a.netmask}" for a in addrs if a.family.name == 'AF_INET'), "N/A")
+    live_ip = "N/A"
+    live_mask = "N/A"
+    for addr in addrs:
+        if addr.family.name == 'AF_INET':
+            live_ip = addr.address
+            live_mask = addr.netmask
+            break
     
     # THE CONFIG (Saved)
     driver = NetworkDriver.detect()
-    saved = {"dhcp": True, "address": "", "gateway": "", "dns": "", "driver": driver}
+    saved = {"dhcp": True, "address": "", "netmask": "", "gateway": "", "dns": "", "driver": driver}
     
     # Logic to read from Netplan or /etc/network/interfaces
     if driver == "netplan":
@@ -97,9 +103,14 @@ def get_config(iface):
                     cfg = yaml.safe_load(res["stdout"])
                     if "network" in cfg and "ethernets" in cfg["network"] and iface in cfg["network"]["ethernets"]:
                         ifc = cfg["network"]["ethernets"][iface]
+                        full_addr = ifc.get("addresses", [""])[0]
+                        ip = full_addr.split('/')[0] if '/' in full_addr else full_addr
+                        mask = full_addr.split('/')[1] if '/' in full_addr else "24"
+                        
                         saved.update({
                             "dhcp": ifc.get("dhcp4") == "yes" or ifc.get("dhcp4", True) is True,
-                            "address": ifc.get("addresses", [""])[0],
+                            "address": ip,
+                            "netmask": mask,
                             "gateway": ifc.get("routes", [{}])[0].get("via", "") if ifc.get("routes") else "",
                             "dns": ", ".join(ifc.get("nameservers", {}).get("addresses", []))
                         })
@@ -117,7 +128,7 @@ def get_config(iface):
                 if gw: saved["gateway"] = gw.group(1)
 
     return jsonify({
-        "live": {"address": live_ip},
+        "live": {"address": live_ip, "netmask": live_mask},
         "saved": saved,
         "raw_ip": run_host_command(f"ip -4 addr show {iface}")["stdout"]
     })
