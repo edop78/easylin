@@ -17,10 +17,22 @@ function StatCard({ title, value, sub, icon: Icon, color, details, percent }) {
             <div className={`progress-fill ${color}`} style={{ width: `${percent || 0}%` }}></div>
           </div>
         )}
-        <div className="stat-sub">
-          {details ? (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', fontSize: '11px' }}>
-              {details.map((d, i) => <span key={i}>{d}</span>)}
+        <div className="stat-sub" style={{ marginTop: '4px' }}>
+          {details && details.length >= 3 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', opacity: 0.7 }}>
+                <span>{details[0]}</span>
+                <span>{details[1]}</span>
+              </div>
+              <div style={{ textAlign: 'center', fontSize: '10px', opacity: 0.7 }}>
+                {details[2]}
+              </div>
+            </div>
+          ) : details ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px' }}>
+              {details.map((d, i) => (
+                <div key={i} style={{ fontSize: '10px', opacity: 0.7, whiteSpace: 'nowrap' }}>{d}</div>
+              ))}
             </div>
           ) : sub}
         </div>
