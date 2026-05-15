@@ -60,10 +60,6 @@ check_compose() {
   fi
 }
 
-# check_ollama is now handled by the Docker App Store inside EasyLin.
-# Keeping it here as a commented optional step if someone prefers host-level install.
-# check_ollama
-
 check_docker
 check_compose
 
