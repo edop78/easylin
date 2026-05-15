@@ -11,7 +11,7 @@ from database import get_db
 
 docker_bp = Blueprint("docker", __name__)
 
-def update_task_db(app_id, status=None, message=None, error=None, log_entry=None):
+def update_task_db(app_id, status=None, message=None, error=None, log_entry=None, logs_list=None):
     """Update task status in DB."""
     conn = get_db()
     try:
@@ -24,7 +24,9 @@ def update_task_db(app_id, status=None, message=None, error=None, log_entry=None
         if row and row['logs']:
             current_logs = json.loads(row['logs'])
         
-        if log_entry:
+        if logs_list is not None:
+            current_logs = logs_list
+        elif log_entry:
             current_logs.append(log_entry)
             if len(current_logs) > 200:
                 current_logs.pop(0)
@@ -401,7 +403,7 @@ def market_install():
             pass
 
         # Initialize task status in DB
-        update_task_db(app_id, status="installing", message="Initializing...", logs=[])
+        update_task_db(app_id, status="installing", message="Initializing...", logs_list=[])
 
         # Start installation in background
         thread = threading.Thread(
