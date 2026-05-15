@@ -142,3 +142,40 @@ def mount_nas():
         # Rollback fstab if failed
         run_host_command("cp /etc/fstab.bak /etc/fstab")
         return jsonify({"success": False, "error": res.get("stderr")}), 500
+
+@storage_bp.route("/mount-local", methods=["POST"])
+@jwt_required()
+def mount_local():
+    data = request.get_json()
+    device = data.get("device") # e.g. /dev/sdb1
+    mountpoint = data.get("mountpoint")
+    fstype = data.get("fstype", "auto")
+    
+    if not device or not mountpoint:
+        return jsonify({"error": "Device and mountpoint required"}), 400
+
+    # 1. Get UUID for stable mounting
+    uuid_res = run_host_command(f"blkid -s UUID -o value {device}")
+    uuid = uuid_res.get("stdout", "").strip()
+    
+    if not uuid:
+        return jsonify({"error": f"Could not find UUID for {device}"}), 400
+
+    if not os.path.exists(mountpoint):
+        os.makedirs(mountpoint, exist_ok=True)
+
+    # 2. Backup fstab
+    run_host_command("cp /etc/fstab /etc/fstab.bak")
+    
+    # 3. Add to fstab using UUID (the professional way)
+    fstab_entry = f"UUID={uuid} {mountpoint} {fstype} defaults 0 2"
+    with open("/etc/fstab", "a") as f:
+        f.write(f"\n# Added by EasyLin (Local Disk)\n{fstab_entry}\n")
+    
+    # 4. Mount
+    res = run_host_command("mount -a")
+    if res.get("returncode") == 0:
+        return jsonify({"success": True, "message": "Disk mounted and persisted."})
+    else:
+        run_host_command("cp /etc/fstab.bak /etc/fstab")
+        return jsonify({"success": False, "error": res.get("stderr")}), 500

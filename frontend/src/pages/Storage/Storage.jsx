@@ -11,6 +11,8 @@ export default function Storage() {
   const { data, loading, refetch } = useApi('/storage/disks');
   const [busyData, setBusyData] = useState(null);
   const [showNASWizard, setShowNASWizard] = useState(false);
+  const [showLocalMount, setShowLocalMount] = useState(null); // Will store { device, fstype }
+  const [localMountPoint, setLocalMountPoint] = useState('');
   const [nasForm, setNasForm] = useState({ type: 'nfs', path: '', mountpoint: '/mnt/nas', username: '', password: '', options: 'defaults' });
   const [isActionLoading, setIsActionLoading] = useState(false);
 
@@ -51,6 +53,24 @@ export default function Storage() {
       refetch();
     } catch (err) {
       alert("NAS Mount failed: " + err.message);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleMountLocal = async () => {
+    setIsActionLoading(true);
+    try {
+      await api.post('/storage/mount-local', { 
+        device: `/dev/${showLocalMount.name}`, 
+        mountpoint: localMountPoint,
+        fstype: showLocalMount.fstype 
+      });
+      setShowLocalMount(null);
+      setLocalMountPoint('');
+      refetch();
+    } catch (err) {
+      alert("Local Mount failed: " + err.message);
     } finally {
       setIsActionLoading(false);
     }
@@ -103,9 +123,16 @@ export default function Storage() {
                     <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{part.name} <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 400 }}>({part.fstype || 'raw'})</span></div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{part.mountpoint || 'Not mounted'} • {part.size}</div>
                   </div>
-                  {part.mountpoint && (
+                  {part.mountpoint ? (
                     <button className="btn btn-sm btn-ghost text-red" onClick={() => handleUnmount(part.mountpoint)}>
                       <Unlink size={14} /> Unmount
+                    </button>
+                  ) : (
+                    <button className="btn btn-sm btn-ghost text-cyan" onClick={() => {
+                      setShowLocalMount(part);
+                      setLocalMountPoint(`/mnt/${part.name}`);
+                    }}>
+                      <Plus size={14} /> Mount
                     </button>
                   )}
                 </div>
@@ -114,6 +141,43 @@ export default function Storage() {
           </div>
         ))}
       </div>
+
+      {/* Local Mount Modal */}
+      {showLocalMount && (
+        <div className="modal-overlay" onClick={() => setShowLocalMount(null)}>
+          <div className="modal-content" style={{ maxWidth: '500px' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <Database size={24} className="text-cyan" />
+                <h3 style={{ margin: 0 }}>Mount Local Partition</h3>
+              </div>
+              <button className="btn btn-icon btn-ghost" onClick={() => setShowLocalMount(null)}><X size={20} /></button>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Device</label>
+              <div className="input-info" style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '8px', fontFamily: 'var(--font-mono)', fontSize: '13px' }}>
+                /dev/{showLocalMount.name} ({showLocalMount.fstype || 'unknown'})
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Mount Point</label>
+              <input className="input" value={localMountPoint} onChange={e => setLocalMountPoint(e.target.value)} placeholder="/mnt/my_disk" />
+              <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
+                The folder will be created if it doesn't exist.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowLocalMount(null)}>Cancel</button>
+              <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleMountLocal} disabled={isActionLoading || !localMountPoint}>
+                {isActionLoading ? <RefreshCw className="spin" size={18} /> : "Mount & Persist"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* NAS Wizard Modal */}
       {showNASWizard && (
