@@ -12,12 +12,20 @@ from database import get_db
 
 docker_bp = Blueprint("docker", __name__)
 
-# Global throttle for DB updates to prevent lock contention
-# Format: { "app_id": float (timestamp) }
+# Global in-memory logs for real-time terminal output (bypasses DB latency)
+GLOBAL_LOGS = {}
 LAST_DB_UPDATE = {}
 
 def update_task_db(app_id, status=None, message=None, error=None, log_entry=None, logs_list=None):
-    """Update task status in DB. No throttling to ensure real-time terminal output."""
+    """Update task status in DB and in-memory log buffer."""
+    if app_id not in GLOBAL_LOGS:
+        GLOBAL_LOGS[app_id] = []
+    
+    if log_entry:
+        GLOBAL_LOGS[app_id].append(log_entry)
+        if len(GLOBAL_LOGS[app_id]) > 200:
+            GLOBAL_LOGS[app_id].pop(0)
+            
     conn = get_db()
     try:
         # Get current
@@ -492,11 +500,14 @@ def market_status():
                 status = 'installed'
                 message = 'Completed (Detected)'
 
+            # Merge DB logs with real-time memory logs
+            mem_logs = GLOBAL_LOGS.get(app_id, [])
+            
             tasks[app_id] = {
                 "status": status,
                 "message": message or "Initializing...",
                 "error": error,
-                "logs": json.loads(logs_json) if logs_json else [],
+                "logs": mem_logs if mem_logs else (json.loads(logs_json) if logs_json else []),
                 "updated_at": updated_at
             }
         return jsonify({"tasks": tasks})
@@ -512,6 +523,9 @@ def market_clear(app_id):
     try:
         conn.execute("DELETE FROM task_status WHERE app_id = ?", (app_id,))
         conn.commit()
+        # Also clear in-memory logs
+        if app_id in GLOBAL_LOGS:
+            del GLOBAL_LOGS[app_id]
     finally:
         conn.close()
     return jsonify({"success": True})
