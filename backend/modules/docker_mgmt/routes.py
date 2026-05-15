@@ -27,7 +27,18 @@ def update_task_db(app_id, status=None, message=None, error=None, log_entry=None
         if logs_list is not None:
             current_logs = logs_list
         elif log_entry:
-            current_logs.append(log_entry)
+            # Check if this is a layer progress update (e.g., "[id] Extracting...")
+            # If so, update the last line if it's the same layer
+            is_progress = log_entry.startswith('[') and ']' in log_entry
+            if is_progress:
+                layer_id = log_entry.split(']')[0] + ']'
+                if current_logs and current_logs[-1].startswith(layer_id):
+                    current_logs[-1] = log_entry
+                else:
+                    current_logs.append(log_entry)
+            else:
+                current_logs.append(log_entry)
+            
             if len(current_logs) > 200:
                 current_logs.pop(0)
         
@@ -360,8 +371,9 @@ def market_install():
                     
                     status = line.get("status", "")
                     progress = line.get("progress", "")
+                    layer_id = line.get("id", "core")
                     if status:
-                        log_msg(f"{status} {progress}".strip())
+                        log_msg(f"[{layer_id}] {status} {progress}".strip())
 
                 # Verify image exists before running
                 log_msg("Verifying image...")
