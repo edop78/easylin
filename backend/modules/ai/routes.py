@@ -36,14 +36,14 @@ def check_ollama():
     
     # Try current known API first
     try:
-        requests.get(f"{OLLAMA_API.replace('/api','')}/", timeout=0.5)
+        requests.get(f"{OLLAMA_API.replace('/api','')}/", timeout=2.0)
         return True
     except:
         pass
 
     for url in endpoints:
         try:
-            requests.get(url, timeout=0.5)
+            requests.get(url, timeout=2.0)
             # If successful, update the global API URL for this session
             global OLLAMA_API
             OLLAMA_API = f"{url.rstrip('/')}/api"
@@ -56,11 +56,13 @@ def check_ollama():
 @ai_bp.route("/status", methods=["GET"])
 @jwt_required()
 def get_status():
+    local_ip = get_local_ip()
     is_active = check_ollama()
     return jsonify({
         "active": is_active,
         "api_url": OLLAMA_API,
-        "message": "Ollama is running" if is_active else "Ollama is not reachable. Is it installed and running on port 11434?"
+        "detected_ip": local_ip,
+        "message": "Ollama is running" if is_active else f"Ollama not reachable at {OLLAMA_API}. Detected host IP: {local_ip}"
     })
 
 @ai_bp.route("/models", methods=["GET"])
