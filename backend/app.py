@@ -61,6 +61,7 @@ def create_app():
         ("modules.terminal.routes", "terminal_bp", "/api/terminal"),
         ("modules.logs.routes", "logs_bp", "/api/logs"),
         ("modules.git_projects.routes", "git_projects_bp", "/api/git"),
+        ("modules.storage.routes", "storage_bp", "/api/storage"),
     ]
 
     for module_path, bp_name, prefix in modules:

@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useApi } from '../../hooks/useApi';
 import { 
   LayoutDashboard, Package, Users, Activity, Container, Network, Shield, Globe, 
-  FileText, Terminal, RefreshCw, Server, Cog, Zap, LogOut, ScrollText, Rocket, GitBranch
+  FileText, Terminal, RefreshCw, Server, Cog, Zap, LogOut, ScrollText, Rocket, GitBranch, HardDrive
 } from 'lucide-react';
 import './Layout.css';
 
@@ -33,7 +33,8 @@ export default function Sidebar() {
         { to: '/network', icon: Network, label: 'Network' },
         { to: '/firewall', icon: Shield, label: 'Firewall' },
         { to: '/proxy', icon: Globe, label: 'Reverse Proxy' },
-        { to: '/git', icon: GitBranch, label: 'Git Projects' }
+        { to: '/git', icon: GitBranch, label: 'Git Projects' },
+        { to: '/storage', icon: HardDrive, label: 'Storage Manager' }
       ]
     },
     {
