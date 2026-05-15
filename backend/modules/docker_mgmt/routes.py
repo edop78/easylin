@@ -302,10 +302,22 @@ def market_install():
                 # Pull with progress tracking
                 log_msg(f"Starting pull for {app_config['image']}...")
                 for line in client.api.pull(app_config["image"], stream=True, decode=True):
+                    if "error" in line:
+                        error_detail = line.get("errorDetail", {}).get("message", line["error"])
+                        raise Exception(f"Pull failed: {error_detail}")
+                    
                     status = line.get("status", "")
                     progress = line.get("progress", "")
                     if status:
                         log_msg(f"{status} {progress}".strip())
+
+                # Verify image exists before running
+                log_msg("Verifying image...")
+                try:
+                    client.images.get(app_config["image"])
+                except Exception:
+                    log_msg(f"Image {app_config['image']} not found after pull. Retrying high-level pull...")
+                    client.images.pull(app_config["image"])
 
                 # Run
                 log_msg("Creating container...")
