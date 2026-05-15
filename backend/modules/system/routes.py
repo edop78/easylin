@@ -14,7 +14,8 @@ system_bp = Blueprint("system", __name__)
 @jwt_required()
 def get_version():
     try:
-        root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
+        # Il file ora si trova in backend/version.json
+        root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
         version_file = os.path.join(root_dir, "version.json")
         
         # Default values
