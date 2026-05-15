@@ -17,21 +17,17 @@ function StatCard({ title, value, sub, icon: Icon, color, details, percent }) {
             <div className={`progress-fill ${color}`} style={{ width: `${percent || 0}%` }}></div>
           </div>
         )}
-        <div className="stat-sub" style={{ marginTop: '4px' }}>
+        <div className="stat-sub" style={{ marginTop: '8px' }}>
           {details && details.length >= 3 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', opacity: 0.7 }}>
-                <span>{details[0]}</span>
-                <span>{details[1]}</span>
-              </div>
-              <div style={{ textAlign: 'center', fontSize: '10px', opacity: 0.7 }}>
-                {details[2]}
-              </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', opacity: 0.8, whiteSpace: 'nowrap' }}>
+              <span>{details[0]}</span>
+              <span style={{ opacity: 0.6 }}>{details[2]}</span>
+              <span>{details[1]}</span>
             </div>
           ) : details ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px' }}>
               {details.map((d, i) => (
-                <div key={i} style={{ fontSize: '10px', opacity: 0.7, whiteSpace: 'nowrap' }}>{d}</div>
+                <div key={i} style={{ fontSize: '11px', opacity: 0.8, whiteSpace: 'nowrap' }}>{d}</div>
               ))}
             </div>
           ) : sub}
