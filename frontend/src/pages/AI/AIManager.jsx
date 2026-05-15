@@ -18,8 +18,8 @@ const SUGGESTED_MODELS = [
 ];
 
 export default function AIManager() {
-  const { data: status, loading: statusLoading, refetch: refetchStatus } = useApi('/api/ai/status');
-  const { data: modelsData, loading: modelsLoading, refetch: refetchModels } = useApi('/api/ai/models');
+  const { data: status, loading: statusLoading, error: statusError, refetch: refetchStatus } = useApi('/ai/status');
+  const { data: modelsData, loading: modelsLoading, refetch: refetchModels } = useApi('/ai/models');
   
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -49,7 +49,7 @@ export default function AIManager() {
     setPulling(true);
     setError(null);
     try {
-      await api.post('/api/ai/pull', { name: modelToPull });
+      await api.post('/ai/pull', { name: modelToPull });
       refetchModels();
       setCustomModelName('');
       setIsCustomModel(false);
@@ -63,7 +63,7 @@ export default function AIManager() {
   const handleDelete = async (name) => {
     if (!confirm(`Are you sure you want to delete model ${name}?`)) return;
     try {
-      await api.delete('/api/ai/delete', { data: { name } });
+      await api.delete('/ai/delete', { data: { name } });
       refetchModels();
       if (selectedModel === name) setSelectedModel('');
     } catch (err) {
@@ -80,7 +80,7 @@ export default function AIManager() {
     setChatLoading(true);
     
     try {
-      const res = await api.post('/api/ai/chat', {
+      const res = await api.post('/ai/chat', {
         model: selectedModel,
         messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content }))
       });
@@ -113,8 +113,10 @@ export default function AIManager() {
         <div className="alert alert-error" style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
           <Info size={24} />
           <div style={{ flex: 1 }}>
-            <strong style={{ display: 'block', marginBottom: '4px' }}>{status?.message || 'Ollama non rilevato'}</strong> 
-            {status?.detected_ip ? `Indirizzo IP rilevato: ${status.detected_ip}` : 'Verifica che il motore Ollama sia installato e attivo nella sezione Docker App Store.'}
+            <strong style={{ display: 'block', marginBottom: '4px' }}>
+              {status?.message || (statusLoading ? 'Caricamento stato...' : 'Errore Connessione Backend')}
+            </strong> 
+            {statusError ? <code style={{ fontSize: '11px', color: '#ffaaaa' }}>{statusError}</code> : (status?.detected_ip ? `IP: ${status.detected_ip}` : 'Verifica che il backend sia attivo e che il container Ollama sia in esecuzione.')}
           </div>
           <Link to="/docker" className="btn btn-sm btn-primary" style={{ whiteSpace: 'nowrap', textDecoration: 'none' }}>
             Vai allo Store
