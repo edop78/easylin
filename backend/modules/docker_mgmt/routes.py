@@ -354,6 +354,9 @@ def market_install():
             "name": "ollama",
             "image": "ollama/ollama:latest",
             "ports": {"11434/tcp": 11434},
+            "environment": {
+                "OLLAMA_HOST": "0.0.0.0"
+            },
             "volumes": {
                 "ollama_data": {"bind": "/root/.ollama", "mode": "rw"}
             },

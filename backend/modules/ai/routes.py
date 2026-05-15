@@ -5,14 +5,21 @@ from flask_jwt_extended import jwt_required
 
 ai_bp = Blueprint("ai", __name__)
 
-OLLAMA_API = "http://localhost:11434/api"
+# Primary is 127.0.0.1 since EasyLin runs in network_mode: host
+OLLAMA_API = "http://127.0.0.1:11434/api"
 
 def check_ollama():
     try:
-        requests.get(f"http://localhost:11434/", timeout=2)
+        # Try localhost/host-IP first
+        requests.get("http://127.0.0.1:11434/", timeout=1)
         return True
     except:
-        return False
+        try:
+            # Fallback to container name if bridged
+            requests.get("http://ollama:11434/", timeout=1)
+            return True
+        except:
+            return False
 
 @ai_bp.route("/status", methods=["GET"])
 @jwt_required()
