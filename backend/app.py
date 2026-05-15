@@ -85,6 +85,10 @@ def create_app():
     def health():
         return jsonify({"status": "ok", "app": "EasyLin"})
 
+    @app.route("/api/ai/test")
+    def ai_test():
+        return jsonify({"status": "ok", "message": "AI Route is working!"})
+
     @app.route("/")
     def index():
         return send_from_directory(app.static_folder, "index.html")
