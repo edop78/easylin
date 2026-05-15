@@ -21,35 +21,47 @@ def get_local_ip():
     except:
         return "127.0.0.1"
 
+import concurrent.futures
+
+def probe_url(url):
+    try:
+        res = requests.get(url, timeout=1.0)
+        if res.status_code == 200 and "ollama" in res.text.lower():
+            return url
+    except:
+        pass
+    return None
+
 def check_ollama():
-    """Detect Ollama by probing multiple possible endpoints including the dynamic local IP."""
+    """Detect Ollama by probing common endpoints and scanning the local subnet."""
     local_ip = get_local_ip()
+    base_ip = ".".join(local_ip.split(".")[:-1]) + "."
+    
     endpoints = [
         "http://127.0.0.1:11434/",
         "http://localhost:11434/",
         f"http://{local_ip}:11434/",
         "http://host.docker.internal:11434/",
-        "http://172.17.0.1:11434/",
-        "http://172.18.0.1:11434/",
         "http://ollama:11434/"
     ]
     
-    # Try current known API first
-    try:
-        requests.get(f"{OLLAMA_API.replace('/api','')}/", timeout=2.0)
-        return True
-    except:
-        pass
-
+    # 1. Try common endpoints first (fast)
     for url in endpoints:
-        try:
-            requests.get(url, timeout=2.0)
-            # If successful, update the global API URL for this session
+        if probe_url(url):
             global OLLAMA_API
             OLLAMA_API = f"{url.rstrip('/')}/api"
             return True
-        except:
-            continue
+
+    # 2. Parallel scan of the subnet (brute force)
+    scan_urls = [f"http://{base_ip}{i}:11434/" for i in range(1, 255)]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
+        future_to_url = {executor.submit(probe_url, url): url for url in scan_urls}
+        for future in concurrent.futures.as_completed(future_to_url):
+            found_url = future.result()
+            if found_url:
+                global OLLAMA_API
+                OLLAMA_API = f"{found_url.rstrip('/')}/api"
+                return True
             
     return False
 
