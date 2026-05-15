@@ -76,11 +76,16 @@ def create_app():
     def health():
         return jsonify({"status": "ok", "app": "EasyLin"})
 
-    @app.route("/", defaults={"path": ""})
-    @app.route("/<path:path>")
-    def serve_spa(path):
-        if path and os.path.exists(os.path.join(app.static_folder, path)):
-            return send_from_directory(app.static_folder, path)
+    @app.route("/")
+    def index():
+        return send_from_directory(app.static_folder, "index.html")
+
+    @app.errorhandler(404)
+    def not_found(e):
+        # Se la richiesta è per un'API, restituisci JSON
+        if request.path.startswith("/api/"):
+            return jsonify({"error": "Not Found", "path": request.path}), 404
+        # Altrimenti, servi la SPA
         return send_from_directory(app.static_folder, "index.html")
 
     return app
