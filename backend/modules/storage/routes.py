@@ -190,3 +190,77 @@ def mount_local():
     else:
         run_host_command("cp /etc/fstab.bak /etc/fstab")
         return jsonify({"success": False, "error": res.get("stderr")}), 500
+@storage_bp.route("/lvm/info", methods=["GET"])
+@jwt_required()
+def get_lvm_info():
+    """Get Volume Groups and Logical Volumes info."""
+    # VGS
+    vgs_res = run_host_command("vgs --units g --noheadings -o vg_name,vg_size,vg_free --separator '|'")
+    vgs = []
+    if vgs_res.get("returncode") == 0:
+        lines = vgs_res.get("stdout", "").strip().split('\n')
+        for line in lines:
+            if not line: continue
+            parts = [p.strip() for p in line.split('|')]
+            if len(parts) >= 3:
+                vgs.append({
+                    "name": parts[0],
+                    "size": parts[1],
+                    "free": parts[2]
+                })
+
+    # LVS
+    lvs_res = run_host_command("lvs --units g --noheadings -o lv_name,vg_name,lv_path,lv_size --separator '|'")
+    lvs = []
+    if lvs_res.get("returncode") == 0:
+        lines = lvs_res.get("stdout", "").strip().split('\n')
+        for line in lines:
+            if not line: continue
+            parts = [p.strip() for p in line.split('|')]
+            if len(parts) >= 4:
+                lvs.append({
+                    "name": parts[0],
+                    "vg": parts[1],
+                    "path": parts[2],
+                    "size": parts[3]
+                })
+
+    return jsonify({
+        "vgs": vgs,
+        "lvs": lvs,
+        "is_lvm_active": len(vgs) > 0
+    })
+
+@storage_bp.route("/expand-root", methods=["POST"])
+@jwt_required()
+def expand_root():
+    """Attempt to expand the root partition to use all free space in VG."""
+    # 1. Detect root LV path using df
+    df_res = run_host_command("df / --output=source")
+    if df_res.get("returncode") != 0:
+        return jsonify({"error": "Could not detect root filesystem"}), 500
+    
+    lines = df_res.get("stdout", "").strip().split('\n')
+    if len(lines) < 2:
+        return jsonify({"error": "Invalid df output"}), 500
+        
+    root_dev = lines[1].strip()
+    
+    # Check if it's an LVM/Mapper device
+    if "/dev/mapper/" not in root_dev and not root_dev.startswith("/dev/ubuntu-vg/"):
+        # Not an LVM volume or different naming, but we'll try lvextend anyway if the user asked
+        pass
+
+    results = []
+    # Step 1: LVExtend
+    ext_res = run_host_command(f"lvextend -l +100%FREE {root_dev}")
+    results.append({"command": "lvextend", "success": ext_res.get("returncode") == 0, "output": ext_res.get("stdout"), "error": ext_res.get("stderr")})
+    
+    # Step 2: ResizeFS
+    res_res = run_host_command(f"resize2fs {root_dev}")
+    results.append({"command": "resize2fs", "success": res_res.get("returncode") == 0, "output": res_res.get("stdout"), "error": res_res.get("stderr")})
+    
+    return jsonify({
+        "results": results,
+        "message": "Root expansion process completed."
+    })

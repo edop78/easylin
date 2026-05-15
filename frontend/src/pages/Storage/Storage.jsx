@@ -8,19 +8,41 @@ import {
 } from 'lucide-react';
 
 export default function Storage() {
-  const { data, loading, refetch } = useApi('/storage/disks');
+  const { data, loading: loadingDisks, refetch: refetchDisks } = useApi('/storage/disks');
+  const { data: lvmData, loading: loadingLVM, refetch: refetchLVM } = useApi('/storage/lvm/info');
   const [busyData, setBusyData] = useState(null);
   const [showNASWizard, setShowNASWizard] = useState(false);
-  const [showLocalMount, setShowLocalMount] = useState(null); // Will store { device, fstype }
+  const [showLocalMount, setShowLocalMount] = useState(null); 
   const [localMountPoint, setLocalMountPoint] = useState('');
   const [nasForm, setNasForm] = useState({ type: 'nfs', path: '', mountpoint: '/mnt/nas', username: '', password: '', options: 'defaults' });
   const [isActionLoading, setIsActionLoading] = useState(false);
+  const [expansionLog, setExpansionLog] = useState(null);
+
+  const handleExpandRoot = async () => {
+    if (!window.confirm("This will expand your root partition to use all available space in the Volume Group. Continue?")) return;
+    
+    setIsActionLoading(true);
+    setExpansionLog("Starting expansion process...");
+    try {
+      const res = await api.post('/storage/expand-root');
+      const results = res.results.map(r => 
+        `${r.command}: ${r.success ? 'SUCCESS' : 'FAILED'}\n${r.output || r.error}`
+      ).join('\n\n');
+      setExpansionLog(results);
+      refetchDisks();
+      refetchLVM();
+    } catch (err) {
+      setExpansionLog("Expansion failed: " + err.message);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
 
   const handleUnmount = async (mountpoint) => {
     setIsActionLoading(true);
     try {
       await api.post('/storage/unmount', { mountpoint });
-      refetch();
+      refetchDisks();
     } catch (err) {
       if (err.response?.status === 409) {
         setBusyData({ mountpoint, processes: err.response.data.processes });
@@ -37,7 +59,7 @@ export default function Storage() {
     try {
       await api.post('/storage/force-unmount', { mountpoint: busyData.mountpoint });
       setBusyData(null);
-      refetch();
+      refetchDisks();
     } catch (err) {
       alert("Force unmount failed: " + err.message);
     } finally {
@@ -50,7 +72,7 @@ export default function Storage() {
     try {
       await api.post('/storage/mount-nas', nasForm);
       setShowNASWizard(false);
-      refetch();
+      refetchDisks();
     } catch (err) {
       alert("NAS Mount failed: " + err.message);
     } finally {
@@ -68,7 +90,7 @@ export default function Storage() {
       });
       setShowLocalMount(null);
       setLocalMountPoint('');
-      refetch();
+      refetchDisks();
     } catch (err) {
       alert("Local Mount failed: " + err.message);
     } finally {
@@ -82,14 +104,83 @@ export default function Storage() {
         <div className="page-title">
           <div className="icon-container cyan"><HardDrive size={24} /></div>
           <div>
-            <h1>Storage & Mount Manager</h1>
-            <p className="subtitle">Physical disks, SMART health and network storage</p>
+            <h1>Storage Manager</h1>
+            <p className="subtitle">Physical disks, LVM expansion and network mounts</p>
           </div>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowNASWizard(true)}>
-          <Plus size={18} /> Mount NAS
-        </button>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button className="btn btn-ghost" onClick={() => { refetchDisks(); refetchLVM(); }}>
+            <RefreshCw size={18} /> Refresh
+          </button>
+          <button className="btn btn-primary" onClick={() => setShowNASWizard(true)}>
+            <Plus size={18} /> Mount NAS
+          </button>
+        </div>
       </div>
+
+      {/* LVM Expansion Utility */}
+      {lvmData?.is_lvm_active && (
+        <div className="card" style={{ marginBottom: '24px', border: '1px solid var(--accent-blue)', background: 'linear-gradient(145deg, rgba(59, 130, 246, 0.05) 0%, rgba(59, 130, 246, 0.02) 100%)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ padding: '10px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-blue)', borderRadius: '12px' }}>
+                <Activity size={24} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0 }}>LVM System Expansion</h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Detected LVM Volume Group: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{lvmData.vgs[0]?.name}</span></p>
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Free Space in VG</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 700, color: lvmData.vgs[0]?.free !== '0' ? 'var(--accent-green)' : 'var(--text-muted)' }}>
+                {lvmData.vgs[0]?.free}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '12px', marginBottom: '20px' }}>
+            <div style={{ fontSize: '0.9rem', marginBottom: '12px', display: 'flex', justifyContent: 'space-between' }}>
+              <span>Root Logical Volume</span>
+              <span className="mono" style={{ color: 'var(--accent-blue)' }}>{lvmData.lvs.find(l => l.name.includes('root') || l.name.includes('lv'))?.path || 'Detecting...'}</span>
+            </div>
+            <div style={{ height: '8px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: lvmData.vgs[0]?.free === '0' ? '100%' : '70%', backgroundColor: 'var(--accent-blue)', transition: 'width 1s ease' }}></div>
+            </div>
+          </div>
+
+          {lvmData.vgs[0]?.free !== '0' ? (
+            <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+              <button 
+                className="btn btn-primary" 
+                onClick={handleExpandRoot} 
+                disabled={isActionLoading}
+                style={{ flex: 1, height: '48px', fontSize: '1rem' }}
+              >
+                {isActionLoading ? <RefreshCw className="spin" size={20} /> : <Save size={20} />} 
+                Expand Root to Maximum Space
+              </button>
+              <div style={{ flex: 2, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                This will automatically run <code>lvextend</code> and <code>resize2fs</code> to reclaim all unallocated disk space.
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-green)', fontSize: '0.9rem', background: 'rgba(34, 197, 94, 0.05)', padding: '12px', borderRadius: '8px' }}>
+              <ShieldCheck size={18} /> Your root partition is already using all available space in the Volume Group.
+            </div>
+          )}
+
+          {expansionLog && (
+            <div style={{ marginTop: '20px', background: '#000', padding: '15px', borderRadius: '8px', fontSize: '12px', fontFamily: 'monospace', color: '#22c55e', whiteSpace: 'pre-wrap', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '5px' }}>
+                <span style={{ color: '#fff' }}>Expansion Terminal Output</span>
+                <button onClick={() => setExpansionLog(null)} style={{ color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>Close</button>
+              </div>
+              {expansionLog}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(450px, 1fr))' }}>
         {data?.devices?.map(dev => (
