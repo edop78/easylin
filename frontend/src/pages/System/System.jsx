@@ -332,8 +332,10 @@ export default function System() {
         .tabs-mini { display: flex; gap: 4px; background: var(--bg-lighter); padding: 4px; border-radius: 8px; }
         .tab-sm { flex: 1; border: none; background: transparent; color: var(--text-muted); padding: 6px; font-size: 11px; font-weight: 600; cursor: pointer; border-radius: 6px; transition: 0.2s; }
         .tab-sm.active { background: var(--bg-card); color: var(--accent-blue); box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
-        .input-sm { width: 100%; background: var(--bg-lighter); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 6px; font-size: 13px; outline: none; }
+        .input-sm { width: 100%; background: var(--bg-lighter); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 6px; font-size: 13px; outline: none; appearance: none; }
         .input-sm:focus { border-color: var(--accent-blue); }
+        select.input-sm { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px; }
+        select.input-sm option { background: #1a1a1a; color: white; }
         .pulse { animation: pulse-red 2s infinite; }
         @keyframes pulse-red { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
       `}} />
