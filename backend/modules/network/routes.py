@@ -146,9 +146,15 @@ def set_config(iface):
     log = []
 
     # --- PHASE 1: Persistent Storage ---
+    # 0. DISABLE CLOUD-INIT NETWORK (The "Persistence Shield")
+    run_host_command("mkdir -p /etc/cloud/cloud.cfg.d/")
+    run_host_command("echo 'network: {config: disabled}' > /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg")
+    
     if driver == "netplan":
-        # Ensure we are the authority
-        run_host_command("rm -f /etc/netplan/50-cloud-init.yaml")
+        # Backup and remove ALL other netplan files to avoid authority conflicts
+        run_host_command("mkdir -p /etc/netplan/backup")
+        run_host_command("mv /etc/netplan/*.yaml /etc/netplan/backup/ 2>/dev/null")
+        
         cfg = {
             "network": {
                 "version": 2,
