@@ -17,16 +17,7 @@ docker_bp = Blueprint("docker", __name__)
 LAST_DB_UPDATE = {}
 
 def update_task_db(app_id, status=None, message=None, error=None, log_entry=None, logs_list=None):
-    """Update task status in DB with throttling."""
-    now = time.time()
-    
-    # Always allow status changes or errors, but throttle log entries/messages
-    if not status and not error and not logs_list:
-        if app_id in LAST_DB_UPDATE and (now - LAST_DB_UPDATE[app_id] < 0.5):
-            return
-    
-    LAST_DB_UPDATE[app_id] = now
-    
+    """Update task status in DB. No throttling to ensure real-time terminal output."""
     conn = get_db()
     try:
         # Get current
@@ -446,6 +437,9 @@ def market_install():
         update_task_db(app_id, status="installing", message="Initializing...", logs_list=[])
 
         # Start installation in background
+        # Create initial status BEFORE thread starts to avoid UI race condition
+        update_task_db(app_id, status="installing", message="Starting installation...", log_entry=f"--- Starting deployment for {app_config['name']} ---")
+        
         thread = threading.Thread(
             target=background_install, 
             args=(app_id, app_config, current_app._get_current_object())
