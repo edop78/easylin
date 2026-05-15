@@ -273,33 +273,48 @@ export default function Docker() {
       {activeTaskLogs && (
         <div className="modal-overlay" onClick={() => setActiveTaskLogs(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', width: '90%' }}>
-            <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <RotateCw size={18} className={marketTasks?.tasks?.[activeTaskLogs.id]?.status === 'installing' ? 'spin' : ''} />
-              Installation Logs: {activeTaskLogs.name}
+            <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <RotateCw size={18} className={marketTasks?.tasks?.[activeTaskLogs.id]?.status === 'installing' ? 'spin' : ''} />
+                Installation Logs: {activeTaskLogs.name}
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button className="btn btn-sm btn-ghost" onClick={() => refetchMarket()} title="Refresh logs from server">
+                  <RefreshCw size={14} /> Refresh
+                </button>
+                {marketTasks?.tasks?.[activeTaskLogs.id]?.status === 'installing' && (
+                  <span style={{ fontSize: '10px', color: 'var(--accent-red)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'currentColor', animation: 'pulse 1s infinite' }} /> LIVE
+                  </span>
+                )}
+              </div>
             </h3>
-            <div style={{ backgroundColor: '#000', borderRadius: '8px', padding: '15px', marginTop: '15px', position: 'relative' }}>
+            <div style={{ backgroundColor: '#000', borderRadius: '8px', padding: '15px', marginTop: '15px', position: 'relative', border: '1px solid rgba(255,255,255,0.1)' }}>
               <button 
                 className="btn btn-sm btn-ghost" 
-                style={{ position: 'absolute', top: '10px', right: '10px', color: '#fff', backgroundColor: 'rgba(255,255,255,0.1)' }}
+                style={{ position: 'absolute', top: '10px', right: '10px', color: '#fff', backgroundColor: 'rgba(255,255,255,0.1)', zIndex: 10 }}
                 onClick={() => {
-                  navigator.clipboard.writeText(persistedLogs.join('\n'));
+                  const text = persistedLogs.join('\n');
+                  navigator.clipboard.writeText(text);
                   setMsg({ type: 'success', text: 'Logs copied to clipboard!' });
                 }}
               >
                 <Copy size={14} /> Copy
               </button>
               <pre style={{ 
-                maxHeight: '400px', 
+                maxHeight: '450px', 
                 overflowY: 'auto', 
                 margin: 0, 
                 color: '#22c55e', 
                 fontFamily: 'monospace',
-                fontSize: '13px',
-                lineHeight: 1.5
+                fontSize: '12px',
+                lineHeight: 1.6,
+                paddingRight: '60px'
               }}>
                 {persistedLogs.length > 0 ? (
                   persistedLogs.map((line, i) => (
-                    <div key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '2px', marginBottom: '4px' }}>
+                    <div key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '2px', marginBottom: '2px' }}>
+                      <span style={{ opacity: 0.4, marginRight: '10px', fontSize: '10px' }}>[{i+1}]</span>
                       {line}
                     </div>
                   ))
@@ -307,12 +322,6 @@ export default function Docker() {
                   <div style={{ color: '#888', fontStyle: 'italic' }}>
                     > Establishing console connection...<br/>
                     > Waiting for installation output...
-                  </div>
-                )}
-                {marketTasks?.tasks?.[activeTaskLogs.id]?.status === 'installing' && (
-                  <div style={{ color: '#3b82f6', marginTop: '10px' }}>
-                    <RefreshCw size={12} className="spin" style={{ marginRight: '8px' }} />
-                    Receiving real-time data...
                   </div>
                 )}
                 <div ref={logsEndRef} />
@@ -456,18 +465,20 @@ export default function Docker() {
 
                 return (
                   <div key={app.id} className="app-card" style={{ border: '1px solid var(--border-color)', borderRadius: '12px', padding: 'var(--space-lg)', backgroundColor: 'rgba(255,255,255,0.02)', position: 'relative' }}>
-                    {installed && <div style={{ position: 'absolute', top: '12px', right: '12px' }}><span className="badge badge-success">Installed</span></div>}
-                    {!installed && isInstalling && (
+                    {installed && !task && <div style={{ position: 'absolute', top: '12px', right: '12px' }}><span className="badge badge-success">Installed</span></div>}
+                    {(isInstalling || (installed && task)) && (
                       <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '6px', alignItems: 'center' }}>
                         <button 
                           className="btn btn-sm btn-ghost" 
                           onClick={(e) => { e.stopPropagation(); clearTask(app.id); }}
                           style={{ padding: '2px', color: 'var(--accent-red)', minWidth: 'auto', height: 'auto' }}
-                          title="Reset status"
+                          title="Clear status and hide log button"
                         >
                           <X size={14} />
                         </button>
-                        <span className="badge badge-warning"><RotateCw size={10} className="spin" /> {task.message || 'Installing...'}</span>
+                        <span className={`badge ${installed ? 'badge-success' : 'badge-warning'}`}>
+                          {installed ? <Check size={10} /> : <RotateCw size={10} className="spin" />} {installed ? 'Installed' : (task?.message || 'Installing...')}
+                        </span>
                       </div>
                     )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 'var(--space-md)' }}><div style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-blue)', padding: '10px', borderRadius: '10px' }}><app.icon size={24} /></div></div>
