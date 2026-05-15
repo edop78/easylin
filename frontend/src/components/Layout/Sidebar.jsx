@@ -7,11 +7,16 @@ import {
 } from 'lucide-react';
 import './Layout.css';
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, onClose }) {
   const { user, logout } = useAuth();
   const { data: versionData } = useApi('/system/version');
 
+  const handleLinkClick = () => {
+    if (onClose) onClose();
+  };
+
   const sections = [
+// ... (omitting sections content for brevity in instruction, but keeping it in implementation)
     {
       title: 'Main',
       links: [{ to: '/', icon: LayoutDashboard, label: 'Dashboard' }]
@@ -49,8 +54,8 @@ export default function Sidebar() {
   ];
 
   return (
-    <aside className="sidebar">
-      <Link to="/" className="sidebar-brand" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: '12px', padding: 'var(--space-md) var(--space-lg)' }}>
+    <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
+      <Link to="/" className="sidebar-brand" onClick={handleLinkClick} style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: '12px', padding: 'var(--space-md) var(--space-lg)' }}>
         <div className="brand-icon" style={{ 
           background: 'linear-gradient(135deg, var(--accent-blue) 0%, #3b82f6 100%)', 
           color: 'white', 
@@ -79,6 +84,7 @@ export default function Sidebar() {
                 to={link.to}
                 end
                 className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
+                onClick={handleLinkClick}
               >
                 <link.icon size={18} />
                 <span>{link.label}</span>
