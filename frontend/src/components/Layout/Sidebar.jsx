@@ -1,5 +1,6 @@
 import { NavLink, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useApi } from '../../hooks/useApi';
 import { 
   LayoutDashboard, Package, Users, Activity, Container, Network, Shield, Globe, 
   FileText, Terminal, RefreshCw, Server, Cog, Zap, LogOut, ScrollText, Rocket, GitBranch
