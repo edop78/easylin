@@ -59,7 +59,8 @@ export default function Docker() {
 
   useEffect(() => {
     if (msg) {
-      const timer = setTimeout(() => setMsg(null), 10000);
+      const timeout = msg.type === 'success' && msg.text.includes('background') ? 20000 : 10000;
+      const timer = setTimeout(() => setMsg(null), timeout);
       return () => clearTimeout(timer);
     }
   }, [msg]);
@@ -110,6 +111,11 @@ export default function Docker() {
     try {
       const res = await api.post('/docker/market/install', { app_id: appId });
       setMsg({ type: 'success', text: res.message });
+      
+      // Auto-refresh every 5s for the next minute to catch the new container
+      const refreshInterval = setInterval(refetchContainers, 5000);
+      setTimeout(() => clearInterval(refreshInterval), 60000);
+      
       refetchContainers();
       setTab('containers');
     } catch (err) {

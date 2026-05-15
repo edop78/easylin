@@ -89,6 +89,19 @@ def create_app():
         # Altrimenti, servi la SPA
         return send_from_directory(app.static_folder, "index.html")
 
+    @app.errorhandler(Exception)
+    def handle_exception(e):
+        # Log dell'errore (opzionale, ma utile)
+        app.logger.error(f"Unhandled Exception: {e}")
+        # Se la richiesta è per un'API, restituisci JSON
+        if request.path.startswith("/api/"):
+            return jsonify({
+                "error": "Internal Server Error",
+                "message": str(e)
+            }), 500
+        # Altrimenti, servi la SPA o un errore generico
+        return send_from_directory(app.static_folder, "index.html")
+
     return app
 
 if __name__ == "__main__":

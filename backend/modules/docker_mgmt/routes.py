@@ -1,9 +1,10 @@
 """Docker management API — containers, images, volumes, networks."""
 
 import docker
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required
 import os
+import threading
 
 docker_bp = Blueprint("docker", __name__)
 
@@ -273,23 +274,50 @@ def market_install():
     if not app_config:
         return jsonify({"error": "Unknown app"}), 400
 
+    def background_install(app_config, flask_app):
+        with flask_app.app_context():
+            try:
+                client = docker.from_env()
+                # Check if already exists
+                try:
+                    client.containers.get(app_config["name"])
+                    return # Already exists, thread can exit
+                except Exception:
+                    pass
+
+                # Pull and run
+                client.images.pull(app_config["image"])
+                client.containers.run(
+                    app_config["image"],
+                    name=app_config["name"],
+                    ports=app_config["ports"],
+                    volumes=app_config["volumes"],
+                    restart_policy=app_config["restart_policy"],
+                    detach=True
+                )
+            except Exception as e:
+                print(f"Background install error for {app_config['name']}: {e}")
+
     try:
+        # Check if already exists (immediate check)
         try:
             client.containers.get(app_config["name"])
             return jsonify({"error": f"Container {app_config['name']} already exists"}), 409
         except Exception:
             pass
 
-        client.images.pull(app_config["image"])
-        container = client.containers.run(
-            app_config["image"],
-            name=app_config["name"],
-            ports=app_config["ports"],
-            volumes=app_config["volumes"],
-            restart_policy=app_config["restart_policy"],
-            detach=True
+        # Start installation in background
+        thread = threading.Thread(
+            target=background_install, 
+            args=(app_config, current_app._get_current_object())
         )
-        return jsonify({"success": True, "message": f"{app_config['name']} installed"})
+        thread.daemon = True
+        thread.start()
+
+        return jsonify({
+            "success": True, 
+            "message": f"Installation of {app_config['name']} started in background. It will appear in the list once ready."
+        }), 202
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
