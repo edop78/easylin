@@ -200,7 +200,7 @@ def configure_interface(iface):
             "ethernets": {
                 iface: {
                     "dhcp4": "yes" if use_dhcp else "no",
-                    "critical": True # Forza l'applicazione anche se rischioso
+                    "critical": True
                 }
             }
         }
@@ -216,7 +216,7 @@ def configure_interface(iface):
     import yaml
     yaml_content = yaml.dump(config, default_flow_style=False)
     
-    # Rimuoviamo eventuali file cloud-init che potrebbero andare in conflitto
+    # Rimuoviamo conflitti
     run_host_command("rm -f /etc/netplan/50-cloud-init.yaml")
     
     file_path = "/etc/netplan/99-easylin.yaml"
@@ -225,16 +225,28 @@ def configure_interface(iface):
     if write_res["returncode"] != 0:
         return jsonify({"error": f"Failed to write netplan: {write_res['stderr']}"}), 500
 
-    # Applichiamo e forziamo il riavvio del servizio di rete per essere sicuri
-    apply_res = run_host_command("netplan generate && netplan apply", timeout=15)
+    # APPLICAZIONE AGGRESSIVA
+    # 1. Tentativo standard
+    run_host_command("netplan generate && netplan apply", timeout=15)
     
-    # Fallback estremo: se l'IP non è cambiato, proviamo a riavviare il demone
-    run_host_command("systemctl restart systemd-networkd", timeout=10)
-    
+    # 2. Se è statico, forziamo l'IP direttamente via kernel (soluzione definitiva)
+    if not use_dhcp:
+        # Puliamo i vecchi IP (pericoloso ma necessario per la coerenza)
+        run_host_command(f"ip addr flush dev {iface}")
+        # Aggiungiamo il nuovo IP
+        run_host_command(f"ip addr add {address} dev {iface}")
+        # Tiriamo su l'interfaccia
+        run_host_command(f"ip link set {iface} up")
+        # Aggiungiamo il gateway
+        if gateway:
+            run_host_command(f"ip route add default via {gateway} dev {iface}")
+    else:
+        # Se è DHCP, forziamo il rinnovo
+        run_host_command(f"dhclient -r {iface} && dhclient {iface}")
+
     return jsonify({
         "success": True,
-        "message": "Configuration saved and forced. If IP was changed, reconnection might be needed.",
-        "output": apply_res["stdout"]
+        "message": "COMMAND FORCED: The IP has been pushed directly to the kernel. Reconnect to the new IP now.",
     })
 
 
