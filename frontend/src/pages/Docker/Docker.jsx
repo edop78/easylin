@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useApi } from '../../hooks/useApi';
 import api from '../../api/client';
 import { 
@@ -47,7 +47,7 @@ export default function Docker() {
   const { data: imagesData, refetch: refetchImages } = useApi('/docker/images');
   const { data: volumesData, refetch: refetchVolumes } = useApi('/docker/volumes');
   const { data: networksData, refetch: refetchNetworks } = useApi('/docker/networks');
-  const { data: marketTasks } = useApi('/docker/market/status', { interval: 5000 });
+  const { data: marketTasks, refetch: refetchMarket } = useApi('/docker/market/status', { interval: 5000 });
   
   const [tab, setTab] = useState('containers');
   const [logsModal, setLogsModal] = useState(null);
@@ -58,6 +58,13 @@ export default function Docker() {
   
   const [customApp, setCustomApp] = useState({ type: 'image', image: '', name: '', ports: '' });
   const [activeTaskLogs, setActiveTaskLogs] = useState(null);
+  const logsEndRef = useRef(null);
+
+  useEffect(() => {
+    if (activeTaskLogs && logsEndRef.current) {
+      logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [marketTasks, activeTaskLogs]);
 
   useEffect(() => {
     if (msg) {
@@ -109,10 +116,16 @@ export default function Docker() {
   };
 
   const installApp = async (appId) => {
+    const app = MARKET_APPS.find(a => a.id === appId);
     setInstalling(appId);
     try {
       const res = await api.post('/docker/market/install', { app_id: appId });
       setMsg({ type: 'success', text: res.message });
+      
+      // Auto-open logs modal and force immediate status refresh
+      setActiveTaskLogs({ id: appId, name: app?.name || appId });
+      refetchMarket();
+      
       refetchContainers();
       setTab('containers');
     } catch (err) {
@@ -274,6 +287,7 @@ export default function Docker() {
                     Waiting for more logs...
                   </div>
                 )}
+                <div ref={logsEndRef} />
               </pre>
             </div>
             <div className="modal-actions" style={{ marginTop: '20px' }}>
