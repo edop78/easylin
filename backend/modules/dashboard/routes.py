@@ -48,19 +48,16 @@ def get_metrics():
             "display_total": f"{commercial_total:.1f} GB" if commercial_total % 1 != 0 else f"{int(commercial_total)} GB"
         }
         
-        # Disk - Calcolo dello spazio fisico stimato
+        # Disk - Calcolo dello spazio reale senza arrotondamenti commerciali
         disk_obj = psutil.disk_usage('/')
         total_disk_gb = disk_obj.total / (1024**3)
-        # Il disco ha spesso partizioni o overhead, arrotondiamo alla taglia commerciale più vicina (8, 16, 32, 64...)
-        possible_sizes = [8, 16, 32, 64, 128, 256, 512, 1024]
-        commercial_disk = min(possible_sizes, key=lambda x: abs(x - total_disk_gb)) if total_disk_gb < 1024 else total_disk_gb
         
         disk = {
             "percent": disk_obj.percent,
             "used": disk_obj.used,
             "free": disk_obj.free,
             "total": disk_obj.total,
-            "display_total": f"{int(commercial_disk)} GB"
+            "display_total": f"{total_disk_gb:.1f} GB"
         }
         
         # Network
