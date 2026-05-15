@@ -130,14 +130,9 @@ export default function Docker() {
   const installApp = async (appId) => {
     setInstalling(appId);
     try {
-      const app = MARKET_APPS.find(a => a.id === appId);
       await api.post('/docker/market/install', { app_id: appId });
-      
-      // Auto-open logs modal so the user sees progress immediately
-      setActiveTaskLogs({ id: appId, name: app?.name || appId });
-      
-      // We don't setInstalling(null) here anymore. 
-      // It will be cleared by the useEffect when the task is picked up by the backend.
+      // Removed auto-open logs modal as requested. 
+      // The user now decides when to open them via the "View Progress" button.
       setTimeout(() => refetchMarket(), 500);
     } catch (err) {
       setMsg({ type: 'error', text: err.message });
