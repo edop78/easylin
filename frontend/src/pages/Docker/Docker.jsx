@@ -4,7 +4,7 @@ import api from '../../api/client';
 import { 
   Container, Play, Square, RotateCw, Trash2, RefreshCw, 
   Image, HardDrive, Network, ScrollText, Cog, ShoppingCart, 
-  Download, ExternalLink, Globe, Trash, CheckCircle, AlertCircle, Copy, Plus, Github, Lock
+  Download, ExternalLink, Globe, Trash, CheckCircle, AlertCircle, Copy, Plus, Github, Lock, Bot
 } from 'lucide-react';
 import ConfirmModal from '../../components/Common/ConfirmModal';
 
@@ -27,6 +27,17 @@ const MARKET_APPS = [
     tags: ['Proxy', 'SSL', 'Security'],
     url: 'https://nginxproxymanager.com/',
     uiPort: 81
+  },
+  {
+    id: 'ollama',
+    containerName: 'ollama',
+    name: 'Ollama AI',
+    desc: 'Get up and running with large language models locally.',
+    icon: Bot,
+    image: 'ollama/ollama:latest',
+    tags: ['AI', 'LLM', 'Local'],
+    url: 'https://ollama.com/',
+    uiPort: 11434
   }
 ];
 

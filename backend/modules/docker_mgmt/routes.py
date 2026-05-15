@@ -257,6 +257,15 @@ def market_install():
                 "npm_letsencrypt": {"bind": "/etc/letsencrypt", "mode": "rw"}
             },
             "restart_policy": {"Name": "unless-stopped"}
+        },
+        "ollama": {
+            "name": "ollama",
+            "image": "ollama/ollama:latest",
+            "ports": {"11434/tcp": 11434},
+            "volumes": {
+                "ollama_data": {"bind": "/root/.ollama", "mode": "rw"}
+            },
+            "restart_policy": {"Name": "unless-stopped"}
         }
     }
 
