@@ -141,11 +141,20 @@ export default function Storage() {
 
           <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '12px', marginBottom: '20px' }}>
             <div style={{ fontSize: '0.9rem', marginBottom: '12px', display: 'flex', justifyContent: 'space-between' }}>
-              <span>Root Logical Volume</span>
-              <span className="mono" style={{ color: 'var(--accent-blue)' }}>{lvmData.lvs.find(l => l.name.includes('root') || l.name.includes('lv'))?.path || 'Detecting...'}</span>
+              <span>Root Logical Volume Allocation</span>
+              <span className="mono" style={{ color: 'var(--accent-blue)' }}>
+                {lvmData.lvs.find(l => l.path.includes('root') || l.path.includes('lv'))?.size} / {lvmData.vgs[0]?.size}
+              </span>
             </div>
             <div style={{ height: '8px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: lvmData.vgs[0]?.free === '0' ? '100%' : '70%', backgroundColor: 'var(--accent-blue)', transition: 'width 1s ease' }}></div>
+              <div 
+                style={{ 
+                  height: '100%', 
+                  width: `${Math.min(100, (parseFloat(lvmData.lvs.find(l => l.path.includes('root') || l.path.includes('lv'))?.size) / parseFloat(lvmData.vgs[0]?.size)) * 100)}%`, 
+                  backgroundColor: 'var(--accent-blue)', 
+                  transition: 'width 1s ease' 
+                }}
+              ></div>
             </div>
           </div>
 
