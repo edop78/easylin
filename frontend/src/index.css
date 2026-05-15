@@ -437,6 +437,8 @@ select.form-input {
 .progress-fill.green { background: var(--accent-green); }
 .progress-fill.amber { background: var(--accent-amber); }
 .progress-fill.red { background: var(--accent-red); }
+.progress-fill.purple { background: var(--accent-purple); }
+.progress-fill.cyan { background: var(--accent-cyan); }
 
 /* --- Modal --- */
 .modal-overlay {
