@@ -367,7 +367,7 @@ export default function Docker() {
                 return (
                   <div key={app.id} className="app-card" style={{ border: '1px solid var(--border-color)', borderRadius: '12px', padding: 'var(--space-lg)', backgroundColor: 'rgba(255,255,255,0.02)', position: 'relative' }}>
                     {installed && <div style={{ position: 'absolute', top: '12px', right: '12px' }}><span className="badge badge-success">Installed</span></div>}
-                    {!installed && isInstalling && <div style={{ position: 'absolute', top: '12px', right: '12px' }}><span className="badge badge-warning"><RotateCw size={10} className="spin" /> Installing...</span></div>}
+                    {!installed && isInstalling && <div style={{ position: 'absolute', top: '12px', right: '12px' }}><span className="badge badge-warning"><RotateCw size={10} className="spin" /> {task.message || 'Installing...'}</span></div>}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 'var(--space-md)' }}><div style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-blue)', padding: '10px', borderRadius: '10px' }}><app.icon size={24} /></div></div>
                     <h3 style={{ marginBottom: '4px', fontSize: '1.1rem' }}>{app.name}</h3>
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 'var(--space-md)', lineHeight: 1.4 }}>{app.desc}</p>

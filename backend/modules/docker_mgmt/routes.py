@@ -9,7 +9,7 @@ import threading
 docker_bp = Blueprint("docker", __name__)
 
 # Track background installation tasks
-# Format: { "app_id": { "status": "installing" | "success" | "error", "error": str | None, "timestamp": float } }
+# Format: { "app_id": { "status": "installing" | "success" | "error", "message": str, "error": str | None, "timestamp": float } }
 INSTALLATION_TASKS = {}
 
 
@@ -285,13 +285,22 @@ def market_install():
                 # Check if already exists
                 try:
                     client.containers.get(app_config["name"])
-                    INSTALLATION_TASKS[app_id] = {"status": "success", "error": None}
+                    INSTALLATION_TASKS[app_id] = {"status": "success", "message": "Already installed", "error": None}
                     return
                 except Exception:
                     pass
 
-                # Pull and run
-                client.images.pull(app_config["image"])
+                # Pull with progress tracking
+                INSTALLATION_TASKS[app_id]["message"] = "Starting download..."
+                for line in client.api.pull(app_config["image"], stream=True, decode=True):
+                    status = line.get("status", "")
+                    progress = line.get("progress", "")
+                    if status:
+                        msg = f"{status} {progress}".strip()
+                        INSTALLATION_TASKS[app_id]["message"] = msg
+
+                # Run
+                INSTALLATION_TASKS[app_id]["message"] = "Creating container..."
                 client.containers.run(
                     app_config["image"],
                     name=app_config["name"],
@@ -300,11 +309,17 @@ def market_install():
                     restart_policy=app_config["restart_policy"],
                     detach=True
                 )
-                INSTALLATION_TASKS[app_id] = {"status": "success", "error": None}
+                INSTALLATION_TASKS[app_id] = {"status": "success", "message": "Installed successfully", "error": None}
             except Exception as e:
                 error_msg = str(e)
+                # Clean up error message if it's a known Docker API error
+                if "port is already allocated" in error_msg.lower():
+                    error_msg = "Port conflict: Port 11434 is already in use by another process."
+                elif "repository does not exist" in error_msg.lower():
+                    error_msg = f"Image {app_config['image']} not found on Docker Hub."
+                
                 print(f"Background install error for {app_config['name']}: {error_msg}")
-                INSTALLATION_TASKS[app_id] = {"status": "error", "error": error_msg}
+                INSTALLATION_TASKS[app_id] = {"status": "error", "message": "Failed", "error": error_msg}
 
     try:
         # Check if already exists (immediate check)
@@ -315,7 +330,7 @@ def market_install():
             pass
 
         # Initialize task status
-        INSTALLATION_TASKS[app_id] = {"status": "installing", "error": None}
+        INSTALLATION_TASKS[app_id] = {"status": "installing", "message": "Initializing...", "error": None}
 
         # Start installation in background
         thread = threading.Thread(
