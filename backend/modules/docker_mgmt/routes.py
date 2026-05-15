@@ -6,11 +6,65 @@ from flask_jwt_extended import jwt_required
 import os
 import threading
 
+import json
+from database import get_db
+
 docker_bp = Blueprint("docker", __name__)
 
-# Track background installation tasks
-# Format: { "app_id": { "status": "installing" | "success" | "error", "message": str, "error": str | None, "logs": [], "timestamp": float } }
-INSTALLATION_TASKS = {}
+def update_task_db(app_id, status=None, message=None, error=None, log_entry=None):
+    """Update task status in DB."""
+    conn = get_db()
+    try:
+        # Get current
+        cur = conn.cursor()
+        cur.execute("SELECT status, message, error, logs FROM task_status WHERE app_id = ?", (app_id,))
+        row = cur.fetchone()
+        
+        current_logs = []
+        if row and row['logs']:
+            current_logs = json.loads(row['logs'])
+        
+        if log_entry:
+            current_logs.append(log_entry)
+            if len(current_logs) > 200:
+                current_logs.pop(0)
+        
+        new_status = status or (row['status'] if row else 'installing')
+        new_message = message or (row['message'] if row else '')
+        new_error = error or (row['error'] if row else None)
+        
+        conn.execute("""
+            INSERT INTO task_status (app_id, status, message, error, logs, updated_at)
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(app_id) DO UPDATE SET
+                status = excluded.status,
+                message = excluded.message,
+                error = excluded.error,
+                logs = excluded.logs,
+                updated_at = CURRENT_TIMESTAMP
+        """, (app_id, new_status, new_message, new_error, json.dumps(current_logs)))
+        conn.commit()
+    finally:
+        conn.close()
+
+def get_tasks_db():
+    """Get all tasks from DB."""
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT app_id, status, message, error, logs FROM task_status")
+        rows = cur.fetchall()
+        tasks = {}
+        for r in rows:
+            tasks[r['app_id']] = {
+                "status": r['status'],
+                "message": r['message'],
+                "error": r['error'],
+                "logs": json.loads(r['logs']) if r['logs'] else []
+            }
+        return tasks
+    finally:
+        conn.close()
 
 
 def get_client():
@@ -280,11 +334,7 @@ def market_install():
 
     def background_install(app_id, app_config, flask_app):
         def log_msg(msg):
-            if app_id in INSTALLATION_TASKS:
-                INSTALLATION_TASKS[app_id]["logs"].append(msg)
-                if len(INSTALLATION_TASKS[app_id]["logs"]) > 100:
-                    INSTALLATION_TASKS[app_id]["logs"].pop(0)
-                INSTALLATION_TASKS[app_id]["message"] = msg
+            update_task_db(app_id, log_entry=msg)
 
         with flask_app.app_context():
             try:
@@ -293,7 +343,7 @@ def market_install():
                 # Check if already exists
                 try:
                     client.containers.get(app_config["name"])
-                    INSTALLATION_TASKS[app_id].update({"status": "success", "message": "Already installed", "error": None})
+                    update_task_db(app_id, status="success", message="Already installed")
                     log_msg("Container already exists. Task finished.")
                     return
                 except Exception:
@@ -329,7 +379,7 @@ def market_install():
                     restart_policy=app_config["restart_policy"],
                     detach=True
                 )
-                INSTALLATION_TASKS[app_id].update({"status": "success", "message": "Installed successfully", "error": None})
+                update_task_db(app_id, status="success", message="Installed successfully")
                 log_msg("Installation completed successfully.")
             except Exception as e:
                 import traceback
@@ -340,7 +390,7 @@ def market_install():
                 
                 log_msg(f"ERROR: {error_msg}")
                 log_msg(error_details)
-                INSTALLATION_TASKS[app_id].update({"status": "error", "message": "Failed", "error": error_msg})
+                update_task_db(app_id, status="error", message="Failed", error=error_msg)
 
     try:
         # Check if already exists (immediate check)
@@ -350,14 +400,8 @@ def market_install():
         except Exception:
             pass
 
-        # Initialize task status
-        INSTALLATION_TASKS[app_id] = {
-            "status": "installing", 
-            "message": "Initializing...", 
-            "error": None, 
-            "logs": [],
-            "timestamp": __import__("time").time()
-        }
+        # Initialize task status in DB
+        update_task_db(app_id, status="installing", message="Initializing...", logs=[])
 
         # Start installation in background
         thread = threading.Thread(
@@ -379,15 +423,19 @@ def market_install():
 @jwt_required()
 def market_status():
     """Get status of background installations."""
-    return jsonify({"tasks": INSTALLATION_TASKS})
+    return jsonify({"tasks": get_tasks_db()})
 
 
 @docker_bp.route("/market/clear/<app_id>", methods=["POST"])
 @jwt_required()
 def market_clear(app_id):
     """Clear a task status."""
-    if app_id in INSTALLATION_TASKS:
-        del INSTALLATION_TASKS[app_id]
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM task_status WHERE app_id = ?", (app_id,))
+        conn.commit()
+    finally:
+        conn.close()
     return jsonify({"success": True})
 
 

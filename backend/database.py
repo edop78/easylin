@@ -34,6 +34,15 @@ def init_db():
             ssl_enabled INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+
+        CREATE TABLE IF NOT EXISTS task_status (
+            app_id TEXT PRIMARY KEY,
+            status TEXT NOT NULL,
+            message TEXT,
+            error TEXT,
+            logs TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
     """)
     conn.commit()
     conn.close()
