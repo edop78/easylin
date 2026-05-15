@@ -42,12 +42,12 @@ const MARKET_APPS = [
 ];
 
 export default function Docker() {
-  const { data: info } = useApi('/docker/info');
-  const { data: containersData, loading, refetch: refetchContainers } = useApi('/docker/containers');
-  const { data: imagesData, refetch: refetchImages } = useApi('/docker/images');
-  const { data: volumesData, refetch: refetchVolumes } = useApi('/docker/volumes');
-  const { data: networksData, refetch: refetchNetworks } = useApi('/docker/networks');
-  const { data: marketTasks, refetch: refetchMarket } = useApi('/docker/market/status', { interval: 5000 });
+  const { data: info } = useApi('/docker/info', { interval: 5000 });
+  const { data: containersData, loading, refetch: refetchContainers } = useApi('/docker/containers', { interval: 5000 });
+  const { data: imagesData, refetch: refetchImages } = useApi('/docker/images', { interval: 10000 });
+  const { data: volumesData, refetch: refetchVolumes } = useApi('/docker/volumes', { interval: 10000 });
+  const { data: networksData, refetch: refetchNetworks } = useApi('/docker/networks', { interval: 10000 });
+  const { data: marketTasks, refetch: refetchMarket } = useApi('/docker/market/status', { interval: 3000 });
   
   const [tab, setTab] = useState('containers');
   const [logsModal, setLogsModal] = useState(null);
