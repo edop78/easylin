@@ -181,6 +181,53 @@ def system_info():
         "active_sessions": sessions
     })
 
+@system_bp.route("/time/info", methods=["GET"])
+@jwt_required()
+def get_time_info():
+    now = datetime.datetime.now()
+    try:
+        res_time = run_host_command("timedatectl show --property=Timezone,NTP,NTPSynchronized")
+        time_data = {}
+        for line in res_time.get("stdout", "").split("\n"):
+            if "=" in line:
+                k, v = line.split("=", 1)
+                time_data[k] = v
+    except:
+        time_data = {"Timezone": "UTC", "NTP": "no", "NTPSynchronized": "no"}
+        
+    return jsonify({
+        "current_time": now.strftime("%Y-%m-%d %H:%M:%S"),
+        "timezone": time_data.get("Timezone"),
+        "ntp_active": time_data.get("NTP") == "yes",
+        "ntp_synchronized": time_data.get("NTPSynchronized") == "yes"
+    })
+
+@system_bp.route("/time/list-timezones", methods=["GET"])
+@jwt_required()
+def list_timezones():
+    res = run_host_command("timedatectl list-timezones")
+    zones = res.get("stdout", "").strip().split("\n")
+    return jsonify(zones)
+
+@system_bp.route("/time/set-timezone", methods=["POST"])
+@jwt_required()
+def set_timezone():
+    data = request.get_json()
+    tz = data.get("timezone")
+    if not tz:
+        return jsonify({"success": False, "error": "No timezone provided"}), 400
+    res = run_host_command(f"timedatectl set-timezone {tz}")
+    return jsonify({"success": res.get("returncode") == 0, "message": f"Timezone set to {tz}"})
+
+@system_bp.route("/time/sync", methods=["POST"])
+@jwt_required()
+def sync_time():
+    # Attiva NTP se disattivato
+    run_host_command("timedatectl set-ntp true")
+    # Tenta un restart di systemd-timesyncd per forzare
+    res = run_host_command("systemctl restart systemd-timesyncd")
+    return jsonify({"success": res.get("returncode") == 0, "message": "Time synchronization requested"})
+
 @system_bp.route("/power/status", methods=["GET"])
 @jwt_required()
 def get_power_status():

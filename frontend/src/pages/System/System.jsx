@@ -10,12 +10,63 @@ import ConfirmModal from '../../components/Common/ConfirmModal';
 export default function System() {
   const { data, loading, error, refetch } = useApi('/system/info');
   const { data: powerStatus, refetch: refetchPower } = useApi('/system/power/status', { refreshInterval: 5000 });
+  const { data: timeInfo, refetch: refetchTime } = useApi('/system/time/info', { refreshInterval: 30000 });
   const [msg, setMsg] = useState(null);
   const [powerMode, setPowerMode] = useState('delay'); // delay, time, cron
   const [powerDelay, setPowerDelay] = useState(0);
   const [powerTime, setPowerTime] = useState('00:00');
   const [powerCron, setPowerCron] = useState('0 3 * * 0');
   const [confirm, setConfirm] = useState({ open: false, title: '', message: '', action: null });
+
+  // Live Clock logic
+  const [localServerTime, setLocalServerTime] = useState(null);
+  useEffect(() => {
+    if (timeInfo?.current_time) {
+      setLocalServerTime(new Date(timeInfo.current_time.replace(/-/g, '/')));
+    }
+  }, [timeInfo]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setLocalServerTime(prev => prev ? new Date(prev.getTime() + 1000) : null);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Timezones logic
+  const [timezones, setTimezones] = useState([]);
+  const [selectedTz, setSelectedTz] = useState('');
+  
+  useEffect(() => {
+    if (timeInfo?.timezone) setSelectedTz(timeInfo.timezone);
+    const fetchTzs = async () => {
+      try {
+        const zones = await api.get('/system/time/list-timezones');
+        setTimezones(zones);
+      } catch (err) {}
+    };
+    fetchTzs();
+  }, [timeInfo]);
+
+  const handleSetTimezone = async (tz) => {
+    try {
+      await api.post('/system/time/set-timezone', { timezone: tz });
+      setMsg({ type: 'success', text: `Timezone changed to ${tz}` });
+      refetchTime();
+    } catch (err) {
+      setMsg({ type: 'error', text: err.message });
+    }
+  };
+
+  const handleSyncTime = async () => {
+    try {
+      await api.post('/system/time/sync');
+      setMsg({ type: 'success', text: 'Time synchronization requested' });
+      setTimeout(refetchTime, 2000);
+    } catch (err) {
+      setMsg({ type: 'error', text: err.message });
+    }
+  };
 
   useEffect(() => {
     if (msg) {
@@ -96,7 +147,7 @@ export default function System() {
     <div className="page fade-in">
       <div className="page-header">
         <div className="page-title"><Settings size={28} /><h1>System Management</h1></div>
-        <button className="btn btn-ghost" onClick={refetch} disabled={loading}>
+        <button className="btn btn-ghost" onClick={() => { refetch(); refetchTime(); refetchPower(); }} disabled={loading}>
           <RotateCw size={15} className={loading ? 'spin' : ''} /> Refresh
         </button>
       </div>
@@ -143,6 +194,33 @@ export default function System() {
         </div>
 
         <div className="side-column">
+          {/* TIME CARD */}
+          <div className="card time-card">
+            <div className="card-header"><div className="card-title"><Clock size={16} /> Time & Region</div></div>
+            <div style={{ marginBottom: '20px', textAlign: 'center', padding: '10px', background: 'var(--bg-lighter)', borderRadius: '12px' }}>
+              <div style={{ fontSize: '28px', fontWeight: 800, fontFamily: 'monospace', color: 'var(--accent-blue)' }}>
+                {localServerTime ? localServerTime.toLocaleTimeString() : '--:--:--'}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                {localServerTime ? localServerTime.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'Loading...'}
+              </div>
+            </div>
+            
+            <div className="form-group" style={{ marginBottom: '16px' }}>
+              <label className="form-label">Timezone</label>
+              <select className="input-sm" value={selectedTz} onChange={(e) => handleSetTimezone(e.target.value)}>
+                {timezones.map(tz => <option key={tz} value={tz}>{tz}</option>)}
+              </select>
+            </div>
+
+            <button className="btn btn-ghost btn-sm" style={{ width: '100%', gap: '8px' }} onClick={handleSyncTime}>
+              <RefreshCw size={14} /> Sync with NTP
+            </button>
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '8px' }}>
+              NTP Status: {timeInfo?.ntp_active ? 'Active' : 'Disabled'} • {timeInfo?.ntp_synchronized ? 'Synced' : 'Unsynced'}
+            </div>
+          </div>
+
           {/* SESSIONS CARD */}
           <div className="card sessions-card">
             <div className="card-header"><div className="card-title"><Users size={16} /> Active Sessions</div></div>
