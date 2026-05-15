@@ -8,15 +8,29 @@ ai_bp = Blueprint("ai", __name__)
 # Primary is 127.0.0.1 since EasyLin runs in network_mode: host
 OLLAMA_API = "http://127.0.0.1:11434/api"
 
+import socket
+
+def get_local_ip():
+    try:
+        # Create a dummy socket to detect the preferred local IP
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except:
+        return "127.0.0.1"
+
 def check_ollama():
-    """Detect Ollama by probing multiple possible endpoints (Host, Container, Docker Bridge)."""
+    """Detect Ollama by probing multiple possible endpoints including the dynamic local IP."""
+    local_ip = get_local_ip()
     endpoints = [
         "http://127.0.0.1:11434/",
         "http://localhost:11434/",
+        f"http://{local_ip}:11434/",
         "http://host.docker.internal:11434/",
         "http://172.17.0.1:11434/",
         "http://172.18.0.1:11434/",
-        "http://192.168.1.1:11434/", # Long shot for some setups
         "http://ollama:11434/"
     ]
     
