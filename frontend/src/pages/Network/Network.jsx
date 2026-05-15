@@ -31,15 +31,22 @@ export default function Network() {
     }
   };
 
-  const openEdit = (iface) => {
-    const addr = iface.addresses?.find(a => a.family === 'AF_INET');
+  const openEdit = async (iface) => {
     setEditIface(iface.name);
-    setConfig({
-      dhcp: true,
-      address: addr ? `${addr.address}/24` : '',
-      gateway: '',
-      dns: '8.8.8.8, 1.1.1.1'
-    });
+    setApplying(true); // Usa applying come loading per il fetch iniziale
+    try {
+      const current = await api.get(`/network/interfaces/${iface.name}/config`);
+      setConfig({
+        dhcp: current.dhcp,
+        address: current.address || (iface.addresses?.find(a => a.family === 'AF_INET')?.address ? `${iface.addresses?.find(a => a.family === 'AF_INET').address}/24` : ''),
+        gateway: current.gateway || '',
+        dns: current.dns || '8.8.8.8, 1.1.1.1'
+      });
+    } catch (err) {
+      console.error("Failed to fetch current config", err);
+    } finally {
+      setApplying(false);
+    }
   };
 
   const applyConfig = async () => {
@@ -117,63 +124,108 @@ export default function Network() {
       {/* Edit Modal */}
       {editIface && (
         <div className="modal-overlay" onClick={() => setEditIface(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3 className="modal-title">Configure {editIface}</h3>
-
-            <div className="alert alert-warning" style={{ fontSize: '12px' }}>
-              <ShieldAlert size={16} />
-              Changing network settings can lead to <strong>disconnection</strong> and loss of access if misconfigured.
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <div className="modal-header" style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 className="modal-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Edit2 size={20} className="text-blue" /> Configure {editIface}
+              </h3>
+              <button className="btn btn-icon btn-ghost" onClick={() => setEditIface(null)}><RefreshCw size={18} style={{ transform: 'rotate(45deg)' }} /></button>
             </div>
 
-            <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)', background: 'var(--bg-primary)', padding: '12px', borderRadius: 'var(--radius-sm)' }}>
-              <label className="form-label" style={{ marginBottom: 0 }}>Use DHCP</label>
-              <input
-                type="checkbox"
-                checked={config.dhcp}
-                onChange={(e) => setConfig({ ...config, dhcp: e.target.checked })}
-                style={{ width: '20px', height: '20px', cursor: 'pointer' }}
-              />
-            </div>
-
-            {!config.dhcp && (
-              <div className="fade-in" style={{ marginTop: 'var(--space-md)' }}>
-                <div className="form-group">
-                  <label className="form-label">IP Address (with CIDR, e.g. /24)</label>
-                  <input
-                    className="form-input"
-                    value={config.address}
-                    onChange={(e) => setConfig({ ...config, address: e.target.value })}
-                    placeholder="192.168.1.100/24"
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Gateway</label>
-                  <input
-                    className="form-input"
-                    value={config.gateway}
-                    onChange={(e) => setConfig({ ...config, gateway: e.target.value })}
-                    placeholder="192.168.1.1"
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">DNS Servers (comma separated)</label>
-                  <input
-                    className="form-input"
-                    value={config.dns}
-                    onChange={(e) => setConfig({ ...config, dns: e.target.value })}
-                    placeholder="8.8.8.8, 1.1.1.1"
-                  />
-                </div>
+            <div className="alert-box warning" style={{ 
+              background: 'rgba(245, 158, 11, 0.1)', 
+              border: '1px solid rgba(245, 158, 11, 0.2)', 
+              borderRadius: '12px', 
+              padding: '16px', 
+              marginBottom: '24px',
+              display: 'flex',
+              gap: '12px'
+            }}>
+              <ShieldAlert size={20} style={{ color: '#f59e0b', flexShrink: 0 }} />
+              <div style={{ fontSize: '13px', lineHeight: '1.5', color: '#fbbf24' }}>
+                <strong>Critical Action:</strong> Changing network settings can lead to immediate <strong>disconnection</strong>. Ensure your static settings are correct before applying.
               </div>
-            )}
+            </div>
 
-            <div className="modal-actions">
-              <button className="btn btn-ghost" onClick={() => setEditIface(null)}>Cancel</button>
-              <button className="btn btn-primary" onClick={applyConfig} disabled={applying}>
-                {applying ? <div className="spinner spinner-sm" /> : "Apply Changes"}
+            <div style={{ 
+              background: 'rgba(255,255,255,0.03)', 
+              padding: '20px', 
+              borderRadius: '16px', 
+              border: '1px solid var(--border-color)',
+              marginBottom: '24px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontWeight: 600, marginBottom: '4px' }}>Automatic Configuration</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Use DHCP to obtain IP automatically</div>
+                </div>
+                <label className="switch">
+                  <input
+                    type="checkbox"
+                    checked={config.dhcp}
+                    onChange={(e) => setConfig({ ...config, dhcp: e.target.checked })}
+                  />
+                  <span className="slider round"></span>
+                </label>
+              </div>
+
+              {!config.dhcp && (
+                <div className="fade-in" style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div className="form-group" style={{ marginBottom: '16px' }}>
+                    <label className="form-label" style={{ color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>IPv4 Address / CIDR</label>
+                    <input
+                      className="input"
+                      value={config.address}
+                      onChange={(e) => setConfig({ ...config, address: e.target.value })}
+                      placeholder="e.g. 192.168.1.100/24"
+                      style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)' }}
+                    />
+                  </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                    <div className="form-group">
+                      <label className="form-label" style={{ color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase' }}>Gateway</label>
+                      <input
+                        className="input"
+                        value={config.gateway}
+                        onChange={(e) => setConfig({ ...config, gateway: e.target.value })}
+                        placeholder="192.168.1.1"
+                        style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)' }}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" style={{ color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase' }}>DNS Servers</label>
+                      <input
+                        className="input"
+                        value={config.dns}
+                        onChange={(e) => setConfig({ ...config, dns: e.target.value })}
+                        placeholder="8.8.8.8, 1.1.1.1"
+                        style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-actions" style={{ display: 'flex', gap: '12px' }}>
+              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setEditIface(null)}>Cancel</button>
+              <button className="btn btn-primary" style={{ flex: 2 }} onClick={applyConfig} disabled={applying}>
+                {applying ? <RefreshCw className="spin" size={18} /> : "Save & Apply Configuration"}
               </button>
             </div>
           </div>
+          <style dangerouslySetInnerHTML={{ __html: `
+            .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+            .switch input { opacity: 0; width: 0; height: 0; }
+            .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.1); transition: .4s; }
+            .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; }
+            input:checked + .slider { background-color: var(--accent-blue); }
+            input:checked + .slider:before { transform: translateX(20px); }
+            .slider.round { border-radius: 34px; }
+            .slider.round:before { border-radius: 50%; }
+            .text-blue { color: var(--accent-blue); }
+          `}} />
         </div>
       )}
 

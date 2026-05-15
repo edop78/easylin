@@ -75,6 +75,33 @@ def list_connections():
     return jsonify({"output": result["stdout"]})
 
 
+@network_bp.route("/interfaces/<iface>/config", methods=["GET"])
+@jwt_required()
+def get_interface_config(iface):
+    """Attempt to read current configuration for an interface from netplan."""
+    # This is a bit complex as there might be multiple files, 
+    # but we check our own file first, then others.
+    try:
+        import yaml
+        files = ["/etc/netplan/99-easylin.yaml", "/etc/netplan/01-netcfg.yaml", "/etc/netplan/50-cloud-init.yaml"]
+        for f in files:
+            res = run_host_command(f"cat {f}")
+            if res["returncode"] == 0:
+                cfg = yaml.safe_load(res["stdout"])
+                if "network" in cfg and "ethernets" in cfg["network"] and iface in cfg["network"]["ethernets"]:
+                    ifc = cfg["network"]["ethernets"][iface]
+                    return jsonify({
+                        "dhcp": ifc.get("dhcp4") == "yes" or ifc.get("dhcp4", True) is True,
+                        "address": ifc.get("addresses", [""])[0],
+                        "gateway": ifc.get("routes", [{}])[0].get("via", "") if ifc.get("routes") else "",
+                        "dns": ", ".join(ifc.get("nameservers", {}).get("addresses", []))
+                    })
+    except:
+        pass
+    
+    return jsonify({"dhcp": True, "address": "", "gateway": "", "dns": "8.8.8.8, 1.1.1.1"})
+
+
 @network_bp.route("/interfaces/<iface>/config", methods=["POST"])
 @jwt_required()
 def configure_interface(iface):
