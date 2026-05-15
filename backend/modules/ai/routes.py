@@ -66,6 +66,7 @@ def check_ollama():
     return False
 
 @ai_bp.route("/status", methods=["GET"])
+@ai_bp.route("/ai/status", methods=["GET"]) # Redundant route for tolerance
 @jwt_required()
 def get_status():
     local_ip = get_local_ip()

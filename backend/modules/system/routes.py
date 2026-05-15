@@ -41,7 +41,7 @@ def get_version():
             patch = max(patch, git_count)
         
         return jsonify({
-            "version": f"v{major}.{minor}.{patch} - REVOLUTION",
+            "version": f"v{major}.{minor}.{patch}",
             "build": build,
             "label": label
         })
