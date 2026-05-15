@@ -123,7 +123,11 @@ export default function Storage() {
                     <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{part.name} <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 400 }}>({part.fstype || 'raw'})</span></div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{part.mountpoint || 'Not mounted'} • {part.size}</div>
                   </div>
-                  {part.mountpoint ? (
+                  {part.critical ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '0.8rem', background: 'rgba(255,255,255,0.03)', padding: '4px 10px', borderRadius: '6px' }}>
+                      <ShieldCheck size={12} /> System Core 🔒
+                    </div>
+                  ) : part.mountpoint ? (
                     <button className="btn btn-sm btn-ghost text-red" onClick={() => handleUnmount(part.mountpoint)}>
                       <Unlink size={14} /> Unmount
                     </button>

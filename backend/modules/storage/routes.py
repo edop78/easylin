@@ -21,15 +21,26 @@ def list_disks():
 
     devices = lsblk_data.get("blockdevices", [])
     
-    # 2. Enrich with SMART status for physical disks
+    # 2. Enrich with SMART status and protect critical partitions
     for dev in devices:
         if dev['type'] == 'disk':
             dev_path = f"/dev/{dev['name']}"
             smart_res = run_host_command(f"smartctl -H {dev_path}")
-            # Simple check for PASSED status
             dev['smart_status'] = "PASSED" if "PASSED" in smart_res.get("stdout", "") else "UNKNOWN/FAILED"
             
-            # Check for bad sectors if possible
+            # Enrich children (partitions)
+            for part in dev.get("children", []):
+                # Mark as critical if mounted on / or /boot, or if it's a tiny boot partition
+                mount = part.get("mountpoint")
+                size = part.get("size", "")
+                is_boot_size = size.endswith('M') and int(size.replace('M', '')) <= 2
+                
+                if mount in ["/", "/boot", "/boot/efi"] or is_boot_size:
+                    part['critical'] = True
+                else:
+                    part['critical'] = False
+
+            # Check for bad sectors
             attr_res = run_host_command(f"smartctl -A {dev_path}")
             dev['bad_sectors'] = 0
             # Look for Reallocated_Sector_Ct
