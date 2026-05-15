@@ -65,7 +65,6 @@ def check_ollama():
     return False
 
 @ai_bp.route("/status", methods=["GET"])
-@ai_bp.route("/ai/status", methods=["GET"]) # Redundant route for tolerance
 @jwt_required()
 def get_status():
     local_ip = get_local_ip()
@@ -120,7 +119,7 @@ def chat():
         res = requests.post(f"{OLLAMA_API}/chat", json={
             "model": model,
             "messages": messages,
-            "stream": False # Semplifichiamo per ora senza streaming in chat
+            "stream": False
         })
         return jsonify(res.json())
     except Exception as e:

@@ -18,7 +18,7 @@ const SUGGESTED_MODELS = [
 ];
 
 export default function AIManager() {
-  const { data: status, loading: statusLoading, error: statusError, refetch: refetchStatus } = useApi('/ollama_status');
+  const { data: status, loading: statusLoading, error: statusError, refetch: refetchStatus } = useApi('/ai/status');
   const { data: modelsData, loading: modelsLoading, refetch: refetchModels } = useApi('/ai/models');
   
   const [messages, setMessages] = useState([]);
@@ -113,9 +113,9 @@ export default function AIManager() {
           <Info size={24} />
           <div style={{ flex: 1 }}>
             <strong style={{ display: 'block', marginBottom: '4px' }}>
-              {status?.message || (statusLoading ? 'Caricamento stato...' : 'Errore Connessione Backend')}
+              {status?.message || (statusLoading ? 'Caricamento stato...' : 'Ollama non rilevato')}
             </strong> 
-            {statusError ? <code style={{ fontSize: '11px', color: '#ffaaaa' }}>{statusError}</code> : (status?.detected_ip ? `IP: ${status.detected_ip}` : 'Verifica che il backend sia attivo e che il container Ollama sia in esecuzione.')}
+            {status?.detected_ip ? `Indirizzo IP rilevato: ${status.detected_ip}` : 'Verifica che il motore Ollama sia installato e attivo.'}
           </div>
           <Link to="/docker" className="btn btn-sm btn-primary" style={{ whiteSpace: 'nowrap', textDecoration: 'none' }}>
             Vai allo Store
