@@ -5,8 +5,17 @@ import api from '../../api/client';
 import { 
   Bot, Send, Download, Trash2, Cpu, Activity, 
   MessageSquare, Settings, AlertCircle, CheckCircle, 
-  RefreshCw, Terminal, Info 
+  RefreshCw, Terminal, Info, X 
 } from 'lucide-react';
+
+const SUGGESTED_MODELS = [
+  { id: 'qwen2.5:1.5b', name: 'Qwen 2.5 (Leggero)', desc: 'Perfetto per server con poca RAM (<4GB).' },
+  { id: 'qwen2.5:7b', name: 'Qwen 2.5 (Standard)', desc: 'Il miglior equilibrio tra intelligenza e velocità.' },
+  { id: 'llama3.1:8b', name: 'Llama 3.1 (Avanzato)', desc: 'Il modello più potente di Meta per uso generale.' },
+  { id: 'mistral:latest', name: 'Mistral (Classico)', desc: 'Affidabile e molto veloce.' },
+  { id: 'codegemma:2b', name: 'CodeGemma (Codice)', desc: 'Specializzato per aiutarti a programmare.' },
+  { id: 'phi3:mini', name: 'Phi-3 Mini (Microsoft)', desc: 'Incredibilmente potente per le sue dimensioni ridotte.' },
+];
 
 export default function AIManager() {
   const { data: status, loading: statusLoading, refetch: refetchStatus } = useApi('/api/ai/status');
@@ -15,7 +24,9 @@ export default function AIManager() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [selectedModel, setSelectedModel] = useState('');
-  const [pullModel, setPullModel] = useState('');
+  const [pullModel, setPullModel] = useState(SUGGESTED_MODELS[0].id);
+  const [isCustomModel, setIsCustomModel] = useState(false);
+  const [customModelName, setCustomModelName] = useState('');
   const [pulling, setPulling] = useState(false);
   const [chatLoading, setChatLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -33,17 +44,17 @@ export default function AIManager() {
   }, [messages, chatLoading]);
 
   const handlePull = async () => {
-    if (!pullModel) return;
+    const modelToPull = isCustomModel ? customModelName : pullModel;
+    if (!modelToPull) return;
     setPulling(true);
     setError(null);
     try {
-      // In un'implementazione reale useremmo gli eventi streaming, 
-      // qui semplifichiamo con un messaggio di inizio.
-      await api.post('/api/ai/pull', { name: pullModel });
+      await api.post('/api/ai/pull', { name: modelToPull });
       refetchModels();
-      setPullModel('');
+      setCustomModelName('');
+      setIsCustomModel(false);
     } catch (err) {
-      setError("Error pulling model. Make sure the name is correct (e.g. qwen2.5:1.5b)");
+      setError("Error pulling model. Make sure the name is correct.");
     } finally {
       setPulling(false);
     }
@@ -114,17 +125,50 @@ export default function AIManager() {
         {/* MODELLI E GESTIONE */}
         <div className="ai-sidebar">
           <div className="card">
-            <div className="card-header"><div className="card-title"><Settings size={16} /> Models Library</div></div>
+            <div className="card-header" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
+              <div className="card-title"><Settings size={16} /> Models Library</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Scarica e gestisci i tuoi cervelli locali.</div>
+            </div>
             
-            <div className="pull-section">
-               <input 
-                 className="input-sm" 
-                 placeholder="Model name (e.g. qwen2.5:1.5b)" 
-                 value={pullModel}
-                 onChange={(e) => setPullModel(e.target.value)}
-               />
-               <button className="btn btn-primary btn-sm" onClick={handlePull} disabled={pulling || !status?.active}>
-                  {pulling ? <RefreshCw size={14} className="spin" /> : <Download size={14} />} Pull
+            <div className="pull-section" style={{ flexDirection: 'column', gap: '10px' }}>
+               {!isCustomModel ? (
+                 <select 
+                   className="input-sm" 
+                   value={pullModel}
+                   onChange={(e) => {
+                     if (e.target.value === 'custom') {
+                       setIsCustomModel(true);
+                     } else {
+                       setPullModel(e.target.value);
+                     }
+                   }}
+                 >
+                   {SUGGESTED_MODELS.map(m => (
+                     <option key={m.id} value={m.id}>{m.name}</option>
+                   ))}
+                   <option value="custom">-- Altro (Inserisci nome) --</option>
+                 </select>
+               ) : (
+                 <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                   <input 
+                     className="input-sm" 
+                     placeholder="Nome modello (es. llama3)" 
+                     value={customModelName}
+                     onChange={(e) => setCustomModelName(e.target.value)}
+                   />
+                   <button className="btn btn-sm btn-ghost" onClick={() => setIsCustomModel(false)}><X size={14} /></button>
+                 </div>
+               )}
+
+               {!isCustomModel && (
+                 <div style={{ fontSize: '10px', color: 'var(--accent-blue)', opacity: 0.8, padding: '0 4px' }}>
+                   {SUGGESTED_MODELS.find(m => m.id === pullModel)?.desc}
+                 </div>
+               )}
+
+               <button className="btn btn-primary btn-sm" style={{ width: '100%' }} onClick={handlePull} disabled={pulling || !status?.active}>
+                  {pulling ? <RefreshCw size={14} className="spin" /> : <Download size={14} />} 
+                  {pulling ? ' Scaricando...' : ' Scarica Modello'}
                </button>
             </div>
 
