@@ -431,7 +431,12 @@ export default function Docker() {
               </form>
             </div>
 
-            <div className="grid-3">
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', 
+              gap: 'var(--space-lg)',
+              marginTop: 'var(--space-md)'
+            }}>
               {MARKET_APPS.map(app => {
                 const installed = isAppInstalled(app.containerName);
                 const containerId = getAppContainerId(app.containerName);
