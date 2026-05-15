@@ -461,7 +461,19 @@ def market_install():
 @docker_bp.route("/market/status", methods=["GET"])
 @jwt_required()
 def market_status():
-    """Get status of background installations."""
+    """Get status of background installations and cleanup stale ones."""
+    # Cleanup tasks older than 1 hour that are still in 'installing'
+    conn = get_db()
+    try:
+        conn.execute("""
+            DELETE FROM task_status 
+            WHERE status = 'installing' 
+            AND updated_at < datetime('now', '-1 hour')
+        """)
+        conn.commit()
+    finally:
+        conn.close()
+        
     return jsonify({"tasks": get_tasks_db()})
 
 
