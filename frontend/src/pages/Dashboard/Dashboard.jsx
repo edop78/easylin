@@ -38,7 +38,7 @@ const formatBytes = (bytes) => {
 };
 
 export default function Dashboard() {
-  const { data, loading, error, refetch } = useApi('/dashboard/metrics', { interval: 1000 });
+  const { data, loading, error, refetch } = useApi('/dashboard/metrics', { interval: 5000 });
   const navigate = useNavigate();
 
   if (loading && !data) {
@@ -75,9 +75,6 @@ export default function Dashboard() {
     <div className="page fade-in">
       <div className="page-header">
         <div className="page-title"><LayoutDashboard size={28} /><h1>Dashboard</h1></div>
-        <button className="btn btn-ghost" onClick={refetch} disabled={loading}>
-          <RefreshCw size={15} className={loading ? 'spin' : ''} /> Refresh
-        </button>
       </div>
 
       <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>

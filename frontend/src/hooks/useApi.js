@@ -29,8 +29,45 @@ export function useApi(endpoint, options = {}) {
     }
 
     if (autoFetch && interval > 0) {
-      const timer = setInterval(fetchData, interval);
-      return () => clearInterval(timer);
+      let timer;
+      
+      const startTimer = () => {
+        if (!timer) {
+          timer = setInterval(() => {
+            if (document.visibilityState === 'visible') {
+              fetchData();
+            }
+          }, interval);
+        }
+      };
+
+      const stopTimer = () => {
+        if (timer) {
+          clearInterval(timer);
+          timer = null;
+        }
+      };
+
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+          fetchData(); // Aggiorna subito al ritorno
+          startTimer();
+        } else {
+          stopTimer();
+        }
+      };
+
+      // Avvia se visibile
+      if (document.visibilityState === 'visible') {
+        startTimer();
+      }
+
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      
+      return () => {
+        stopTimer();
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
     }
   }, [autoFetch, interval, fetchData]);
 
