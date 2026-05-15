@@ -128,18 +128,15 @@ export default function Docker() {
   };
 
   const installApp = async (appId) => {
-    const app = MARKET_APPS.find(a => a.id === appId);
     setInstalling(appId);
     try {
-      const res = await api.post('/docker/market/install', { app_id: appId });
-      setMsg({ type: 'success', text: res.message });
+      await api.post('/docker/market/install', { app_id: appId });
+      setMsg({ type: 'success', text: 'Installation started in background.' });
       
-      // Auto-open logs modal and force immediate status refresh
-      setActiveTaskLogs({ id: appId, name: app?.name || appId });
+      // Force immediate status refresh so the "View Logs" button appears
       refetchMarket();
       
       refetchContainers();
-      setTab('containers');
     } catch (err) {
       setMsg({ type: 'error', text: err.message });
     } finally {
