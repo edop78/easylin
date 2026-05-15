@@ -131,9 +131,12 @@ export default function Docker() {
   const installApp = async (appId) => {
     setInstalling(appId);
     try {
+      const app = MARKET_APPS.find(a => a.id === appId);
       await api.post('/docker/market/install', { app_id: appId });
-      // Removed auto-open logs modal as requested. 
-      // The user now decides when to open them via the "View Progress" button.
+      
+      // FORCED: Open the cazzo di finestra immediately
+      setActiveTaskLogs({ id: appId, name: app?.name || appId });
+      
       setTimeout(() => refetchMarket(), 500);
     } catch (err) {
       setMsg({ type: 'error', text: err.message });

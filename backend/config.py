@@ -12,7 +12,7 @@ class Config:
     JWT_ACCESS_TOKEN_EXPIRES = 86400  # 24 hours
     
     # Database
-    DATABASE_PATH = os.environ.get("DATABASE_PATH", "/app/data/easylin.db")
+    DATABASE_PATH = os.environ.get("DATABASE_PATH", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "easylin.db"))
 
     # Host filesystem mount point
     HOST_ROOT = os.environ.get("HOST_ROOT", "/host")
