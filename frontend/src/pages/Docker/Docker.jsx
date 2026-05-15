@@ -130,19 +130,26 @@ export default function Docker() {
   const installApp = async (appId) => {
     setInstalling(appId);
     try {
+      const app = MARKET_APPS.find(a => a.id === appId);
       await api.post('/docker/market/install', { app_id: appId });
-      setMsg({ type: 'success', text: 'Installation started in background.' });
       
-      // Force immediate status refresh so the "View Logs" button appears
-      refetchMarket();
+      // Auto-open logs modal so the user sees progress immediately
+      setActiveTaskLogs({ id: appId, name: app?.name || appId });
       
-      refetchContainers();
+      // We don't setInstalling(null) here anymore. 
+      // It will be cleared by the useEffect when the task is picked up by the backend.
+      setTimeout(() => refetchMarket(), 500);
     } catch (err) {
       setMsg({ type: 'error', text: err.message });
-    } finally {
       setInstalling(null);
     }
   };
+
+  useEffect(() => {
+    if (installing && marketTasks?.tasks?.[installing]) {
+      setInstalling(null);
+    }
+  }, [marketTasks, installing]);
 
   const clearTask = async (appId) => {
     try {
