@@ -8,6 +8,7 @@ import './Layout.css';
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
+  const { data: versionData } = useApi('/system/version');
 
   const sections = [
     {
@@ -59,7 +60,10 @@ export default function Sidebar() {
         }}>
           <Rocket size={18} />
         </div>
-        <span className="brand-name" style={{ fontSize: '1.2rem', fontWeight: 700, letterSpacing: '-0.5px' }}>EasyLin</span>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <span className="brand-name" style={{ fontSize: '1.2rem', fontWeight: 700, letterSpacing: '-0.5px', lineHeight: '1.1' }}>EasyLin</span>
+          <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 500, marginTop: '2px', opacity: 0.8 }}>{versionData?.version || 'v1.1.0'}</span>
+        </div>
       </Link>
 
       <nav className="sidebar-nav">

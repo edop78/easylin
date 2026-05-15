@@ -6,8 +6,35 @@ import psutil
 import datetime
 import os
 import sys
+import json
 
 system_bp = Blueprint("system", __name__)
+
+@system_bp.route("/version", methods=["GET"])
+@jwt_required()
+def get_version():
+    try:
+        root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
+        version_file = os.path.join(root_dir, "version.json")
+        
+        # Leggi Major/Minor
+        major, minor = 1, 0
+        if os.path.exists(version_file):
+            with open(version_file, 'r') as f:
+                v = json.load(f)
+                major = v.get('major', 1)
+                minor = v.get('minor', 0)
+        
+        # Calcola Patch basato sui commit Git
+        res = run_host_command("git rev-list --count HEAD")
+        patch = res.get("stdout", "0").strip() if res.get("returncode") == 0 else "0"
+        
+        return jsonify({
+            "version": f"v{major}.{minor}.{patch}",
+            "label": "stable"
+        })
+    except Exception as e:
+        return jsonify({"version": "v1.1.0", "label": "error", "error": str(e)})
 
 # Helper to import run_host_command safely
 def get_run_command():
