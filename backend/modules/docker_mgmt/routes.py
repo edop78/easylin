@@ -7,12 +7,26 @@ import os
 import threading
 
 import json
+import time
 from database import get_db
 
 docker_bp = Blueprint("docker", __name__)
 
+# Global throttle for DB updates to prevent lock contention
+# Format: { "app_id": float (timestamp) }
+LAST_DB_UPDATE = {}
+
 def update_task_db(app_id, status=None, message=None, error=None, log_entry=None, logs_list=None):
-    """Update task status in DB."""
+    """Update task status in DB with throttling."""
+    now = time.time()
+    
+    # Always allow status changes or errors, but throttle log entries/messages
+    if not status and not error and not logs_list:
+        if app_id in LAST_DB_UPDATE and (now - LAST_DB_UPDATE[app_id] < 0.5):
+            return
+    
+    LAST_DB_UPDATE[app_id] = now
+    
     conn = get_db()
     try:
         # Get current
@@ -414,10 +428,14 @@ def market_install():
                 update_task_db(app_id, status="error", message="Failed", error=error_msg)
 
     try:
-        # Check if already exists (immediate check)
+        # Check if already exists (immediate check) and cleanup if it's dead
         try:
-            client.containers.get(app_config["name"])
-            return jsonify({"error": f"Container {app_config['name']} already exists"}), 409
+            old_c = client.containers.get(app_config['name'])
+            if old_c.status != 'running':
+                log_msg(f"Removing old stopped container: {app_config['name']}")
+                old_c.remove()
+            else:
+                return jsonify({"error": f"Container {app_config['name']} is already running"}), 409
         except Exception:
             pass
 
