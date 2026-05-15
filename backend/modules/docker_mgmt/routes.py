@@ -406,14 +406,26 @@ def market_install():
 
                 # Run
                 log_msg("Creating container...")
-                client.containers.run(
-                    app_config["image"],
-                    name=app_config["name"],
-                    ports=app_config["ports"],
-                    volumes=app_config["volumes"],
-                    restart_policy=app_config["restart_policy"],
-                    detach=True
-                )
+                
+                # Build run arguments dynamically
+                run_kwargs = {
+                    "image": app_config["image"],
+                    "name": app_config["name"],
+                    "volumes": app_config.get("volumes", {}),
+                    "restart_policy": app_config.get("restart_policy", {"Name": "unless-stopped"}),
+                    "detach": True
+                }
+                
+                if app_config.get("network_mode"):
+                    run_kwargs["network_mode"] = app_config["network_mode"]
+                
+                if app_config.get("ports") and not app_config.get("network_mode") == "host":
+                    run_kwargs["ports"] = app_config["ports"]
+                
+                if app_config.get("environment"):
+                    run_kwargs["environment"] = app_config["environment"]
+
+                client.containers.run(**run_kwargs)
                 update_task_db(app_id, status="success", message="Installed successfully")
                 log_msg("Installation completed successfully.")
             except Exception as e:
