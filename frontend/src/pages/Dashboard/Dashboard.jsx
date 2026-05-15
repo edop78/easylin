@@ -82,7 +82,7 @@ export default function Dashboard() {
   return (
     <div className="page fade-in">
       <div className="page-header">
-        <div className="page-title"><LayoutDashboard size={28} /><h1>Dashboard</h1></div>
+        <div className="page-title"><LayoutDashboard size={28} /><h1>Dashboard <small style={{ fontSize: '0.5em', opacity: 0.6 }}>(v1.2.0 - REVOLUTION)</small></h1></div>
       </div>
 
       <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
