@@ -8,6 +8,10 @@ import threading
 
 docker_bp = Blueprint("docker", __name__)
 
+# Track background installation tasks
+# Format: { "app_id": { "status": "installing" | "success" | "error", "error": str | None, "timestamp": float } }
+INSTALLATION_TASKS = {}
+
 
 def get_client():
     """Get Docker client."""
@@ -274,14 +278,15 @@ def market_install():
     if not app_config:
         return jsonify({"error": "Unknown app"}), 400
 
-    def background_install(app_config, flask_app):
+    def background_install(app_id, app_config, flask_app):
         with flask_app.app_context():
             try:
                 client = docker.from_env()
                 # Check if already exists
                 try:
                     client.containers.get(app_config["name"])
-                    return # Already exists, thread can exit
+                    INSTALLATION_TASKS[app_id] = {"status": "success", "error": None}
+                    return
                 except Exception:
                     pass
 
@@ -295,8 +300,11 @@ def market_install():
                     restart_policy=app_config["restart_policy"],
                     detach=True
                 )
+                INSTALLATION_TASKS[app_id] = {"status": "success", "error": None}
             except Exception as e:
-                print(f"Background install error for {app_config['name']}: {e}")
+                error_msg = str(e)
+                print(f"Background install error for {app_config['name']}: {error_msg}")
+                INSTALLATION_TASKS[app_id] = {"status": "error", "error": error_msg}
 
     try:
         # Check if already exists (immediate check)
@@ -306,20 +314,30 @@ def market_install():
         except Exception:
             pass
 
+        # Initialize task status
+        INSTALLATION_TASKS[app_id] = {"status": "installing", "error": None}
+
         # Start installation in background
         thread = threading.Thread(
             target=background_install, 
-            args=(app_config, current_app._get_current_object())
+            args=(app_id, app_config, current_app._get_current_object())
         )
         thread.daemon = True
         thread.start()
 
         return jsonify({
             "success": True, 
-            "message": f"Installation of {app_config['name']} started in background. It will appear in the list once ready."
+            "message": f"Installation of {app_config['name']} started in background. Check the App Store for progress."
         }), 202
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@docker_bp.route("/market/status", methods=["GET"])
+@jwt_required()
+def market_status():
+    """Get status of background installations."""
+    return jsonify({"tasks": INSTALLATION_TASKS})
 
 
 @docker_bp.route("/images/<image_id>", methods=["DELETE"])

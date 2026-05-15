@@ -47,6 +47,7 @@ export default function Docker() {
   const { data: imagesData, refetch: refetchImages } = useApi('/docker/images');
   const { data: volumesData, refetch: refetchVolumes } = useApi('/docker/volumes');
   const { data: networksData, refetch: refetchNetworks } = useApi('/docker/networks');
+  const { data: marketTasks } = useApi('/docker/market/status', { interval: 5000 });
   
   const [tab, setTab] = useState('containers');
   const [logsModal, setLogsModal] = useState(null);
@@ -359,17 +360,46 @@ export default function Docker() {
               {MARKET_APPS.map(app => {
                 const installed = isAppInstalled(app.containerName);
                 const containerId = getAppContainerId(app.containerName);
+                const task = marketTasks?.tasks?.[app.id];
+                const isInstalling = task?.status === 'installing';
+                const hasError = task?.status === 'error';
+
                 return (
                   <div key={app.id} className="app-card" style={{ border: '1px solid var(--border-color)', borderRadius: '12px', padding: 'var(--space-lg)', backgroundColor: 'rgba(255,255,255,0.02)', position: 'relative' }}>
                     {installed && <div style={{ position: 'absolute', top: '12px', right: '12px' }}><span className="badge badge-success">Installed</span></div>}
+                    {!installed && isInstalling && <div style={{ position: 'absolute', top: '12px', right: '12px' }}><span className="badge badge-warning"><RotateCw size={10} className="spin" /> Installing...</span></div>}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 'var(--space-md)' }}><div style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-blue)', padding: '10px', borderRadius: '10px' }}><app.icon size={24} /></div></div>
                     <h3 style={{ marginBottom: '4px', fontSize: '1.1rem' }}>{app.name}</h3>
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 'var(--space-md)', lineHeight: 1.4 }}>{app.desc}</p>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: 'var(--space-lg)' }}>{app.tags.map(tag => <span key={tag} style={{ fontSize: '10px', backgroundColor: 'var(--border-color)', padding: '2px 8px', borderRadius: '10px' }}>{tag}</span>)}</div>
+                    
+                    {hasError && !installed && (
+                      <div className="alert alert-danger" style={{ fontSize: '11px', padding: '8px', marginBottom: '12px' }}>
+                        <AlertCircle size={12} /> {task.error}
+                      </div>
+                    )}
+
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {!installed ? <button className="btn btn-primary" style={{ width: '100%' }} disabled={installing === app.id} onClick={() => setConfirm({ open: true, title: `Install ${app.name}`, message: `This will pull ${app.image} and create a new container. Continue?`, action: () => installApp(app.id) })}>{installing === app.id ? <RefreshCw size={16} className="spin" /> : <Download size={16} />} Install App</button> : (
-                        <><a href={`http://${window.location.hostname}:${app.uiPort}`} target="_blank" rel="noreferrer" className="btn btn-primary" style={{ width: '100%', textDecoration: 'none', justifyContent: 'center' }}><ExternalLink size={16} /> Open Web UI</a>
-                        <button className="btn btn-ghost" style={{ width: '100%', color: 'var(--accent-red)' }} onClick={() => setConfirm({ open: true, title: `Uninstall ${app.name}`, message: `Are you sure you want to remove the ${app.name} container? All data in volumes will be preserved.`, action: () => containerAction(containerId, 'remove') })}><Trash size={16} /> Uninstall</button></>
+                      {!installed ? (
+                        <button 
+                          className="btn btn-primary" 
+                          style={{ width: '100%' }} 
+                          disabled={installing === app.id || isInstalling} 
+                          onClick={() => setConfirm({ 
+                            open: true, 
+                            title: `Install ${app.name}`, 
+                            message: `This will pull ${app.image} and create a new container. Continue?`, 
+                            action: () => installApp(app.id) 
+                          })}
+                        >
+                          {installing === app.id || isInstalling ? <RefreshCw size={16} className="spin" /> : <Download size={16} />} 
+                          {isInstalling ? 'Installing...' : 'Install App'}
+                        </button>
+                      ) : (
+                        <>
+                          <a href={`http://${window.location.hostname}:${app.uiPort}`} target="_blank" rel="noreferrer" className="btn btn-primary" style={{ width: '100%', textDecoration: 'none', justifyContent: 'center' }}><ExternalLink size={16} /> Open Web UI</a>
+                          <button className="btn btn-ghost" style={{ width: '100%', color: 'var(--accent-red)' }} onClick={() => setConfirm({ open: true, title: `Uninstall ${app.name}`, message: `Are you sure you want to remove the ${app.name} container? All data in volumes will be preserved.`, action: () => containerAction(containerId, 'remove') })}><Trash size={16} /> Uninstall</button>
+                        </>
                       )}
                     </div>
                   </div>
