@@ -17,6 +17,7 @@ export default function System() {
   const [powerTime, setPowerTime] = useState('00:00');
   const [powerCron, setPowerCron] = useState('0 3 * * 0');
   const [confirm, setConfirm] = useState({ open: false, title: '', message: '', action: null });
+  const [tzModal, setTzModal] = useState(false);
 
   // Live Clock logic
   const [localServerTime, setLocalServerTime] = useState(null);
@@ -49,10 +50,12 @@ export default function System() {
   }, [timeInfo]);
 
   const handleSetTimezone = async (tz) => {
+    setTzModal(false);
     try {
       await api.post('/system/time/set-timezone', { timezone: tz });
       setMsg({ type: 'success', text: `Timezone changed to ${tz}` });
       refetchTime();
+      refetch(); // Update System Info too
     } catch (err) {
       setMsg({ type: 'error', text: err.message });
     }
@@ -138,8 +141,8 @@ export default function System() {
     { label: 'Kernel', value: data?.kernel, icon: Settings },
     { label: 'CPU Cores', value: data?.cpu_count, icon: Cpu },
     { label: 'CPU Temp', value: data?.cpu_temp ? `${Number(data.cpu_temp).toFixed(1)}°C` : 'N/A', icon: Activity },
-    { label: 'Timezone', value: data?.timezone, icon: Clock },
-    { label: 'NTP Sync', value: data?.ntp_active ? 'Active' : 'Disabled', icon: RefreshCw },
+    { label: 'Timezone', value: timeInfo?.timezone || data?.timezone, icon: Clock },
+    { label: 'NTP Sync', value: timeInfo?.ntp_active ? 'Active' : 'Disabled', icon: RefreshCw },
     { label: 'Uptime', value: data?.uptime, icon: Clock },
   ];
 
@@ -206,12 +209,9 @@ export default function System() {
               </div>
             </div>
             
-            <div className="form-group" style={{ marginBottom: '16px' }}>
-              <label className="form-label">Timezone</label>
-              <select className="input-sm" value={selectedTz} onChange={(e) => handleSetTimezone(e.target.value)}>
-                {timezones.map(tz => <option key={tz} value={tz}>{tz}</option>)}
-              </select>
-            </div>
+            <button className="btn btn-ghost btn-sm" style={{ width: '100%', gap: '8px', marginBottom: '8px' }} onClick={() => setTzModal(true)}>
+              <Globe size={14} /> Change Timezone
+            </button>
 
             <button className="btn btn-ghost btn-sm" style={{ width: '100%', gap: '8px' }} onClick={handleSyncTime}>
               <RefreshCw size={14} /> Sync with NTP
@@ -299,6 +299,30 @@ export default function System() {
         type="danger"
       />
 
+      {/* Timezone Selection Modal */}
+      {tzModal && (
+        <div className="modal-overlay fade-in" onClick={() => setTzModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title"><Globe size={18} /> Select Timezone</div>
+              <button className="btn btn-sm btn-ghost" onClick={() => setTzModal(false)}><X size={16} /></button>
+            </div>
+            <div className="modal-body" style={{ maxHeight: '400px', overflowY: 'auto', padding: '10px' }}>
+              <div className="tz-list">
+                {timezones.map(tz => (
+                  <div key={tz} 
+                       className={`tz-option ${selectedTz === tz ? 'active' : ''}`}
+                       onClick={() => handleSetTimezone(tz)}>
+                    {tz}
+                    {selectedTz === tz && <CheckCircle size={14} />}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style dangerouslySetInnerHTML={{ __html: `
         .system-container { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; }
         @media (max-width: 1100px) { .system-container { grid-template-columns: 1fr; } }
@@ -338,6 +362,16 @@ export default function System() {
         select.input-sm option { background: #1a1a1a; color: white; }
         .pulse { animation: pulse-red 2s infinite; }
         @keyframes pulse-red { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+        .modal-content { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; width: 100%; max-width: 500px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); overflow: hidden; }
+        .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .modal-title { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; }
+        
+        .tz-list { display: flex; flex-direction: column; gap: 4px; }
+        .tz-option { padding: 10px 16px; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 13px; transition: 0.2s; }
+        .tz-option:hover { background: var(--bg-lighter); }
+        .tz-option.active { background: var(--accent-blue-transparent); color: var(--accent-blue); font-weight: 600; }
       `}} />
     </div>
   );
