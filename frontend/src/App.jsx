@@ -15,6 +15,7 @@ import Files from './pages/Files/Files';
 import Terminal from './pages/Terminal/Terminal';
 import Logs from './pages/Logs/Logs';
 import UpdateClean from './pages/System/UpdateClean';
+import GitProjects from './pages/GitProjects/GitProjects';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -57,6 +58,7 @@ export default function App() {
                 <Route path="/files" element={<Files />} />
                 <Route path="/terminal" element={<Terminal />} />
                 <Route path="/logs" element={<Logs />} />
+                <Route path="/git" element={<GitProjects />} />
                 <Route path="/system/maintenance" element={<UpdateClean />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>

@@ -2,7 +2,7 @@ import { NavLink, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { 
   LayoutDashboard, Package, Users, Activity, Container, Network, Shield, Globe, 
-  FileText, Terminal, RefreshCw, Server, Cog, Zap, LogOut, ScrollText, Rocket
+  FileText, Terminal, RefreshCw, Server, Cog, Zap, LogOut, ScrollText, Rocket, GitBranch
 } from 'lucide-react';
 import './Layout.css';
 
@@ -30,7 +30,8 @@ export default function Sidebar() {
         { to: '/docker', icon: Container, label: 'Docker' },
         { to: '/network', icon: Network, label: 'Network' },
         { to: '/firewall', icon: Shield, label: 'Firewall' },
-        { to: '/proxy', icon: Globe, label: 'Reverse Proxy' }
+        { to: '/proxy', icon: Globe, label: 'Reverse Proxy' },
+        { to: '/git', icon: GitBranch, label: 'Git Projects' }
       ]
     },
     {
