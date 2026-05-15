@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useApi } from '../../hooks/useApi';
 import { 
   LayoutDashboard, Package, Users, Activity, Container, Network, Shield, Globe, 
-  FileText, Terminal, RefreshCw, Server, Cog, Zap, LogOut, ScrollText, Rocket, GitBranch, HardDrive
+  FileText, Terminal, RefreshCw, Server, Cog, Zap, LogOut, ScrollText, Rocket, GitBranch, HardDrive, Bot
 } from 'lucide-react';
 import './Layout.css';
 
@@ -42,7 +42,8 @@ export default function Sidebar() {
       links: [
         { to: '/files', icon: FileText, label: 'File Manager' },
         { to: '/terminal', icon: Terminal, label: 'Terminal' },
-        { to: '/logs', icon: ScrollText, label: 'System Logs' }
+        { to: '/logs', icon: ScrollText, label: 'System Logs' },
+        { to: '/ai', icon: Bot, label: 'AI Manager' }
       ]
     }
   ];

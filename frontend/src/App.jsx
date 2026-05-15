@@ -17,6 +17,7 @@ import Logs from './pages/Logs/Logs';
 import UpdateClean from './pages/System/UpdateClean';
 import GitProjects from './pages/GitProjects/GitProjects';
 import Storage from './pages/Storage/Storage';
+import AIManager from './pages/AI/AIManager';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -61,6 +62,7 @@ export default function App() {
                 <Route path="/logs" element={<Logs />} />
                 <Route path="/git" element={<GitProjects />} />
                 <Route path="/storage" element={<Storage />} />
+                <Route path="/ai" element={<AIManager />} />
                 <Route path="/system/maintenance" element={<UpdateClean />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
