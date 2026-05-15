@@ -12,7 +12,7 @@ YELLOW='\033[1-33m'
 NC='\033[0m' # No Color
 
 echo -e "${GREEN}==========================================${NC}"
-echo -e "${GREEN}   EasyLin — Linux Management Dashboard   ${NC}"
+echo -e "${GREEN}   EasyLin v1.2.0 — Linux Dashboard       ${NC}"
 echo -e "${GREEN}==========================================${NC}"
 
 # 1. Check if running as root
@@ -60,8 +60,26 @@ check_compose() {
   fi
 }
 
+check_ollama() {
+  if ! command -v ollama &> /dev/null; then
+    echo -e "${YELLOW}Ollama is not installed (Required for local AI).${NC}"
+    read -p "Do you want to install Ollama now? (y/n) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+      echo -e "${GREEN}Installing Ollama...${NC}"
+      curl -fsSL https://ollama.com/install.sh | sh
+      echo -e "${GREEN}Ollama installed successfully.${NC}"
+    else
+      echo -e "${YELLOW}Skipping Ollama. AI features will be disabled until manually installed.${NC}"
+    fi
+  else
+    echo -e "${GREEN}✓ Ollama is already installed.${NC}"
+  fi
+}
+
 check_docker
 check_compose
+check_ollama
 
 # 3. Setup Environment
 if [ ! -f .env ]; then

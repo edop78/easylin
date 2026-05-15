@@ -1,15 +1,17 @@
 # EasyLin — Modern Linux Management Dashboard
 
-EasyLin is a premium, lightweight, and secure web-based dashboard designed to manage Linux servers directly from a Docker container. It provides high-level control over system services, Docker resources, networking, and security with a sleek, high-fidelity interface.
+EasyLin is a premium, lightweight, and secure web-based dashboard designed to manage Linux servers directly from a Docker container. It provides high-level control over system services, Docker resources, networking, and AI integration with a sleek, high-fidelity interface.
 
-## ✨ Core Features
+## ✨ v1.2.0 Features
 
+-   **🤖 AI Manager**: Run local AI models (Qwen, Llama, Mistral) via **Ollama** integration. Private, secure, and entirely on your hardware.
 -   **🐳 Docker Management**: Full control over containers, images, volumes, and networks.
+-   **⚙️ Advanced Power Controls**: Schedule reboots, shutdowns, or recurring power actions (Cron). Real-time monitoring and cancellation of pending tasks.
+-   **📊 Technical Telemetry**: Real-time monitoring of CPU temperature, core usage, active user sessions (SSH/Local), and NTP synchronization.
 -   **🌐 Reverse Proxy**: Nginx management with automated SSL (Let's Encrypt/Certbot).
 -   **🛡️ System Security**: UFW Firewall management and SSH status monitoring.
--   **⚙️ Service Control**: Manage `systemd` services (start, stop, restart, logs) via host integration.
+-   **📂 Storage & Files**: Visual Storage Manager and a powerful, high-fidelity File Manager.
 -   **🔐 PAM Auth**: Login using your existing Linux system users (requires sudo privileges).
--   **📊 System Monitoring**: Real-time stats for CPU, RAM, Disk, and Network.
 
 ## 🚀 Quick Start
 
@@ -26,30 +28,27 @@ Alternatively, manual installation:
 3.  **Deploy**: `sudo docker compose up -d --build`
 4.  **Access**: `http://YOUR_SERVER_IP:5050`
 
+## 🧠 AI Integration (Ollama)
+
+To use the AI features, you must have **Ollama** installed on your host system:
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+```
+EasyLin will automatically detect Ollama and allow you to download and chat with models locally.
+
 ## 🛡️ Security Hardening
 
 EasyLin is built with security in mind:
 -   **Rate Limiting**: Protection against brute-force attacks on the login API.
--   **Security Headers**: Built-in Talisman integration for HSTS, CSP, and XSS protection.
--   **Host Isolation**: Uses `nsenter` for controlled host interaction rather than running everything in a shared namespace.
+-   **Security Headers**: Built-in Talisman integration for HSTS, XSS, and CSP protection.
+-   **Host Isolation**: Uses `nsenter` for controlled host interaction.
 -   **JWT Auth**: Stateless, secure authentication with 24h token rotation.
 
 ## ⚠️ Important Considerations
 
-### 1. Protocol: HTTP vs HTTPS
-Access the dashboard via **HTTP** on port 5050.
--   **Rule**: The internal server is HTTP only. If you need HTTPS for the dashboard itself, use the built-in Reverse Proxy module to expose it securely via a domain.
-
-### 2. Privileged Mode
-EasyLin requires `privileged: true` and `pid: host` to interact with the host system (e.g., managing Docker or systemd services). This is standard for infrastructure management tools.
-
-### 3. Permissions
-Only users with **Sudo privileges** (members of `sudo`, `wheel`, or `root` groups) can log in to the dashboard.
-
-## 🛠 Tech Stack
--   **Backend**: Flask (Python 3.12), Docker SDK, Psutil, JWT.
--   **Frontend**: React 18, Vite, Lucide Icons, Vanilla CSS (Premium Dark Theme).
--   **Infrastructure**: Docker Compose, Nginx, Certbot.
+-   **Privileged Mode**: Required to interact with the host system (Docker, systemd, power controls).
+-   **Sudo Users**: Only system users with sudo privileges can authenticate.
+-   **HTTPS**: The internal server is HTTP. For remote access, use the built-in Reverse Proxy to enable SSL.
 
 ## 📄 License
 MIT License.
