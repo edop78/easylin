@@ -486,10 +486,13 @@ def market_status():
             pass
 
         tasks = {}
+        # First, collect all IDs from DB
+        db_task_ids = set()
         for row in rows:
             app_id, status, message, error, logs_json, updated_at = row
+            db_task_ids.add(app_id)
             
-            # Smart detection: if installing but container is already there
+            # Smart detection
             container_name = app_id
             for app_cfg in MARKET_APPS:
                 if app_cfg['id'] == app_id:
@@ -500,9 +503,7 @@ def market_status():
                 status = 'installed'
                 message = 'Completed (Detected)'
 
-            # Merge DB logs with real-time memory logs
             mem_logs = GLOBAL_LOGS.get(app_id, [])
-            
             tasks[app_id] = {
                 "status": status,
                 "message": message or "Initializing...",
@@ -510,6 +511,18 @@ def market_status():
                 "logs": mem_logs if mem_logs else (json.loads(logs_json) if logs_json else []),
                 "updated_at": updated_at
             }
+
+        # SECOND: Add tasks that are ONLY in RAM (just started)
+        for app_id, mem_logs in GLOBAL_LOGS.items():
+            if app_id not in tasks:
+                tasks[app_id] = {
+                    "status": "installing",
+                    "message": "Initializing (RAM)...",
+                    "error": None,
+                    "logs": mem_logs,
+                    "updated_at": None
+                }
+        
         return jsonify({"tasks": tasks})
     finally:
         conn.close()
