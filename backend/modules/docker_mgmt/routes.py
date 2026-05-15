@@ -353,7 +353,7 @@ def market_install():
         "ollama": {
             "name": "ollama",
             "image": "ollama/ollama:latest",
-            "ports": {"11434/tcp": 11434},
+            "network_mode": "host",
             "environment": {
                 "OLLAMA_HOST": "0.0.0.0"
             },
