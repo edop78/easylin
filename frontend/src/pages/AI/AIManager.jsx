@@ -191,12 +191,14 @@ export default function AIManager() {
             </div>
           </div>
 
-          <div className="card stats-mini">
-             <div className="stat-item">
-                <Cpu size={14} /> <span>System Engine: Ollama</span>
+          <div className="card stats-mini" style={{ padding: '16px' }}>
+             <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Accesso Esterno</div>
+             <div className="stat-item" style={{ marginBottom: '8px' }}>
+                <Cpu size={14} /> <span style={{ fontSize: '12px' }}>Motore: Ollama</span>
              </div>
-             <div className="stat-item">
-                <Terminal size={14} /> <span>Port: 11434</span>
+             <div className="stat-item" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Indirizzo API (per app esterne):</div>
+                <code style={{ fontSize: '11px', color: 'var(--accent-blue)' }}>http://{status?.detected_ip || 'localhost'}:11434</code>
              </div>
           </div>
         </div>
