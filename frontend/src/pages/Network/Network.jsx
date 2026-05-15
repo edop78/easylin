@@ -1,383 +1,320 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApi } from '../../hooks/useApi';
 import api from '../../api/client';
-import { Network as NetworkIcon, RefreshCw, Wifi, Globe, Send, CheckCircle, AlertCircle, Edit2, ShieldAlert, X, Info } from 'lucide-react';
+import { 
+  Network as NetworkIcon, 
+  RefreshCw, 
+  Settings2, 
+  Globe, 
+  Terminal, 
+  CheckCircle, 
+  AlertTriangle, 
+  Edit3, 
+  Activity,
+  ChevronRight,
+  ShieldCheck,
+  Cpu
+} from 'lucide-react';
 import ConfirmModal from '../../components/Common/ConfirmModal';
 
 export default function Network() {
-  const { data: ifaceData, loading, refetch: refetchIfaces } = useApi('/network/interfaces');
-  const { data: dnsData, refetch: refetchDns } = useApi('/network/dns');
-  const { data: connData } = useApi('/network/connections');
-  const { data: netStatus } = useApi('/network/status');
+  const { data: ifaces, loading, refetch: refetchIfaces } = useApi('/network/interfaces');
+  const { data: status } = useApi('/network/status');
   
-  const [tab, setTab] = useState('interfaces');
-  const [pingHost, setPingHost] = useState('');
-  const [pingResult, setPingResult] = useState(null);
-  const [pinging, setPinging] = useState(false);
-  const [editIface, setEditIface] = useState(null);
-  const [config, setConfig] = useState({ dhcp: true, address: '', gateway: '', dns: '8.8.8.8, 1.1.1.1' });
-  const [applying, setApplying] = useState(false);
-  const [msg, setMsg] = useState(null);
+  const [activeTab, setActiveTab] = useState('interfaces');
+  const [editingIface, setEditingIface] = useState(null);
+  const [form, setForm] = useState({ dhcp: true, address: '', gateway: '', dns: '8.8.8.8, 1.1.1.1' });
+  const [isApplying, setIsApplying] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [lastOutput, setLastOutput] = useState(null);
+  const [diagData, setDiagData] = useState(null);
+  const [applyLog, setApplyLog] = useState('');
+  const [message, setMessage] = useState(null);
 
-  const doPing = async () => {
-    if (!pingHost) return;
-    setPinging(true);
-    setPingResult(null);
-    try {
-      const result = await api.post('/network/ping', { host: pingHost });
-      setPingResult(result);
-    } catch (err) {
-      setPingResult({ success: false, output: err.message });
-    } finally {
-      setPinging(false);
-    }
-  };
-
-  const openEdit = async (iface) => {
-    setEditIface(iface.name);
-    setApplying(true);
+  // Carica i dettagli reali quando si apre il modal
+  const openEditor = async (iface) => {
+    setEditingIface(iface);
+    setDiagData(null);
+    setApplyLog('');
+    setMessage(null);
+    
     try {
       const res = await api.get(`/network/interfaces/${iface.name}/config`);
-      const { live, saved } = res;
-      
-      setConfig({
-        dhcp: saved.dhcp,
-        address: saved.address || (iface.addresses?.find(a => a.family === 'AF_INET')?.address ? `${iface.addresses?.find(a => a.family === 'AF_INET').address}/24` : ''),
-        gateway: saved.gateway || '',
-        dns: saved.dns || '8.8.8.8, 1.1.1.1',
-        liveAddress: live.address,
-        raw: live.raw,
-        route: live.route,
-        source: saved.source
+      setDiagData(res);
+      setForm({
+        dhcp: res.saved.dhcp,
+        address: res.saved.address || (iface.ip !== 'N/A' ? `${iface.ip}/24` : ''),
+        gateway: res.saved.gateway || '',
+        dns: res.saved.dns || '8.8.8.8, 1.1.1.1'
       });
     } catch (err) {
-      console.error("Failed to fetch current config", err);
-    } finally {
-      setApplying(false);
+      console.error("Failed to fetch interface details", err);
     }
   };
 
-  const applyConfig = async () => {
+  const handleApply = async () => {
     setShowConfirm(false);
-    setApplying(true);
-    setMsg(null);
+    setIsApplying(true);
+    setApplyLog("Initializing atomic network update...\n");
+    
     try {
-      const result = await api.post(`/network/interfaces/${editIface}/config`, {
-        ...config,
-        dns: config.dns.split(',').map(s => s.trim())
+      const res = await api.post(`/network/interfaces/${editingIface.name}/config`, {
+        ...form,
+        dns: form.dns.split(',').map(s => s.trim())
       });
-      setMsg({ type: 'success', text: result.message });
-      setLastOutput(result.output || "No output returned.");
-      // Non chiudere il modal subito per permettere di vedere l'output
+      
+      setApplyLog(prev => prev + res.log);
+      setMessage({ type: 'success', text: "Configuration pushed to host. Reconnect if IP changed." });
+      
       setTimeout(() => {
         refetchIfaces();
-        refetchDns();
-      }, 3000);
+      }, 5000);
     } catch (err) {
-      setMsg({ type: 'error', text: err.message });
-      setLastOutput(err.response?.data?.error || err.message);
+      setApplyLog(prev => prev + "\nERROR: " + (err.response?.data?.error || err.message));
+      setMessage({ type: 'error', text: "Application failed. Check the log below." });
     } finally {
-      setApplying(false);
+      setIsApplying(false);
     }
-  };
-
-  const syncFromLive = () => {
-    if (!config.liveAddress) return;
-    setConfig({
-      ...config,
-      address: config.liveAddress,
-      dhcp: false
-    });
   };
 
   return (
     <div className="page fade-in">
       <div className="page-header">
-        <div className="page-title"><NetworkIcon size={28} /><h1>Network</h1></div>
-      </div>
-
-      {msg && (
-        <div className={`alert alert-${msg.type}`} style={{ marginBottom: 'var(--space-md)' }}>
-          {msg.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle size={16} />}
-          {msg.text}
+        <div className="page-title">
+          <div className="icon-container primary"><NetworkIcon size={24} /></div>
+          <div>
+            <h1>Network Infrastructure</h1>
+            <p className="subtitle">Manage interfaces, IP addressing and routing authority</p>
+          </div>
         </div>
-      )}
-
-      <div className="tabs">
-        <button className={`tab ${tab === 'interfaces' ? 'active' : ''}`} onClick={() => setTab('interfaces')}>Interfaces</button>
-        <button className={`tab ${tab === 'dns' ? 'active' : ''}`} onClick={() => setTab('dns')}>DNS</button>
-        <button className={`tab ${tab === 'connections' ? 'active' : ''}`} onClick={() => setTab('connections')}>Connections</button>
-        <button className={`tab ${tab === 'ping' ? 'active' : ''}`} onClick={() => setTab('ping')}>Ping</button>
-        
-        {netStatus && (
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: netStatus.manager !== 'unknown' ? '#10b981' : '#ef4444' }}></div>
-            System: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{netStatus.manager}</span>
+        {status && (
+          <div className="status-badge-group">
+            <div className={`status-pill ${status.active_driver !== 'unknown' ? 'online' : 'offline'}`}>
+              <Cpu size={14} /> {status.active_driver.toUpperCase()}
+            </div>
           </div>
         )}
       </div>
 
-      {tab === 'interfaces' && (
-        <div className="card">
+      <div className="tabs-container">
+        <div className="tabs">
+          <button className={`tab-btn ${activeTab === 'interfaces' ? 'active' : ''}`} onClick={() => setActiveTab('interfaces')}>
+            <Settings2 size={16} /> Interfaces
+          </button>
+          <button className={`tab-btn ${activeTab === 'dns' ? 'active' : ''}`} onClick={() => setActiveTab('dns')}>
+            <Globe size={16} /> Global DNS
+          </button>
+          <button className={`tab-btn ${activeTab === 'diag' ? 'active' : ''}`} onClick={() => setActiveTab('diag')}>
+            <Activity size={16} /> Diagnostics
+          </button>
+        </div>
+      </div>
+
+      {activeTab === 'interfaces' && (
+        <div className="grid-list">
           {loading ? (
-            <div className="loading-container"><div className="spinner" /></div>
+            <div className="loading-state"><RefreshCw className="spin" /> Scanning interfaces...</div>
           ) : (
-            <table className="data-table">
-              <thead><tr><th>Interface</th><th>Status</th><th>Address</th><th>Speed</th><th>Actions</th></tr></thead>
-              <tbody>
-                {(ifaceData?.interfaces || []).map((iface) => (
-                  <tr key={iface.name}>
-                    <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{iface.name}</td>
-                    <td>
-                      <span className={`badge ${iface.is_up ? 'badge-success' : 'badge-danger'}`}>
-                        {iface.is_up ? 'UP' : 'DOWN'}
-                      </span>
-                    </td>
-                    <td className="mono">
-                      {iface.addresses?.filter(a => a.family === 'AF_INET').map(a => a.address).join(', ') || '—'}
-                    </td>
-                    <td>{iface.speed ? `${iface.speed} Mbps` : '—'}</td>
-                    <td>
-                      <button className="btn btn-ghost btn-sm btn-icon" onClick={() => openEdit(iface)} title="Configure">
-                        <Edit2 size={14} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            (ifaces?.interfaces || []).map(iface => (
+              <div key={iface.name} className="interface-card card">
+                <div className="iface-header">
+                  <div className="iface-info">
+                    <div className={`status-indicator ${iface.is_up ? 'active' : 'inactive'}`}></div>
+                    <h3>{iface.name}</h3>
+                  </div>
+                  <button className="btn btn-sm btn-secondary" onClick={() => openEditor(iface)}>
+                    <Edit3 size={14} /> Configure
+                  </button>
+                </div>
+                
+                <div className="iface-details">
+                  <div className="detail-item">
+                    <span>IP Address</span>
+                    <strong className="mono">{iface.ip}</strong>
+                  </div>
+                  <div className="detail-item">
+                    <span>Netmask</span>
+                    <strong className="mono">{iface.netmask}</strong>
+                  </div>
+                  <div className="detail-item">
+                    <span>MAC Address</span>
+                    <strong className="mono text-muted">{iface.mac}</strong>
+                  </div>
+                </div>
+              </div>
+            ))
           )}
         </div>
       )}
 
-      {/* Edit Modal */}
-      {editIface && (
-        <div className="modal-overlay" onClick={() => setEditIface(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
-            <div className="modal-header" style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 className="modal-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Edit2 size={20} className="text-blue" /> Configure {editIface}
-              </h3>
-              <button className="btn btn-icon btn-ghost" onClick={() => setEditIface(null)}><RefreshCw size={18} style={{ transform: 'rotate(45deg)' }} /></button>
+      {/* Interface Editor Modal */}
+      {editingIface && (
+        <div className="modal-overlay" onClick={() => !isApplying && setEditingIface(null)}>
+          <div className="modal-content network-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div className="icon-container accent"><Settings2 size={20} /></div>
+                <h3>Configure {editingIface.name}</h3>
+              </div>
+              <button className="close-btn" onClick={() => setEditingIface(null)} disabled={isApplying}>&times;</button>
             </div>
 
-            <div className="alert-box warning" style={{ 
-              background: 'rgba(245, 158, 11, 0.1)', 
-              border: '1px solid rgba(245, 158, 11, 0.2)', 
-              borderRadius: '12px', 
-              padding: '16px', 
-              marginBottom: '24px',
-              display: 'flex',
-              gap: '12px'
-            }}>
-              <ShieldAlert size={20} style={{ color: '#f59e0b', flexShrink: 0 }} />
-              <div style={{ fontSize: '13px', lineHeight: '1.5', color: '#fbbf24' }}>
-                <strong>Critical Action:</strong> Changing network settings can lead to immediate <strong>disconnection</strong>. Ensure your static settings are correct before applying.
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
-              <div className="stat-box" style={{ flex: 1, background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Live IP (Active)</div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: '#10b981' }}>{config.liveAddress || 'Unknown'}</div>
-              </div>
-              <div className="stat-box" style={{ flex: 1, background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Config Source</div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--accent-blue)' }}>
-                  {config.source || 'Unknown'}
-                </div>
-              </div>
-            </div>
-
-            <details style={{ marginBottom: '24px', background: 'rgba(0,0,0,0.3)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <summary style={{ padding: '12px', cursor: 'pointer', fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Info size={14} /> View Raw Kernel Diagnostics (The Naked Truth)
-              </summary>
-              <div style={{ padding: '0 12px 12px 12px' }}>
-                <pre style={{ margin: 0, padding: '12px', background: '#000', color: '#10b981', borderRadius: '8px', fontSize: '11px', overflowX: 'auto', border: '1px solid #10b98133' }}>
-                  {config.raw || 'No raw data available'}
-                  {"\n\n--- ROUTES ---\n"}
-                  {config.route || 'No route data available'}
-                </pre>
-              </div>
-            </details>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Configuration</div>
-              <button className="btn btn-ghost btn-sm" onClick={syncFromLive} style={{ fontSize: '10px', height: '24px' }}>
-                <RefreshCw size={10} style={{ marginRight: '4px' }} /> Sync from Live
-              </button>
-            </div>
-
-            <div style={{ 
-              background: 'rgba(255,255,255,0.03)', 
-              padding: '20px', 
-              borderRadius: '16px', 
-              border: '1px solid var(--border-color)',
-              marginBottom: '24px'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="modal-body">
+              {/* Alert Warning */}
+              <div className="premium-alert warning">
+                <AlertTriangle size={20} />
                 <div>
-                  <div style={{ fontWeight: 600, marginBottom: '4px' }}>Automatic Configuration</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Use DHCP to obtain IP automatically</div>
+                  <strong>Authority Warning:</strong> Changes will be applied using the <code>{diagData?.saved?.driver || 'detected'}</code> driver. 
+                  Misconfiguration will lead to loss of access.
                 </div>
-                <label className="switch">
-                  <input
-                    type="checkbox"
-                    checked={config.dhcp}
-                    onChange={(e) => setConfig({ ...config, dhcp: e.target.checked })}
-                  />
-                  <span className="slider round"></span>
-                </label>
               </div>
 
-              {!config.dhcp && (
-                <div className="fade-in" style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                  <div className="form-group" style={{ marginBottom: '16px' }}>
-                    <label className="form-label" style={{ color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>IPv4 Address / CIDR</label>
-                    <input
-                      className="input"
-                      value={config.address}
-                      onChange={(e) => setConfig({ ...config, address: e.target.value })}
-                      placeholder="e.g. 192.168.1.100/24"
-                      style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)' }}
-                    />
+              {/* State Comparison */}
+              <div className="comparison-grid">
+                <div className="state-box">
+                  <label>Current OS State (Live)</label>
+                  <div className="value success mono">{diagData?.live?.address || 'Detecting...'}</div>
+                </div>
+                <div className="state-box">
+                  <label>Configured in {diagData?.saved?.driver || 'Files'}</label>
+                  <div className={`value mono ${diagData?.live?.address?.split('/')[0] === diagData?.saved?.address?.split('/')[0] ? '' : 'warning'}`}>
+                    {diagData?.saved?.address || 'DHCP'}
                   </div>
-                  
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                    <div className="form-group">
-                      <label className="form-label" style={{ color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase' }}>Gateway</label>
-                      <input
-                        className="input"
-                        value={config.gateway}
-                        onChange={(e) => setConfig({ ...config, gateway: e.target.value })}
-                        placeholder="192.168.1.1"
-                        style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)' }}
+                </div>
+              </div>
+
+              {/* Form */}
+              <div className="config-form">
+                <div className="form-row">
+                  <div className="toggle-group">
+                    <div className="toggle-info">
+                      <h4>Automatic Configuration</h4>
+                      <p>Obtain IP address automatically via DHCP</p>
+                    </div>
+                    <label className="premium-switch">
+                      <input type="checkbox" checked={form.dhcp} onChange={e => setForm({...form, dhcp: e.target.checked})} />
+                      <span className="slider"></span>
+                    </label>
+                  </div>
+                </div>
+
+                {!form.dhcp && (
+                  <div className="static-fields fade-in">
+                    <div className="form-field">
+                      <label>IPv4 Address / CIDR</label>
+                      <input 
+                        type="text" 
+                        value={form.address} 
+                        onChange={e => setForm({...form, address: e.target.value})}
+                        placeholder="e.g. 192.168.1.100/24"
                       />
                     </div>
-                    <div className="form-group">
-                      <label className="form-label" style={{ color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase' }}>DNS Servers</label>
-                      <input
-                        className="input"
-                        value={config.dns}
-                        onChange={(e) => setConfig({ ...config, dns: e.target.value })}
-                        placeholder="8.8.8.8, 1.1.1.1"
-                        style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)' }}
-                      />
+                    <div className="form-grid">
+                      <div className="form-field">
+                        <label>Gateway</label>
+                        <input 
+                          type="text" 
+                          value={form.gateway} 
+                          onChange={e => setForm({...form, gateway: e.target.value})}
+                          placeholder="192.168.1.1"
+                        />
+                      </div>
+                      <div className="form-field">
+                        <label>DNS Servers</label>
+                        <input 
+                          type="text" 
+                          value={form.dns} 
+                          onChange={e => setForm({...form, dns: e.target.value})}
+                          placeholder="8.8.8.8, 1.1.1.1"
+                        />
+                      </div>
                     </div>
                   </div>
+                )}
+              </div>
+
+              {/* Command Log */}
+              {applyLog && (
+                <div className="terminal-box">
+                  <div className="terminal-header"><Terminal size={12} /> Host Execution Log</div>
+                  <pre>{applyLog}</pre>
+                </div>
+              )}
+
+              {message && (
+                <div className={`status-message ${message.type}`}>
+                  {message.type === 'success' ? <ShieldCheck size={16} /> : <AlertTriangle size={16} />}
+                  {message.text}
                 </div>
               )}
             </div>
 
-            <div className="modal-actions" style={{ display: 'flex', gap: '12px' }}>
-              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => { setEditIface(null); setLastOutput(null); }}>Cancel</button>
-              <button className="btn btn-primary" style={{ flex: 2 }} onClick={() => setShowConfirm(true)} disabled={applying}>
-                {applying ? <RefreshCw className="spin" size={18} /> : "Save & Apply Configuration"}
+            <div className="modal-footer">
+              <button className="btn btn-ghost" onClick={() => setEditingIface(null)} disabled={isApplying}>Cancel</button>
+              <button className="btn btn-primary" onClick={() => setShowConfirm(true)} disabled={isApplying}>
+                {isApplying ? <RefreshCw className="spin" size={18} /> : "Apply Settings"}
               </button>
             </div>
-
-            {lastOutput && (
-              <div style={{ marginTop: '24px', animation: 'slideUp 0.3s ease-out' }}>
-                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Info size={12} /> Execution Result:
-                </div>
-                <pre style={{ 
-                  margin: 0, 
-                  padding: '12px', 
-                  background: '#0a0a0a', 
-                  color: '#3b82f6', 
-                  borderRadius: '12px', 
-                  fontSize: '11px', 
-                  border: '1px solid rgba(59, 130, 246, 0.2)',
-                  fontFamily: 'var(--font-mono)',
-                  overflowX: 'auto',
-                  maxHeight: '150px'
-                }}>
-                  {lastOutput}
-                </pre>
-              </div>
-            )}
           </div>
-          
-          <ConfirmModal 
-            isOpen={showConfirm}
-            title="Confirm Network Change"
-            message="WARNING: Applying new network settings may disconnect your current session. If you set a wrong IP, you might lose access to the server. Continue?"
-            onConfirm={applyConfig}
-            onCancel={() => setShowConfirm(false)}
-            confirmText="Apply & Reconnect"
-            type="warning"
-          />
-
-          <style dangerouslySetInnerHTML={{ __html: `
-            .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
-            .switch input { opacity: 0; width: 0; height: 0; }
-            .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.1); transition: .4s; }
-            .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; }
-            input:checked + .slider { background-color: var(--accent-blue); }
-            input:checked + .slider:before { transform: translateX(20px); }
-            .slider.round { border-radius: 34px; }
-            .slider.round:before { border-radius: 50%; }
-            .text-blue { color: var(--accent-blue); }
-          `}} />
         </div>
       )}
 
-      {tab === 'dns' && (
-        <div className="card">
-          <div className="card-header">
-            <div className="card-title"><Globe size={16} /> DNS Nameservers</div>
-          </div>
-          {dnsData?.nameservers?.length > 0 ? (
-            <ul style={{ listStyle: 'none', padding: 0 }}>
-              {dnsData.nameservers.map((ns, i) => (
-                <li key={i} style={{ padding: '8px 0', borderBottom: '1px solid var(--border-color)', fontFamily: 'var(--font-mono)', fontSize: '13px' }}>
-                  {ns}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p style={{ color: 'var(--text-muted)' }}>No nameservers configured</p>
-          )}
-          {dnsData?.raw && (
-            <details style={{ marginTop: 'var(--space-md)' }}>
-              <summary style={{ cursor: 'pointer', color: 'var(--text-muted)', fontSize: '12px' }}>Raw resolv.conf</summary>
-              <pre className="code-block" style={{ marginTop: 'var(--space-sm)' }}>{dnsData.raw}</pre>
-            </details>
-          )}
-        </div>
-      )}
+      <ConfirmModal 
+        isOpen={showConfirm}
+        title="Apply Network Changes?"
+        message="The system will rewrite the host configuration and force the network stack to reload. Your session might drop immediately. Continue?"
+        onConfirm={handleApply}
+        onCancel={() => setShowConfirm(false)}
+        confirmText="Yes, Rewrite & Apply"
+        type="warning"
+      />
 
-      {tab === 'connections' && (
-        <div className="card">
-          <div className="card-header"><div className="card-title"><Wifi size={16} /> Active Connections</div></div>
-          <pre className="code-block">{connData?.output || 'Loading...'}</pre>
-        </div>
-      )}
+      <style jsx>{`
+        .interface-card {
+          padding: 24px;
+          border-radius: 20px;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          transition: transform 0.2s;
+        }
+        .interface-card:hover { transform: translateY(-2px); }
+        .iface-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .iface-info { display: flex; align-items: center; gap: 12px; }
+        .status-indicator { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        .status-indicator.active { background: #10b981; box-shadow: 0 0 12px rgba(16, 185, 129, 0.4); }
+        .status-indicator.inactive { background: #ef4444; }
+        .iface-details { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+        .detail-item { display: flex; flex-direction: column; gap: 4px; }
+        .detail-item span { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+        .detail-item strong { font-size: 13px; }
+        
+        .comparison-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+        .state-box { background: rgba(0,0,0,0.2); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); }
+        .state-box label { display: block; font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; }
+        .state-box .value { font-size: 14px; font-weight: 600; }
+        .value.success { color: #10b981; }
+        .value.warning { color: #f59e0b; }
 
-      {tab === 'ping' && (
-        <div className="card">
-          <div className="card-header"><div className="card-title"><Send size={16} /> Ping Test</div></div>
-          <div style={{ display: 'flex', gap: 'var(--space-sm)', marginBottom: 'var(--space-md)' }}>
-            <input className="form-input" placeholder="Host or IP address" value={pingHost} onChange={(e) => setPingHost(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && doPing()} style={{ flex: 1 }} />
-            <button className="btn btn-primary" onClick={doPing} disabled={pinging || !pingHost}>
-              {pinging ? <div className="spinner spinner-sm" /> : <Send size={15} />} Ping
-            </button>
-          </div>
-          {pingResult && (
-            <>
-              <div className={`alert ${pingResult.success ? 'alert-success' : 'alert-error'}`}>
-                {pingResult.success ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-                {pingResult.success ? 'Host is reachable' : 'Host is unreachable'}
-              </div>
-              <pre className="code-block">{pingResult.output}</pre>
-            </>
-          )}
-        </div>
-      )}
+        .terminal-box { margin-top: 24px; background: #0a0a0a; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); overflow: hidden; }
+        .terminal-header { background: rgba(255,255,255,0.05); padding: 8px 12px; font-size: 10px; font-weight: 600; color: var(--text-muted); display: flex; align-items: center; gap: 8px; }
+        .terminal-box pre { padding: 12px; font-size: 11px; color: #3b82f6; margin: 0; max-height: 150px; overflow-y: auto; }
+
+        .premium-alert { display: flex; gap: 16px; padding: 16px; border-radius: 16px; font-size: 13px; line-height: 1.5; margin-bottom: 24px; }
+        .premium-alert.warning { background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.2); color: #fbbf24; }
+
+        .toggle-group { display: flex; justify-content: space-between; align-items: center; padding: 16px; background: rgba(255,255,255,0.02); border-radius: 16px; border: 1px solid rgba(255,255,255,0.05); }
+        .toggle-info h4 { margin: 0; font-size: 14px; }
+        .toggle-info p { margin: 4px 0 0 0; font-size: 12px; color: var(--text-muted); }
+
+        .form-field { margin-top: 20px; }
+        .form-field label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; }
+        .form-field input { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px; color: white; outline: none; transition: border-color 0.2s; }
+        .form-field input:focus { border-color: var(--accent-blue); }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+        .status-message { margin-top: 16px; display: flex; align-items: center; gap: 8px; padding: 12px; border-radius: 12px; font-size: 13px; }
+        .status-message.success { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+        .status-message.error { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+      `}</style>
     </div>
   );
 }
