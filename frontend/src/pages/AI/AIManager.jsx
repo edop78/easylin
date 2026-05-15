@@ -18,7 +18,7 @@ const SUGGESTED_MODELS = [
 ];
 
 export default function AIManager() {
-  const { data: status, loading: statusLoading, error: statusError, refetch: refetchStatus } = useApi('/ai/status');
+  const { data: status, loading: statusLoading, error: statusError, refetch: refetchStatus } = useApi('/ollama_status');
   const { data: modelsData, loading: modelsLoading, refetch: refetchModels } = useApi('/ai/models');
   
   const [messages, setMessages] = useState([]);

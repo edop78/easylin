@@ -85,9 +85,20 @@ def create_app():
     def health():
         return jsonify({"status": "ok", "app": "EasyLin"})
 
-    @app.route("/api/ai/test")
-    def ai_test():
-        return jsonify({"status": "ok", "message": "AI Route is working!"})
+    @app.route("/api/ollama_status")
+    def ollama_status_direct():
+        try:
+            from modules.ai.routes import check_ollama, OLLAMA_API, get_local_ip
+            is_active = check_ollama()
+            local_ip = get_local_ip()
+            return jsonify({
+                "active": is_active,
+                "api_url": OLLAMA_API,
+                "detected_ip": local_ip,
+                "message": "Ollama is running" if is_active else f"Ollama not reachable. Detected host IP: {local_ip}"
+            })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
 
     @app.route("/")
     def index():
