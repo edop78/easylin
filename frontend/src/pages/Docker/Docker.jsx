@@ -58,13 +58,25 @@ export default function Docker() {
   
   const [customApp, setCustomApp] = useState({ type: 'image', image: '', name: '', ports: '' });
   const [activeTaskLogs, setActiveTaskLogs] = useState(null);
+  const [persistedLogs, setPersistedLogs] = useState([]);
   const logsEndRef = useRef(null);
+
+  useEffect(() => {
+    if (activeTaskLogs) {
+      const currentLogs = marketTasks?.tasks?.[activeTaskLogs.id]?.logs || [];
+      if (currentLogs.length > persistedLogs.length) {
+        setPersistedLogs(currentLogs);
+      }
+    } else {
+      setPersistedLogs([]);
+    }
+  }, [marketTasks, activeTaskLogs]);
 
   useEffect(() => {
     if (activeTaskLogs && logsEndRef.current) {
       logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [marketTasks, activeTaskLogs]);
+  }, [persistedLogs, activeTaskLogs]);
 
   useEffect(() => {
     if (msg) {
@@ -265,7 +277,17 @@ export default function Docker() {
               <RotateCw size={18} className={marketTasks?.tasks?.[activeTaskLogs.id]?.status === 'installing' ? 'spin' : ''} />
               Installation Logs: {activeTaskLogs.name}
             </h3>
-            <div style={{ backgroundColor: '#000', borderRadius: '8px', padding: '15px', marginTop: '15px' }}>
+            <div style={{ backgroundColor: '#000', borderRadius: '8px', padding: '15px', marginTop: '15px', position: 'relative' }}>
+              <button 
+                className="btn btn-sm btn-ghost" 
+                style={{ position: 'absolute', top: '10px', right: '10px', color: '#fff', backgroundColor: 'rgba(255,255,255,0.1)' }}
+                onClick={() => {
+                  navigator.clipboard.writeText(persistedLogs.join('\n'));
+                  setMsg({ type: 'success', text: 'Logs copied to clipboard!' });
+                }}
+              >
+                <Copy size={14} /> Copy
+              </button>
               <pre style={{ 
                 maxHeight: '400px', 
                 overflowY: 'auto', 
@@ -275,7 +297,7 @@ export default function Docker() {
                 fontSize: '13px',
                 lineHeight: 1.5
               }}>
-                {marketTasks?.tasks?.[activeTaskLogs.id]?.logs?.map((line, i) => (
+                {persistedLogs.map((line, i) => (
                   <div key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '2px', marginBottom: '4px' }}>
                     <span style={{ color: 'rgba(255,255,255,0.3)', marginRight: '10px' }}>[{i+1}]</span>
                     {line}
