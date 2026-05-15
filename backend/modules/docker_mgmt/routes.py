@@ -371,9 +371,10 @@ def market_install():
                     
                     status = line.get("status", "")
                     progress = line.get("progress", "")
-                    layer_id = line.get("id", "core")
+                    layer_id = line.get("id")
                     if status:
-                        log_msg(f"[{layer_id}] {status} {progress}".strip())
+                        prefix = f"[{layer_id}] " if layer_id else ""
+                        log_msg(f"{prefix}{status} {progress}".strip())
 
                 # Verify image exists before running
                 log_msg("Verifying image...")

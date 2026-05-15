@@ -299,7 +299,6 @@ export default function Docker() {
               }}>
                 {persistedLogs.map((line, i) => (
                   <div key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '2px', marginBottom: '4px' }}>
-                    <span style={{ color: 'rgba(255,255,255,0.3)', marginRight: '10px' }}>[{i+1}]</span>
                     {line}
                   </div>
                 )) || 'Initializing logs...'}
