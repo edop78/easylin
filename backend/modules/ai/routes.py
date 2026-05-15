@@ -34,6 +34,7 @@ def probe_url(url):
 
 def check_ollama():
     """Detect Ollama by probing common endpoints and scanning the local subnet."""
+    global OLLAMA_API
     local_ip = get_local_ip()
     base_ip = ".".join(local_ip.split(".")[:-1]) + "."
     
@@ -48,7 +49,6 @@ def check_ollama():
     # 1. Try common endpoints first (fast)
     for url in endpoints:
         if probe_url(url):
-            global OLLAMA_API
             OLLAMA_API = f"{url.rstrip('/')}/api"
             return True
 
@@ -59,7 +59,6 @@ def check_ollama():
         for future in concurrent.futures.as_completed(future_to_url):
             found_url = future.result()
             if found_url:
-                global OLLAMA_API
                 OLLAMA_API = f"{found_url.rstrip('/')}/api"
                 return True
             
