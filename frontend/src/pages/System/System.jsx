@@ -137,7 +137,7 @@ export default function System() {
               {data?.active_sessions?.length > 0 ? data.active_sessions.map((s, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: i < data.active_sessions.length -1 ? '1px solid var(--border-color)' : 'none' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--bg-lighter)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700 }}>{s.name[0].toUpperCase()}</div>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--bg-lighter)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700 }}>{(s.name[0] || '?').toUpperCase()}</div>
                     <div>
                       <div style={{ fontSize: '13px', fontWeight: 600 }}>{s.name}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{s.terminal} • {s.host || 'local'}</div>
