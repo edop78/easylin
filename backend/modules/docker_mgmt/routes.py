@@ -468,7 +468,7 @@ def market_status():
         conn.execute("""
             DELETE FROM task_status 
             WHERE status = 'installing' 
-            AND updated_at < datetime('now', '-1 hour')
+            AND updated_at < datetime('now', '-5 minutes')
         """)
         conn.commit()
     finally:
