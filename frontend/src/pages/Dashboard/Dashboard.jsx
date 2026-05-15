@@ -38,7 +38,7 @@ const formatBytes = (bytes) => {
 };
 
 export default function Dashboard() {
-  const { data, loading, error, refetch } = useApi('/dashboard/metrics');
+  const { data, loading, error, refetch } = useApi('/dashboard/metrics', { interval: 1000 });
   const navigate = useNavigate();
 
   if (loading && !data) {
