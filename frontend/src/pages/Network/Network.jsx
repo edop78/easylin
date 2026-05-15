@@ -4,9 +4,10 @@ import api from '../../api/client';
 import { Network as NetworkIcon, RefreshCw, Wifi, Globe, Send, CheckCircle, AlertCircle, Edit2, ShieldAlert } from 'lucide-react';
 
 export default function Network() {
-  const { data: ifaceData, loading } = useApi('/network/interfaces');
+  const { data: ifaceData, loading, refetch: refetchIfaces } = useApi('/network/interfaces');
   const { data: dnsData, refetch: refetchDns } = useApi('/network/dns');
   const { data: connData } = useApi('/network/connections');
+  const { data: netStatus } = useApi('/network/status');
   
   const [tab, setTab] = useState('interfaces');
   const [pingHost, setPingHost] = useState('');
@@ -61,6 +62,10 @@ export default function Network() {
       });
       setMsg({ type: 'success', text: result.message });
       setEditIface(null);
+      setTimeout(() => {
+        refetchIfaces();
+        refetchDns();
+      }, 2000);
     } catch (err) {
       setMsg({ type: 'error', text: err.message });
     } finally {
@@ -86,6 +91,13 @@ export default function Network() {
         <button className={`tab ${tab === 'dns' ? 'active' : ''}`} onClick={() => setTab('dns')}>DNS</button>
         <button className={`tab ${tab === 'connections' ? 'active' : ''}`} onClick={() => setTab('connections')}>Connections</button>
         <button className={`tab ${tab === 'ping' ? 'active' : ''}`} onClick={() => setTab('ping')}>Ping</button>
+        
+        {netStatus && (
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: netStatus.manager !== 'unknown' ? '#10b981' : '#ef4444' }}></div>
+            System: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{netStatus.manager}</span>
+          </div>
+        )}
       </div>
 
       {tab === 'interfaces' && (

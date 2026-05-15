@@ -8,6 +8,34 @@ import psutil
 network_bp = Blueprint("network", __name__)
 
 
+def get_active_manager():
+    """Detect if NetworkManager or systemd-networkd/netplan is active."""
+    nm_check = run_host_command("systemctl is-active NetworkManager")
+    if nm_check["stdout"].strip() == "active":
+        return "NetworkManager"
+    
+    networkd_check = run_host_command("systemctl is-active systemd-networkd")
+    if networkd_check["stdout"].strip() == "active":
+        return "systemd-networkd"
+    
+    return "unknown"
+
+
+@network_bp.route("/status", methods=["GET"])
+@jwt_required()
+def network_status():
+    """Get info about the network management system."""
+    manager = get_active_manager()
+    has_nmcli = run_host_command("which nmcli")["returncode"] == 0
+    has_netplan = run_host_command("which netplan")["returncode"] == 0
+    
+    return jsonify({
+        "manager": manager,
+        "has_nmcli": has_nmcli,
+        "has_netplan": has_netplan
+    })
+
+
 @network_bp.route("/interfaces", methods=["GET"])
 @jwt_required()
 def list_interfaces():
@@ -112,17 +140,49 @@ def configure_interface(iface):
     gateway = data.get("gateway", "")
     dns = data.get("dns", ["8.8.8.8", "1.1.1.1"])
 
-    # Basic validation for static IP
-    if not use_dhcp:
-        if not address or "/" not in address:
-            return jsonify({"error": "Valid IP address with CIDR (e.g. /24) is required for static config"}), 400
+    manager = get_active_manager()
 
-    # Create a netplan configuration
-    # Note: This targets Ubuntu/Debian with netplan.
+    # --- STRATEGY 1: NetworkManager (nmcli) ---
+    if manager == "NetworkManager":
+        # Check if we have a connection for this interface
+        conn_res = run_host_command(f"nmcli -t -f DEVICE,NAME connection show --active | grep '^{iface}:'")
+        if conn_res["returncode"] == 0:
+            conn_name = conn_res["stdout"].split(":")[1]
+        else:
+            # Try to find any connection for this device
+            conn_res = run_host_command(f"nmcli -t -f DEVICE,NAME connection show | grep '^{iface}:'")
+            conn_name = conn_res["stdout"].split(":")[1] if conn_res["returncode"] == 0 else iface
+
+        if use_dhcp:
+            cmd = f"nmcli connection modify '{conn_name}' ipv4.method auto"
+        else:
+            dns_str = " ".join(dns)
+            cmd = (
+                f"nmcli connection modify '{conn_name}' "
+                f"ipv4.method manual ipv4.addresses {address} "
+                f"ipv4.gateway {gateway} ipv4.dns '{dns_str}'"
+            )
+        
+        mod_res = run_host_command(cmd)
+        if mod_res["returncode"] != 0:
+            return jsonify({"error": f"nmcli modify failed: {mod_res['stderr']}"}), 500
+        
+        # Apply changes (up the connection)
+        up_res = run_host_command(f"nmcli connection up '{conn_name}'")
+        return jsonify({
+            "success": up_res["returncode"] == 0,
+            "message": "Configuration applied via NetworkManager.",
+            "output": up_res["stdout"]
+        })
+
+    # --- STRATEGY 2: Netplan ---
+    # Detect renderer for netplan
+    renderer = "NetworkManager" if manager == "NetworkManager" else "networkd"
+    
     config = {
         "network": {
             "version": 2,
-            "renderer": "networkd",
+            "renderer": renderer,
             "ethernets": {
                 iface: {
                     "dhcp4": "yes" if use_dhcp else "no"
@@ -138,25 +198,19 @@ def configure_interface(iface):
         if dns:
             config["network"]["ethernets"][iface]["nameservers"] = {"addresses": dns}
 
-    # Convert to YAML manually to avoid external dependencies for simple structure
     import yaml
     yaml_content = yaml.dump(config, default_flow_style=False)
-
-    # Write to a netplan file (this will override or coexist depending on filename)
-    # We use 99-easylin.yaml to ensure it takes precedence
     file_path = "/etc/netplan/99-easylin.yaml"
     write_res = run_host_command(f"cat > {file_path} << 'EOF'\n{yaml_content}\nEOF")
 
     if write_res["returncode"] != 0:
-        return jsonify({"error": f"Failed to write netplan file: {write_res['stderr']}"}), 500
+        return jsonify({"error": f"Failed to write netplan: {write_res['stderr']}"}), 500
 
-    # Apply netplan
-    # WARNING: This might disconnect the user!
-    apply_res = run_host_command("netplan apply", timeout=10)
-
+    apply_res = run_host_command("netplan apply", timeout=15)
+    
     return jsonify({
         "success": True,
-        "message": "Network configuration applied. Note: If you changed the IP, you might need to reconnect.",
+        "message": "Configuration saved to netplan and applied.",
         "output": apply_res["stdout"]
     })
 
