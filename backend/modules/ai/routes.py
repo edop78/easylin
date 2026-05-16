@@ -97,13 +97,33 @@ def pull_model():
     if not model_name:
         return jsonify({"error": "Model name required"}), 400
 
-    def generate():
-        res = requests.post(f"{OLLAMA_API}/pull", json={"name": model_name}, stream=True)
+    if not check_ollama():
+        return jsonify({"error": "Ollama offline"}), 503
+
+    try:
+        # We use stream=True to avoid loading the entire response into memory,
+        # but we iterate through it and return only the final result.
+        res = requests.post(f"{OLLAMA_API}/pull", json={"name": model_name}, stream=True, timeout=None)
+        
+        final_status = "unknown"
         for line in res.iter_lines():
             if line:
-                yield line.decode('utf-8') + "\n"
+                try:
+                    chunk = json.loads(line.decode('utf-8'))
+                    if 'status' in chunk:
+                        final_status = chunk['status']
+                    if 'error' in chunk:
+                        return jsonify({"error": chunk['error']}), 400
+                except:
+                    continue
+        
+        if final_status == "success":
+            return jsonify({"success": True, "message": f"Model {model_name} pulled successfully"})
+        else:
+            return jsonify({"success": True, "message": f"Pull finished with status: {final_status}"})
                 
-    return Response(generate(), mimetype='application/json')
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @ai_bp.route("/chat", methods=["POST"])
 @jwt_required()

@@ -54,7 +54,7 @@ export default function AIManager() {
       setCustomModelName('');
       setIsCustomModel(false);
     } catch (err) {
-      setError("Error pulling model. Make sure the name is correct.");
+      setError(err.message || "Errore durante il download del modello.");
     } finally {
       setPulling(false);
     }
