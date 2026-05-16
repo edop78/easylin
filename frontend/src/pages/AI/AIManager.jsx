@@ -30,6 +30,7 @@ export default function AIManager() {
   const [pullModel, setPullModel] = useState(SUGGESTED_MODELS[0].id);
   const [isCustomModel, setIsCustomModel] = useState(false);
   const [customModelName, setCustomModelName] = useState('');
+  const [tzModal, setTzModal] = useState(false);
   const [pulling, setPulling] = useState(false);
   const [chatLoading, setChatLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -202,45 +203,28 @@ export default function AIManager() {
         {/* MODELLI E GESTIONE */}
         <div className="ai-sidebar">
           <div className="card">
-            <div className="card-header" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
-              <div className="card-title"><Settings size={16} /> Models Library</div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Download and manage your local brains.</div>
-            </div>
-            
-            <div className="pull-section" style={{ flexDirection: 'column', gap: '10px' }}>
-               {!isCustomModel ? (
-                 <select 
-                   className="input-sm" 
-                   value={pullModel}
-                   onChange={(e) => {
-                     if (e.target.value === 'custom') {
-                       setIsCustomModel(true);
-                     } else {
-                       setPullModel(e.target.value);
-                     }
-                   }}
-                 >
-                    {SUGGESTED_MODELS.map(m => (
-                      <option key={m.id} value={m.id}>{m.name} (RAM {m.ram})</option>
-                    ))}
-                   <option value="custom">-- Other (Enter name) --</option>
-                 </select>
-               ) : (
-                 <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
-                   <input 
-                     className="input-sm" 
-                     placeholder="Model name (e.g. llama3)" 
-                     value={customModelName}
-                     onChange={(e) => setCustomModelName(e.target.value)}
-                   />
-                   <button className="btn btn-sm btn-ghost" onClick={() => setIsCustomModel(false)}><X size={14} /></button>
-                 </div>
-               )}
+            <div className="pull-controls card" style={{ padding: '16px', background: 'rgba(0,0,0,0.2)', border: '1px dashed var(--border-color)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                   <Download size={12} /> Model Library
+                </div>
+                
+                <button 
+                  className="btn btn-ghost btn-sm" 
+                  style={{ width: '100%', justifyContent: 'space-between', marginBottom: '12px', border: '1px solid var(--border-color)' }}
+                  onClick={() => setTzModal(true)}
+                  disabled={pulling}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Package size={14} className="text-blue" />
+                    <span>{isCustomModel ? 'Custom Model...' : (SUGGESTED_MODELS.find(m => m.id === pullModel)?.name || 'Select Model...')}</span>
+                  </div>
+                  <RefreshCw size={12} style={{ opacity: 0.5 }} />
+                </button>
 
                 {!isCustomModel && (() => {
                   const modelInfo = SUGGESTED_MODELS.find(m => m.id === pullModel);
                   return (
-                    <div style={{ fontSize: '10px', color: 'var(--accent-blue)', opacity: 0.8, padding: '0 4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--accent-blue)', opacity: 0.8, padding: '0 4px 12px 4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>{modelInfo?.desc}</span>
                         <span style={{ fontWeight: 600 }}>{modelInfo?.size}</span>
@@ -252,11 +236,24 @@ export default function AIManager() {
                   );
                 })()}
 
+                {isCustomModel && (
+                  <div style={{ display: 'flex', gap: '8px', width: '100%', marginBottom: '12px' }}>
+                    <input 
+                      className="input-sm" 
+                      placeholder="Model name (e.g. llama3)" 
+                      value={customModelName}
+                      onChange={(e) => setCustomModelName(e.target.value)}
+                      style={{ background: 'rgba(0,0,0,0.3)' }}
+                    />
+                    <button className="btn btn-sm btn-ghost" onClick={() => { setIsCustomModel(false); setPullModel(SUGGESTED_MODELS[0].id); }}><X size={14} /></button>
+                  </div>
+                )}
+
                 <button className="btn btn-primary btn-sm" style={{ width: '100%' }} onClick={handlePull} disabled={pulling || !status?.active}>
                    {pulling ? <RefreshCw size={14} className="spin" /> : <Download size={14} />} 
                    {pulling ? ' Downloading...' : ' Download Model'}
                 </button>
-            </div>
+             </div>
 
             <div className="models-list">
                {modelsLoading ? <div className="spinner-sm" /> : (
@@ -508,10 +505,62 @@ export default function AIManager() {
         </div>
       </div>
 
+      {/* Model Selection Modal (Timezone Style) */}
+      {tzModal && (
+        <div className="modal-overlay fade-in" onClick={() => setTzModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px' }}>
+            <div className="modal-header">
+              <div className="modal-title"><Package size={18} /> Select Model from Library</div>
+              <button className="btn btn-sm btn-ghost" onClick={() => setTzModal(false)}><X size={16} /></button>
+            </div>
+            <div className="modal-body" style={{ maxHeight: '450px', overflowY: 'auto', padding: '12px' }}>
+              <div className="tz-list">
+                {SUGGESTED_MODELS.map(m => (
+                  <div key={m.id} 
+                       className={`tz-option ${pullModel === m.id && !isCustomModel ? 'active' : ''}`}
+                       onClick={() => { setPullModel(m.id); setIsCustomModel(false); setTzModal(false); }}
+                       style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '4px', padding: '12px 16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                      <div style={{ fontWeight: 700, fontSize: '14px' }}>{m.name}</div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <span style={{ fontSize: '10px', opacity: 0.7 }}>{m.size}</span>
+                        <span style={{ fontSize: '10px', color: '#22c55e', fontWeight: 600 }}>RAM {m.ram}</span>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '11px', opacity: 0.6 }}>{m.desc}</div>
+                  </div>
+                ))}
+                
+                <div 
+                   className={`tz-option ${isCustomModel ? 'active' : ''}`}
+                   onClick={() => { setIsCustomModel(true); setTzModal(false); }}
+                   style={{ marginTop: '8px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <GitBranch size={16} />
+                    <span>Enter Custom Model Name...</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style dangerouslySetInnerHTML={{ __html: `
         .ai-grid { display: grid; grid-template-columns: 320px 1fr; gap: 20px; height: calc(100vh - 180px); }
         .ai-sidebar { display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
         
+        /* Modal Styles (Timezone style) */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+        .modal-content { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; width: 100%; max-width: 500px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); overflow: hidden; }
+        .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .modal-title { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; }
+        .tz-list { display: flex; flex-direction: column; gap: 4px; }
+        .tz-option { padding: 10px 16px; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 13px; transition: 0.2s; }
+        .tz-option:hover { background: var(--bg-lighter); }
+        .tz-option.active { background: rgba(0, 150, 255, 0.1); color: var(--accent-blue); font-weight: 600; border-left: 3px solid var(--accent-blue); }
+
         .header-actions { display: flex; align-items: center; gap: 12px; }
         .status-badge { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 20px; background: rgba(255,255,255,0.05); }
         .status-badge.active { color: #10b981; background: rgba(16, 185, 129, 0.1); }
