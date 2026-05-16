@@ -20,8 +20,6 @@ OLLAMA_API = os.environ.get("OLLAMA_API", "http://127.0.0.1:11434/api")
 
 def check_ollama():
     try:
-        import requests
-        # Simple, direct check of the tags endpoint which is very reliable
         res = requests.get(f"{OLLAMA_API}/tags", timeout=2.0)
         return res.status_code == 200
     except:
@@ -37,42 +35,16 @@ def get_status():
         "message": "Ollama engine is active" if is_active else "Ollama not detected"
     })
 
-def get_local_ip():
-    try:
-        import socket
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.settimeout(0)
-        s.connect(('10.254.254.254', 1))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    except:
-        return "127.0.0.1"
-
 @ai_bp.route("/models", methods=["GET"])
 @jwt_required()
 def list_models():
-    local_ip = get_local_ip()
-    # Broad scan of possible endpoints
-    endpoints = [
-        os.environ.get("OLLAMA_API", "http://host.docker.internal:11434/api"),
-        "http://127.0.0.1:11434/api",
-        f"http://{local_ip}:11434/api",
-        "http://localhost:11434/api",
-        "http://ollama:11434/api"
-    ]
-    
-    for api_url in endpoints:
-        try:
-            res = requests.get(f"{api_url.rstrip('/')}/tags", timeout=1.5)
-            if res.status_code == 200:
-                global OLLAMA_API
-                OLLAMA_API = api_url.rstrip('/')
-                return jsonify(res.json())
-        except:
-            continue
-            
-    return jsonify({"models": [], "error": "No Ollama service found"}), 200
+    if not check_ollama():
+        return jsonify({"models": [], "error": "Ollama offline"}), 503
+    try:
+        res = requests.get(f"{OLLAMA_API}/tags")
+        return jsonify(res.json())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 SYSTEM_PROMPT = """You are the EasyLin Autonomous AI Agent. 
 You have DIRECT access to the host system via specialized tools. 

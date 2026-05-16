@@ -13,7 +13,11 @@ class Config:
     
     # Database
     PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    DATABASE_PATH = os.environ.get("DATABASE_PATH", os.path.join(PROJECT_ROOT, "easylin.db"))
+    # If in Docker, use the mounted volume at /app/data
+    if os.path.exists("/app/data"):
+        DATABASE_PATH = "/app/data/easylin.db"
+    else:
+        DATABASE_PATH = os.environ.get("DATABASE_PATH", os.path.join(PROJECT_ROOT, "easylin.db"))
 
     # Host filesystem mount point
     HOST_ROOT = os.environ.get("HOST_ROOT", "/host")
