@@ -10,12 +10,12 @@ import {
 } from 'lucide-react';
 
 const SUGGESTED_MODELS = [
-  { id: 'qwen2.5:1.5b', name: 'Qwen 2.5 (1.5B)', size: '1.0 GB', desc: 'Lightweight, ideal for servers with low RAM (<4GB).' },
-  { id: 'qwen2.5:7b', name: 'Qwen 2.5 (7B)', size: '4.7 GB', desc: 'Balanced, great for general use.' },
-  { id: 'llama3.1:8b', name: 'Llama 3.1 (8B)', size: '4.7 GB', desc: 'Advanced, the most powerful from Meta.' },
-  { id: 'mistral:latest', name: 'Mistral (7B)', size: '4.1 GB', desc: 'Reliable, fast and precise.' },
-  { id: 'codegemma:2b', name: 'CodeGemma (2B)', size: '1.7 GB', desc: 'Specialized for software development.' },
-  { id: 'phi3:mini', name: 'Phi-3 Mini', size: '2.3 GB', desc: 'Incredibly compact yet intelligent.' },
+  { id: 'qwen2.5:1.5b', name: 'Qwen 2.5 (1.5B)', size: '1.0 GB', ram: '4GB', desc: 'Lightweight, ideal for servers with low RAM (<4GB).' },
+  { id: 'qwen2.5:7b', name: 'Qwen 2.5 (7B)', size: '4.7 GB', ram: '8GB', desc: 'Balanced, great for general use.' },
+  { id: 'llama3.1:8b', name: 'Llama 3.1 (8B)', size: '4.7 GB', ram: '16GB', desc: 'Advanced, the most powerful from Meta.' },
+  { id: 'mistral:latest', name: 'Mistral (7B)', size: '4.1 GB', ram: '8GB', desc: 'Reliable, fast and precise.' },
+  { id: 'codegemma:2b', name: 'CodeGemma (2B)', size: '1.7 GB', ram: '4GB', desc: 'Specialized for software development.' },
+  { id: 'phi3:mini', name: 'Phi-3 Mini', size: '2.3 GB', ram: '4GB', desc: 'Incredibly compact yet intelligent.' },
 ];
 
 export default function AIManager() {
@@ -257,9 +257,13 @@ export default function AIManager() {
                     {modelsData.models.map((m, i) => (
                       <div key={i} className={`model-item ${selectedModel === m.name ? 'active' : ''}`} onClick={() => setSelectedModel(m.name)}>
                         <div className="model-info">
-                          <div className="model-name">{m.name}</div>
+                          <span className="model-name">{m.name}</span>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <span className="model-size" style={{ fontSize: '10px', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>{(m.size / (1024**3)).toFixed(2)} GB</span>
+                            <span style={{ fontSize: '10px', background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>RAM {m.ram}</span>
+                          </div>
                           <div className="model-size">
-                            {(m.size / (1024**3)).toFixed(2)} GB • {m.details?.parameter_size} • {m.details?.quantization_level || 'N/A'}
+                            {m.details?.parameter_size} • {m.details?.quantization_level || 'N/A'}
                           </div>
                           <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
                             Modified: {new Date(m.modified_at).toLocaleDateString('en-US')}
