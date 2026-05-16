@@ -16,44 +16,21 @@ except ImportError:
 
 ai_bp = Blueprint("ai", __name__)
 
-# Primary is 127.0.0.1 since EasyLin runs in network_mode: host
-OLLAMA_API = "http://127.0.0.1:11434/api"
-
-import socket
-import concurrent.futures
-
-def get_local_ip():
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    except:
-        return "127.0.0.1"
-
-def probe_url(url):
-    try:
-        # Increased timeout to be more resilient under load
-        res = requests.get(url, timeout=3.0)
-        return res.status_code == 200
-    except:
-        return False
+OLLAMA_API = os.environ.get("OLLAMA_API", "http://127.0.0.1:11434/api")
 
 def check_ollama():
-    global OLLAMA_API
-    # Prioritize 127.0.0.1 and localhost
-    endpoints = [
-        "http://127.0.0.1:11434",
-        "http://localhost:11434",
-        "http://host.docker.internal:11434",
-        "http://ollama:11434"
-    ]
-    for url in endpoints:
-        if probe_url(url):
-            OLLAMA_API = f"{url}/api"
-            return True
-    return False
+    try:
+        # Just check if the port is reachable, no complex logic
+        import socket
+        from urllib.parse import urlparse
+        parsed = urlparse(OLLAMA_API.replace("/api", ""))
+        host = parsed.hostname or "127.0.0.1"
+        port = parsed.port or 11434
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(1.0)
+            return s.connect_ex((host, port)) == 0
+    except:
+        return False
 
 @ai_bp.route("/status", methods=["GET"])
 @jwt_required()
