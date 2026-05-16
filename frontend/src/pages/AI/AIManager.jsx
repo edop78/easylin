@@ -425,7 +425,12 @@ export default function AIManager() {
               </div>
 
               <div className="chat-input-area">
-                 {error && <div className="chat-error">{error}</div>}
+                 {error && (
+                   <div className="chat-error" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                     <span>{error}</span>
+                     <button className="btn btn-xs btn-ghost text-red" onClick={() => { setError(null); setChatLoading(false); }}>Dismiss</button>
+                   </div>
+                 )}
                  <div className="input-wrapper">
                    <textarea 
                      rows="1"
@@ -440,9 +445,15 @@ export default function AIManager() {
                        }
                      }}
                    />
-                   <button className="btn btn-primary" onClick={handleSend} disabled={!input.trim() || chatLoading || !selectedModel}>
-                     <Send size={18} />
-                   </button>
+                   {chatLoading ? (
+                     <button className="btn btn-ghost text-red" onClick={() => { setChatLoading(false); setError("Request cancelled by user."); }} title="Abort AI thinking">
+                       <X size={18} />
+                     </button>
+                   ) : (
+                     <button className="btn btn-primary" onClick={handleSend} disabled={!input.trim() || chatLoading || !selectedModel}>
+                       <Send size={18} />
+                     </button>
+                   )}
                  </div>
               </div>
             </div>
