@@ -69,8 +69,21 @@ class ApiClient {
     });
   }
 
+  delete(endpoint, bodyOrOptions) {
+    let body = bodyOrOptions;
+    // Handle axios-style data wrapping
+    if (bodyOrOptions && bodyOrOptions.data) {
+      body = bodyOrOptions.data;
+    }
+    
+    return this.request(endpoint, {
+      method: 'DELETE',
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  }
+
   del(endpoint) {
-    return this.request(endpoint, { method: 'DELETE' });
+    return this.delete(endpoint);
   }
 }
 

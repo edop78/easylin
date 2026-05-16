@@ -67,7 +67,7 @@ export default function AIManager() {
       refetchModels();
       if (selectedModel === name) setSelectedModel('');
     } catch (err) {
-      setError("Error deleting model");
+      setError(err.message || "Errore durante l'eliminazione del modello.");
     }
   };
 
