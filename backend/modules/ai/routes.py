@@ -79,6 +79,9 @@ def chat():
             print(f"Database error in chat: {db_e}")
 
         def generate():
+            # Immediate heartbeat to prevent 504 Gateway Timeout
+            yield f"data: {json.dumps({'status': 'AI Agent initializing...'})}\n\n"
+            
             current_messages = messages.copy()
             if not any(m.get('role') == 'system' for m in current_messages):
                 current_messages.insert(0, {"role": "system", "content": SYSTEM_PROMPT})
@@ -94,12 +97,16 @@ def chat():
                     host = parsed_url.hostname or '127.0.0.1'
                     port = parsed_url.port or 11434
                     
+                    # Heartbeat before potentially slow socket check
+                    yield f"data: {json.dumps({'status': f'Checking connection to {host}...'})}\n\n"
+                    
                     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                         s.settimeout(2.0)
                         if s.connect_ex((host, port)) != 0:
                             yield f"data: {json.dumps({'error': f'Cannot reach Ollama at {OLLAMA_API}'})}\n\n"
                             return
 
+                    yield f"data: {json.dumps({'status': 'Ollama reached, waiting for response...'})}\n\n"
                     res = requests.post(f"{OLLAMA_API}/chat", json={
                         "model": model,
                         "messages": current_messages,
