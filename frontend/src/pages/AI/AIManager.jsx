@@ -9,12 +9,12 @@ import {
 } from 'lucide-react';
 
 const SUGGESTED_MODELS = [
-  { id: 'qwen2.5:1.5b', name: 'Qwen 2.5 (Leggero)', desc: 'Perfetto per server con poca RAM (<4GB).' },
-  { id: 'qwen2.5:7b', name: 'Qwen 2.5 (Standard)', desc: 'Il miglior equilibrio tra intelligenza e velocità.' },
-  { id: 'llama3.1:8b', name: 'Llama 3.1 (Avanzato)', desc: 'Il modello più potente di Meta per uso generale.' },
-  { id: 'mistral:latest', name: 'Mistral (Classico)', desc: 'Affidabile e molto veloce.' },
-  { id: 'codegemma:2b', name: 'CodeGemma (Codice)', desc: 'Specializzato per aiutarti a programmare.' },
-  { id: 'phi3:mini', name: 'Phi-3 Mini (Microsoft)', desc: 'Incredibilmente potente per le sue dimensioni ridotte.' },
+  { id: 'qwen2.5:1.5b', name: 'Qwen 2.5 (1.5B)', size: '1.0 GB', desc: 'Leggero, ideale per server con poca RAM (<4GB).' },
+  { id: 'qwen2.5:7b', name: 'Qwen 2.5 (7B)', size: '4.7 GB', desc: 'Equilibrato, ottimo per uso generale.' },
+  { id: 'llama3.1:8b', name: 'Llama 3.1 (8B)', size: '4.7 GB', desc: 'Avanzato, il più potente di Meta.' },
+  { id: 'mistral:latest', name: 'Mistral (7B)', size: '4.1 GB', desc: 'Affidabile, veloce e preciso.' },
+  { id: 'codegemma:2b', name: 'CodeGemma (2B)', size: '1.7 GB', desc: 'Specializzato per lo sviluppo software.' },
+  { id: 'phi3:mini', name: 'Phi-3 Mini', size: '2.3 GB', desc: 'Incredibilmente compatto ma intelligente.' },
 ];
 
 export default function AIManager() {
@@ -163,8 +163,9 @@ export default function AIManager() {
                )}
 
                {!isCustomModel && (
-                 <div style={{ fontSize: '10px', color: 'var(--accent-blue)', opacity: 0.8, padding: '0 4px' }}>
-                   {SUGGESTED_MODELS.find(m => m.id === pullModel)?.desc}
+                 <div style={{ fontSize: '10px', color: 'var(--accent-blue)', opacity: 0.8, padding: '0 4px', display: 'flex', justifyContent: 'space-between' }}>
+                   <span>{SUGGESTED_MODELS.find(m => m.id === pullModel)?.desc}</span>
+                   <span style={{ fontWeight: 600 }}>{SUGGESTED_MODELS.find(m => m.id === pullModel)?.size}</span>
                  </div>
                )}
 
@@ -175,18 +176,33 @@ export default function AIManager() {
             </div>
 
             <div className="models-list">
-              {modelsLoading ? <div className="spinner-sm" /> : (
-                modelsData?.models?.length > 0 ? modelsData.models.map((m, i) => (
-                  <div key={i} className={`model-item ${selectedModel === m.name ? 'active' : ''}`} onClick={() => setSelectedModel(m.name)}>
-                    <div className="model-info">
-                      <div className="model-name">{m.name}</div>
-                      <div className="model-size">{(m.size / 1e9).toFixed(2)} GB • {m.details?.parameter_size}</div>
+               {modelsLoading ? <div className="spinner-sm" /> : (
+                modelsData?.models?.length > 0 ? (
+                  <>
+                    {modelsData.models.map((m, i) => (
+                      <div key={i} className={`model-item ${selectedModel === m.name ? 'active' : ''}`} onClick={() => setSelectedModel(m.name)}>
+                        <div className="model-info">
+                          <div className="model-name">{m.name}</div>
+                          <div className="model-size">
+                            {(m.size / (1024**3)).toFixed(2)} GB • {m.details?.parameter_size} • {m.details?.quantization_level || 'N/A'}
+                          </div>
+                          <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                            Modificato: {new Date(m.modified_at).toLocaleDateString('it-IT')}
+                          </div>
+                        </div>
+                        <button className="btn-icon delete" title="Elimina Modello" onClick={(e) => { e.stopPropagation(); handleDelete(m.name); }}>
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                    <div className="models-total-info">
+                      <div className="total-label">Spazio Occupato Totale</div>
+                      <div className="total-value">
+                        {(modelsData.models.reduce((acc, m) => acc + m.size, 0) / (1024**3)).toFixed(2)} GB
+                      </div>
                     </div>
-                    <button className="btn-icon delete" onClick={(e) => { e.stopPropagation(); handleDelete(m.name); }}>
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                )) : <div className="empty-state">No models found.</div>
+                  </>
+                ) : <div className="empty-state">Nessun modello trovato.</div>
               )}
             </div>
           </div>
@@ -206,6 +222,20 @@ export default function AIManager() {
         {/* CHAT INTERFACE */}
         <div className="ai-chat-container">
           <div className="card chat-card">
+            {selectedModel && (
+              <div className="chat-header-info">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Bot size={18} className="text-blue" />
+                  <span style={{ fontSize: '13px' }}>Modello attivo: <strong>{selectedModel}</strong></span>
+                </div>
+                {modelsData?.models?.find(m => m.name === selectedModel) && (
+                  <div className="model-stats-pill">
+                    <Activity size={12} />
+                    <span>{(modelsData.models.find(m => m.name === selectedModel).size / (1024**3)).toFixed(2)} GB</span>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="chat-messages">
               {messages.length === 0 ? (
                 <div className="chat-welcome">
@@ -276,6 +306,40 @@ export default function AIManager() {
         .btn-icon.delete { color: var(--text-muted); opacity: 0; }
         .model-item:hover .btn-icon.delete { opacity: 1; }
         .btn-icon.delete:hover { color: #ef4444; }
+        
+        .models-total-info { 
+          margin-top: 16px; 
+          padding: 12px; 
+          border-radius: 12px; 
+          background: rgba(255,255,255,0.02); 
+          border: 1px dashed var(--border-color);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .total-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .total-value { font-size: 13px; font-weight: 700; color: var(--accent-blue); }
+        
+        .chat-header-info { 
+          padding: 12px 20px; 
+          background: rgba(255,255,255,0.03); 
+          border-bottom: 1px solid var(--border-color);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .model-stats-pill {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 10px;
+          border-radius: 20px;
+          background: rgba(59, 130, 246, 0.1);
+          color: var(--accent-blue);
+          font-size: 11px;
+          font-weight: 600;
+        }
+        .text-blue { color: var(--accent-blue); }
 
         .ai-chat-container { height: 100%; min-height: 0; }
         .chat-card { height: 100%; display: flex; flex-direction: column; padding: 0 !important; background: rgba(255,255,255,0.02); overflow: hidden; }
