@@ -73,7 +73,7 @@ export default function AIManager() {
     setPulling(true);
     setError(null);
     setPullProgress("Starting download...");
-    try:
+    try {
       await api.stream('/ai/pull', { name: modelToPull }, (chunk) => {
         if (chunk.error) {
           // Only show real errors from Ollama
@@ -102,7 +102,8 @@ export default function AIManager() {
         setPullProgress(null);
       }, 5000);
     } finally {
-      // Don't set pulling to false immediately if we are in the catch block finalizing
+      // Final cleanup
+      setPulling(false);
     }
   };
 

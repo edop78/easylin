@@ -336,8 +336,8 @@ export default function Docker() {
                   ))
                 ) : (
                   <div style={{ color: '#888', fontStyle: 'italic' }}>
-                    > Waiting for console handshake...<br/>
-                    > [Check backend logs if this persists]
+                    &gt; Waiting for console handshake...<br/>
+                    &gt; [Check backend logs if this persists]
                   </div>
                 )}
                 <div ref={logsEndRef} />
