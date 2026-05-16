@@ -147,16 +147,23 @@ def chat():
                         if func_name in AVAILABLE_TOOLS:
                             # CRITICAL: Keep connection alive during potentially slow tool execution
                             yield f"data: {json.dumps({'status': f'AI is executing {func_name}...'})}\n\n"
+                            print(f"DEBUG: AI calling tool '{func_name}' with args: {args}")
+                            
                             try:
+                                # Extra heartbeat right before call
+                                yield f"data: {json.dumps({'status': f'Waiting for {func_name} response...'})}\n\n"
+                                
                                 result = AVAILABLE_TOOLS[func_name](**args)
-                                # Send result update to keep heartbeat
-                                yield f"data: {json.dumps({'status': f'Tool {func_name} completed.'})}\n\n"
+                                
+                                print(f"DEBUG: Tool '{func_name}' returned result.")
+                                yield f"data: {json.dumps({'status': f'Tool {func_name} execution finished.'})}\n\n"
+                                
                                 current_messages.append({"role": "tool", "content": str(result), "name": func_name})
                             except Exception as tool_e:
                                 error_msg = f"Error executing tool {func_name}: {str(tool_e)}"
-                                print(f"DEBUG: {error_msg}")
+                                print(f"ERROR in tool '{func_name}': {error_msg}")
                                 current_messages.append({"role": "tool", "content": error_msg, "name": func_name})
-                                yield f"data: {json.dumps({'status': 'Tool failed, handling error...'})}\n\n"
+                                yield f"data: {json.dumps({'status': 'Tool failed, proceeding with error context...'})}\n\n"
                 except Exception as e:
                     yield f"data: {json.dumps({'error': str(e)})}\n\n"
                     return
