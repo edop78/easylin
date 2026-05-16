@@ -10,8 +10,8 @@ import {
 } from 'lucide-react';
 
 const SUGGESTED_MODELS = [
-  { id: 'phi4:mini', name: 'Phi-4 Mini (3.8B)', size: '2.4 GB', ram: '4GB', desc: 'May 2026 update: Best-in-class reasoning for home servers.' },
-  { id: 'phi4:latest', name: 'Phi-4 (14B)', size: '8.4 GB', ram: '16GB', desc: 'Powerful logic and STEM reasoning. The 2026 flagship mini.' },
+  { id: 'phi4-mini', name: 'Phi-4 Mini (3.8B)', size: '2.4 GB', ram: '4GB', desc: 'May 2026 update: Best-in-class reasoning for home servers.' },
+  { id: 'phi4', name: 'Phi-4 (14B)', size: '8.4 GB', ram: '16GB', desc: 'Powerful logic and STEM reasoning. The 2026 flagship mini.' },
   { id: 'qwen3:4b', name: 'Qwen 3 (4B)', size: '2.6 GB', ram: '6GB', desc: 'Fast, reliable and optimized for tool calling.' },
   { id: 'qwen3:7b', name: 'Qwen 3 (7B)', size: '4.8 GB', ram: '8GB', desc: 'The new standard for general purpose local tasks.' },
   { id: 'qwen3-coder:latest', name: 'Qwen 3 Coder', size: '5.2 GB', ram: '12GB', desc: 'Specialized for Linux automation and shell scripting.' },
