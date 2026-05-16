@@ -65,16 +65,31 @@ export default function AIManager() {
     }
   }, [selectedModel]);
 
+  const [pullProgress, setPullProgress] = useState(null);
+
   const handlePull = async () => {
     const modelToPull = isCustomModel ? customModelName : pullModel;
     if (!modelToPull) return;
     setPulling(true);
     setError(null);
+    setPullProgress("Starting download...");
     try {
-      await api.post('/ai/pull', { name: modelToPull });
+      await api.stream('/ai/pull', { name: modelToPull }, (chunk) => {
+        if (chunk.error) {
+          setError(chunk.error);
+        } else if (chunk.status) {
+          let progressStr = chunk.status;
+          if (chunk.total && chunk.completed) {
+            const pct = Math.round((chunk.completed / chunk.total) * 100);
+            progressStr = `${chunk.status}: ${pct}%`;
+          }
+          setPullProgress(progressStr);
+        }
+      });
       refetchModels();
       setCustomModelName('');
       setIsCustomModel(false);
+      setPullProgress(null);
     } catch (err) {
       setError(err.message || "Error downloading model.");
     } finally {
@@ -280,7 +295,7 @@ export default function AIManager() {
 
             <button className="btn btn-primary" style={{ width: '100%', height: '42px', borderRadius: '10px' }} onClick={handlePull} disabled={pulling || !status?.active}>
                {pulling ? <RefreshCw size={16} className="spin" /> : <Download size={16} />} 
-               <span style={{ marginLeft: '8px' }}>{pulling ? 'Downloading...' : 'Install AI Model'}</span>
+               <span style={{ marginLeft: '8px' }}>{pulling ? (pullProgress || 'Downloading...') : 'Install AI Model'}</span>
             </button>
           </div>
 

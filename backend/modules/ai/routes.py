@@ -238,17 +238,21 @@ def pull_model():
     model_name = data.get("name")
     if not model_name: return jsonify({"error": "Model name required"}), 400
     if not check_ollama(): return jsonify({"error": "Ollama offline"}), 503
-    try:
-        res = requests.post(f"{OLLAMA_API}/pull", json={"name": model_name}, stream=True, timeout=None)
-        final_status = "unknown"
-        for line in res.iter_lines():
-            if line:
-                chunk = json.loads(line.decode('utf-8'))
-                if 'status' in chunk: final_status = chunk['status']
-                if 'error' in chunk: return jsonify({"error": chunk['error']}), 400
-        return jsonify({"success": True, "message": f"Pull finished: {final_status}"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+
+    def generate_pull():
+        try:
+            res = requests.post(f"{OLLAMA_API}/pull", json={"name": model_name}, stream=True, timeout=None)
+            for line in res.iter_lines():
+                if line:
+                    chunk = json.loads(line.decode('utf-8'))
+                    # Send raw chunk to frontend
+                    yield f"data: {json.dumps(chunk)}\n\n"
+                    if chunk.get('status') == 'success':
+                        break
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return Response(generate_pull(), mimetype='text/event-stream')
 
 @ai_bp.route("/delete", methods=["DELETE"])
 @jwt_required()
