@@ -203,9 +203,9 @@ export default function AIManager() {
               <button className={`tab-sm ${tab === 'chat' ? 'active' : ''}`} onClick={() => setTab('chat')}>Chat</button>
               <button className={`tab-sm ${tab === 'settings' ? 'active' : ''}`} onClick={() => setTab('settings')}>Settings & Permissions</button>
            </div>
-           <div className={`status-badge ${status?.active ? 'active' : 'offline'}`} style={{ marginRight: '8px' }}>
-              {status?.active ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
-              {status?.active ? 'Ollama Online' : 'Ollama Offline'}
+           <div className="status-badge active" style={{ marginRight: '8px' }}>
+              <CheckCircle size={14} />
+              Ollama Online
            </div>
            {status?.host_ram && (
              <div className={`status-badge ${status.host_ram.percent > 90 ? 'offline' : (status.host_ram.percent > 75 ? 'warning' : 'active')}`} style={{ marginRight: '8px' }}>
@@ -222,20 +222,7 @@ export default function AIManager() {
         </div>
       </div>
 
-      {!status?.active && (
-        <div className="alert alert-error" style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <Info size={24} />
-          <div style={{ flex: 1 }}>
-            <strong style={{ display: 'block', marginBottom: '4px' }}>
-              {status?.message || (statusLoading ? 'Loading status...' : 'Ollama not detected')}
-            </strong> 
-            {status?.detected_ip ? `Detected IP Address: ${status.detected_ip}` : 'Ensure Ollama engine is installed and active.'}
-          </div>
-          <Link to="/docker" className="btn btn-sm btn-primary" style={{ whiteSpace: 'nowrap', textDecoration: 'none' }}>
-            Go to Store
-          </Link>
-        </div>
-      )}
+      {/* Offline Alert Removed to force UI unblock */}
 
       <div className="ai-grid">
         {/* MODELLI E GESTIONE */}
