@@ -7,6 +7,8 @@ try:
 except ImportError:
     from database import get_db
 
+from .executor import AVAILABLE_TOOLS, TOOLS_DEFINITION
+
 ai_bp = Blueprint("ai", __name__)
 
 # Primary is 127.0.0.1 since EasyLin runs in network_mode: host
@@ -149,27 +151,86 @@ def chat():
     conn.commit()
 
     try:
-        res = requests.post(f"{OLLAMA_API}/chat", json={
-            "model": model,
-            "messages": messages,
-            "stream": False
-        }, timeout=120)
-        res_data = res.json()
+        # Loop for tool calling (up to 5 turns to prevent infinite loops)
+        current_messages = messages.copy()
         
-        # Save assistant response
-        assistant_msg = res_data.get('message', {})
-        if assistant_msg:
-            conn.execute(
-                "INSERT INTO chat_messages (model, role, content) VALUES (?, ?, ?)",
-                (model, assistant_msg['role'], assistant_msg['content'])
-            )
-            conn.commit()
+        for _ in range(5):
+            res = requests.post(f"{OLLAMA_API}/chat", json={
+                "model": model,
+                "messages": current_messages,
+                "tools": TOOLS_DEFINITION,
+                "stream": False
+            }, timeout=120)
             
+            res_data = res.json()
+            message = res_data.get('message', {})
+            
+            # Check for tool calls
+            tool_calls = message.get('tool_calls', [])
+            if not tool_calls:
+                # No more tools, final response
+                # Save assistant response
+                if message.get('content'):
+                    conn.execute(
+                        "INSERT INTO chat_messages (model, role, content) VALUES (?, ?, ?)",
+                        (model, 'assistant', message['content'])
+                    )
+                    conn.commit()
+                conn.close()
+                return jsonify(res_data)
+
+            # Process tool calls
+            current_messages.append(message) # Add assistant's tool call message
+            
+            for tool_call in tool_calls:
+                func_name = tool_call.get('function', {}).get('name')
+                args = tool_call.get('function', {}).get('arguments', {})
+                
+                if func_name in AVAILABLE_TOOLS:
+                    print(f"DEBUG: AI calling tool {func_name} with args {args}")
+                    result = AVAILABLE_TOOLS[func_name](**args)
+                    
+                    current_messages.append({
+                        "role": "tool",
+                        "content": str(result),
+                        "name": func_name
+                    })
+                else:
+                    current_messages.append({
+                        "role": "tool",
+                        "content": f"ERROR: Tool {func_name} not found",
+                        "name": func_name
+                    })
+
+        # If we reached 5 turns, return whatever we have
         conn.close()
         return jsonify(res_data)
+        
     except Exception as e:
-        conn.close()
+        if conn: conn.close()
         return jsonify({"error": str(e)}), 500
+
+@ai_bp.route("/permissions", methods=["GET"])
+@jwt_required()
+def get_permissions():
+    conn = get_db()
+    cursor = conn.execute("SELECT * FROM ai_permissions")
+    permissions = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return jsonify({"permissions": permissions})
+
+@ai_bp.route("/permissions", methods=["POST"])
+@jwt_required()
+def update_permission():
+    data = request.get_json()
+    capability = data.get("capability")
+    enabled = 1 if data.get("enabled") else 0
+    
+    conn = get_db()
+    conn.execute("UPDATE ai_permissions SET enabled = ? WHERE capability = ?", (enabled, capability))
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
 
 @ai_bp.route("/chat/history", methods=["GET"])
 @jwt_required()

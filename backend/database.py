@@ -51,6 +51,21 @@ def init_db():
             content TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+
+        CREATE TABLE IF NOT EXISTS ai_permissions (
+            capability TEXT PRIMARY KEY,
+            enabled INTEGER DEFAULT 0,
+            description TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        -- Seed initial permissions
+        INSERT OR IGNORE INTO ai_permissions (capability, enabled, description) VALUES 
+        ('system_info', 1, 'Read system metrics, OS version and hardware info'),
+        ('docker_mgmt', 0, 'Start, stop and restart Docker containers'),
+        ('file_read', 0, 'Read file contents from the system'),
+        ('shell_exec', 0, 'CRITICAL: Execute arbitrary shell commands on the host'),
+        ('network_view', 1, 'View network configuration and active connections');
     """)
     conn.commit()
     conn.close()

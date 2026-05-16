@@ -5,7 +5,7 @@ import api from '../../api/client';
 import { 
   Bot, Send, Download, Trash2, Cpu, Activity, 
   MessageSquare, Settings, AlertCircle, CheckCircle, 
-  RefreshCw, Terminal, Info, X 
+  RefreshCw, Terminal, Info, X, Shield, FileText, Container
 } from 'lucide-react';
 
 const SUGGESTED_MODELS = [
@@ -20,7 +20,9 @@ const SUGGESTED_MODELS = [
 export default function AIManager() {
   const { data: status, loading: statusLoading, error: statusError, refetch: refetchStatus } = useApi('/ai/status');
   const { data: modelsData, loading: modelsLoading, refetch: refetchModels } = useApi('/ai/models');
+  const { data: permissionsData, refetch: refetchPermissions } = useApi('/ai/permissions');
   
+  const [tab, setTab] = useState('chat'); // 'chat' or 'settings'
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [selectedModel, setSelectedModel] = useState('');
@@ -117,11 +119,24 @@ export default function AIManager() {
     }
   };
 
+  const togglePermission = async (capability, current) => {
+    try {
+      await api.post('/ai/permissions', { capability, enabled: !current });
+      refetchPermissions();
+    } catch (err) {
+      setError("Failed to update permission");
+    }
+  };
+
   return (
     <div className="page fade-in">
       <div className="page-header">
         <div className="page-title"><Bot size={28} /><h1>AI Manager</h1></div>
         <div className="header-actions">
+           <div className="tabs-sm" style={{ marginRight: '12px' }}>
+              <button className={`tab-sm ${tab === 'chat' ? 'active' : ''}`} onClick={() => setTab('chat')}>Chat</button>
+              <button className={`tab-sm ${tab === 'settings' ? 'active' : ''}`} onClick={() => setTab('settings')}>Settings & Permissions</button>
+           </div>
            <div className={`status-badge ${status?.active ? 'active' : 'offline'}`}>
               {status?.active ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
               {status?.active ? 'Ollama Online' : 'Ollama Offline'}
@@ -243,74 +258,131 @@ export default function AIManager() {
           </div>
         </div>
 
-        {/* CHAT INTERFACE */}
+        {/* CHAT INTERFACE / SETTINGS */}
         <div className="ai-chat-container">
-          <div className="card chat-card">
-            {selectedModel && (
-              <div className="chat-header-info">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Bot size={18} className="text-blue" />
-                  <span style={{ fontSize: '13px' }}>Active model: <strong>{selectedModel}</strong></span>
-                </div>
-                {modelsData?.models?.find(m => m.name === selectedModel) && (
-                  <div className="model-stats-pill">
-                    <Activity size={12} />
-                    <span>{(modelsData.models.find(m => m.name === selectedModel).size / (1024**3)).toFixed(2)} GB</span>
+          {tab === 'chat' ? (
+            <div className="card chat-card">
+              {selectedModel && (
+                <div className="chat-header-info">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Bot size={18} className="text-blue" />
+                    <span style={{ fontSize: '13px' }}>Active model: <strong>{selectedModel}</strong></span>
                   </div>
-                )}
-                <button className="btn btn-sm btn-ghost text-red" style={{ marginLeft: 'auto', fontSize: '11px', gap: '4px' }} onClick={handleClearChat}>
-                  <Trash2 size={12} /> Clear Chat
-                </button>
-              </div>
-            )}
-            <div className="chat-messages">
-              {messages.length === 0 ? (
-                <div className="chat-welcome">
-                  <Bot size={48} className="bot-icon" />
-                  <h2>Welcome to EasyLin Local AI</h2>
-                  <p>Select a model from the library and start chatting. Everything you write stays on your server.</p>
+                  {modelsData?.models?.find(m => m.name === selectedModel) && (
+                    <div className="model-stats-pill">
+                      <Activity size={12} />
+                      <span>{(modelsData.models.find(m => m.name === selectedModel).size / (1024**3)).toFixed(2)} GB</span>
+                    </div>
+                  )}
+                  <button className="btn btn-sm btn-ghost text-red" style={{ marginLeft: 'auto', fontSize: '11px', gap: '4px' }} onClick={handleClearChat}>
+                    <Trash2 size={12} /> Clear Chat
+                  </button>
                 </div>
-              ) : (
-                messages.map((m, i) => (
-                  <div key={i} className={`message-row ${m.role}`}>
-                    <div className="message-bubble">
-                       <div className="message-content">{m.content}</div>
+              )}
+              <div className="chat-messages">
+                {messages.length === 0 ? (
+                  <div className="chat-welcome">
+                    <Bot size={48} className="bot-icon" />
+                    <h2>Welcome to EasyLin Local AI</h2>
+                    <p>Select a model from the library and start chatting. Everything you write stays on your server.</p>
+                  </div>
+                ) : (
+                  messages.map((m, i) => (
+                    <div key={i} className={`message-row ${m.role}`}>
+                      <div className="message-bubble">
+                         <div className="message-content">{m.content}</div>
+                      </div>
+                    </div>
+                  ))
+                )}
+                {chatLoading && (
+                  <div className="message-row assistant">
+                    <div className="message-bubble loading">
+                       <div className="typing-dots"><span></span><span></span><span></span></div>
                     </div>
                   </div>
-                ))
-              )}
-              {chatLoading && (
-                <div className="message-row assistant">
-                  <div className="message-bubble loading">
-                     <div className="typing-dots"><span></span><span></span><span></span></div>
-                  </div>
-                </div>
-              )}
-              <div ref={chatEndRef} />
-            </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
 
-            <div className="chat-input-area">
-               {error && <div className="chat-error">{error}</div>}
-               <div className="input-wrapper">
-                 <textarea 
-                   rows="1"
-                   placeholder={selectedModel ? `Chiedi a ${selectedModel}...` : "Seleziona un modello per iniziare"}
-                   disabled={!selectedModel || chatLoading || !status?.active}
-                   value={input}
-                   onChange={(e) => setInput(e.target.value)}
-                   onKeyDown={(e) => {
-                     if (e.key === 'Enter' && !e.shiftKey) {
-                       e.preventDefault();
-                       handleSend();
-                     }
-                   }}
-                 />
-                 <button className="btn btn-primary" onClick={handleSend} disabled={!input.trim() || chatLoading || !selectedModel}>
-                   <Send size={18} />
-                 </button>
-               </div>
+              <div className="chat-input-area">
+                 {error && <div className="chat-error">{error}</div>}
+                 <div className="input-wrapper">
+                   <textarea 
+                     rows="1"
+                     placeholder={selectedModel ? `Ask ${selectedModel}...` : "Select a model to start"}
+                     disabled={!selectedModel || chatLoading || !status?.active}
+                     value={input}
+                     onChange={(e) => setInput(e.target.value)}
+                     onKeyDown={(e) => {
+                       if (e.key === 'Enter' && !e.shiftKey) {
+                         e.preventDefault();
+                         handleSend();
+                       }
+                     }}
+                   />
+                   <button className="btn btn-primary" onClick={handleSend} disabled={!input.trim() || chatLoading || !selectedModel}>
+                     <Send size={18} />
+                   </button>
+                 </div>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="card settings-card">
+              <div className="card-header">
+                <div className="card-title"><Shield size={18} /> AI Agent Permissions Matrix</div>
+              </div>
+              <div className="permissions-list" style={{ padding: '20px' }}>
+                <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '24px' }}>
+                  Enable the following capabilities to allow the AI to interact with your system. 
+                  <strong> Warning:</strong> Enabling shell execution gives the AI full root access to your host.
+                </p>
+                
+                {permissionsData?.permissions?.map(p => (
+                  <div key={p.capability} className="permission-item" style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center', 
+                    padding: '16px', 
+                    background: 'rgba(255,255,255,0.03)', 
+                    borderRadius: '12px', 
+                    marginBottom: '12px',
+                    border: '1px solid var(--border-color)'
+                  }}>
+                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                      <div style={{ 
+                        width: '40px', 
+                        height: '40px', 
+                        borderRadius: '10px', 
+                        background: p.enabled ? 'rgba(59, 130, 246, 0.1)' : 'rgba(255,255,255,0.05)', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        color: p.enabled ? 'var(--accent-blue)' : 'var(--text-muted)'
+                      }}>
+                        {p.capability === 'shell_exec' ? <Terminal size={20} /> : 
+                         p.capability === 'docker_mgmt' ? <Container size={20} /> :
+                         p.capability === 'file_read' ? <FileText size={20} /> :
+                         p.capability === 'system_info' ? <Activity size={20} /> : <Shield size={20} />}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '14px', fontWeight: 600 }}>{p.capability.replace('_', ' ').toUpperCase()}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{p.description}</div>
+                      </div>
+                    </div>
+                    
+                    <button 
+                      className={`btn btn-sm ${p.enabled ? 'btn-primary' : 'btn-ghost'}`}
+                      onClick={() => togglePermission(p.capability, p.enabled)}
+                      style={{ minWidth: '100px' }}
+                    >
+                      {p.enabled ? 'Enabled' : 'Disabled'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -401,6 +473,13 @@ export default function AIManager() {
           .page-header { flex-direction: column; align-items: flex-start; gap: 12px; }
           .header-actions { width: 100%; justify-content: space-between; }
         }
+
+        .tabs-sm { display: flex; background: rgba(255,255,255,0.05); padding: 4px; border-radius: 8px; border: 1px solid var(--border-color); }
+        .tab-sm { background: transparent; border: none; color: var(--text-muted); padding: 6px 16px; font-size: 12px; font-weight: 600; cursor: pointer; border-radius: 6px; transition: 0.2s; }
+        .tab-sm.active { background: var(--accent-blue); color: white; }
+        .tab-sm:hover:not(.active) { color: var(--text-primary); background: rgba(255,255,255,0.05); }
+
+        .settings-card { height: 100%; overflow-y: auto; }
       `}} />
     </div>
   );
