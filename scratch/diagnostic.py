@@ -56,7 +56,25 @@ def check_database():
     except Exception as e:
         print(f"[ERROR] Database access failed: {e}")
 
+def check_database():
+    print("\n--- Database Diagnostics ---")
+    # ... (omitted for brevity in this call but I'll replace the whole function)
+
+def check_resources():
+    print("\n--- Resource Diagnostics ---")
+    try:
+        import psutil
+        vm = psutil.virtual_memory()
+        print(f"Total RAM: {vm.total / (1024**3):.2f} GB")
+        print(f"Available RAM: {vm.available / (1024**3):.2f} GB")
+        print(f"Used RAM: {vm.percent}%")
+        if vm.percent > 90:
+            print("[WARNING] RAM usage is critical! This will make AI extremely slow.")
+    except Exception as e:
+        print(f"[ERROR] Could not check resources: {e}")
+
 if __name__ == "__main__":
     active_url = check_network()
+    check_resources()
     check_database()
     print("\nDiagnostic complete.")
