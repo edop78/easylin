@@ -43,6 +43,20 @@ export default function AIManager() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, chatLoading]);
 
+  useEffect(() => {
+    if (selectedModel) {
+      const fetchHistory = async () => {
+        try {
+          const res = await api.get(`/ai/chat/history?model=${selectedModel}`);
+          setMessages(res.messages || []);
+        } catch (err) {
+          console.error("Failed to fetch chat history", err);
+        }
+      };
+      fetchHistory();
+    }
+  }, [selectedModel]);
+
   const handlePull = async () => {
     const modelToPull = isCustomModel ? customModelName : pullModel;
     if (!modelToPull) return;
@@ -90,6 +104,16 @@ export default function AIManager() {
       setError("Chat error. Is the model loaded correctly?");
     } finally {
       setChatLoading(false);
+    }
+  };
+
+  const handleClearChat = async () => {
+    if (!confirm("Sei sicuro di voler cancellare la cronologia della chat per questo modello?")) return;
+    try {
+      await api.post('/ai/chat/clear', { model: selectedModel });
+      setMessages([]);
+    } catch (err) {
+      setError("Errore nella cancellazione della chat");
     }
   };
 
@@ -234,6 +258,9 @@ export default function AIManager() {
                     <span>{(modelsData.models.find(m => m.name === selectedModel).size / (1024**3)).toFixed(2)} GB</span>
                   </div>
                 )}
+                <button className="btn btn-sm btn-ghost text-red" style={{ marginLeft: 'auto', fontSize: '11px', gap: '4px' }} onClick={handleClearChat}>
+                  <Trash2 size={12} /> Svuota Chat
+                </button>
               </div>
             )}
             <div className="chat-messages">

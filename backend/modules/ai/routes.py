@@ -2,6 +2,10 @@ from flask import Blueprint, request, jsonify, Response
 import requests
 import json
 from flask_jwt_extended import jwt_required
+try:
+    from backend.database import get_db
+except ImportError:
+    from database import get_db
 
 ai_bp = Blueprint("ai", __name__)
 
@@ -135,15 +139,69 @@ def chat():
     if not model or not messages:
         return jsonify({"error": "Model and messages required"}), 400
 
+    # Save user message
+    user_msg = messages[-1]
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO chat_messages (model, role, content) VALUES (?, ?, ?)",
+        (model, user_msg['role'], user_msg['content'])
+    )
+    conn.commit()
+
     try:
         res = requests.post(f"{OLLAMA_API}/chat", json={
             "model": model,
             "messages": messages,
             "stream": False
         })
-        return jsonify(res.json())
+        res_data = res.json()
+        
+        # Save assistant response
+        assistant_msg = res_data.get('message', {})
+        if assistant_msg:
+            conn.execute(
+                "INSERT INTO chat_messages (model, role, content) VALUES (?, ?, ?)",
+                (model, assistant_msg['role'], assistant_msg['content'])
+            )
+            conn.commit()
+            
+        conn.close()
+        return jsonify(res_data)
     except Exception as e:
+        conn.close()
         return jsonify({"error": str(e)}), 500
+
+@ai_bp.route("/chat/history", methods=["GET"])
+@jwt_required()
+def get_chat_history():
+    model = request.args.get("model")
+    conn = get_db()
+    if model:
+        cursor = conn.execute(
+            "SELECT role, content FROM chat_messages WHERE model = ? ORDER BY created_at ASC",
+            (model,)
+        )
+    else:
+        cursor = conn.execute(
+            "SELECT role, content FROM chat_messages ORDER BY created_at ASC"
+        )
+    messages = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return jsonify({"messages": messages})
+
+@ai_bp.route("/chat/clear", methods=["POST"])
+@jwt_required()
+def clear_chat_history():
+    data = request.get_json() or {}
+    model = data.get("model")
+    conn = get_db()
+    if model:
+        conn.execute("DELETE FROM chat_messages WHERE model = ?", (model,))
+    else:
+        conn.execute("DELETE FROM chat_messages")
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
 
 @ai_bp.route("/delete", methods=["DELETE"])
 @jwt_required()
