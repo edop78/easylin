@@ -10,16 +10,14 @@ import {
 } from 'lucide-react';
 
 const SUGGESTED_MODELS = [
-  { id: 'qwen2.5:0.5b', name: 'Qwen 2.5 (0.5B)', size: '390 MB', ram: '2GB', desc: 'Ultra-lightweight, extremely fast for basic tasks.' },
-  { id: 'qwen2.5:1.5b', name: 'Qwen 2.5 (1.5B)', size: '1.0 GB', ram: '4GB', desc: 'Lightweight, ideal for most home servers.' },
-  { id: 'qwen2.5:3b', name: 'Qwen 2.5 (3B)', size: '1.9 GB', ram: '6GB', desc: 'Smart and balanced, high reasoning for its size.' },
-  { id: 'qwen2.5:7b', name: 'Qwen 2.5 (7B)', size: '4.7 GB', ram: '8GB', desc: 'The gold standard for general purpose local AI.' },
-  { id: 'gemma2:2b', name: 'Gemma 2 (2B)', size: '1.6 GB', ram: '4GB', desc: 'Google\'s latest compact model, very efficient.' },
-  { id: 'gemma2:9b', name: 'Gemma 2 (9B)', size: '5.4 GB', ram: '12GB', desc: 'Google\'s state-of-the-art balanced model.' },
-  { id: 'llama3.1:8b', name: 'Llama 3.1 (8B)', size: '4.7 GB', ram: '12GB', desc: 'Meta\'s flagship, extremely reliable and versatile.' },
-  { id: 'mistral:latest', name: 'Mistral (7B)', size: '4.1 GB', ram: '8GB', desc: 'Classic European model, fast and precise.' },
-  { id: 'phi3.5:latest', name: 'Phi-3.5 Mini', size: '2.2 GB', ram: '4GB', desc: 'Microsoft\'s latest update, high logic in tiny size.' },
-  { id: 'qwen2.5:32b', name: 'Qwen 2.5 (32B)', size: '19 GB', ram: '32GB', desc: 'Professional grade reasoning (Requires high RAM).' },
+  { id: 'phi4:mini', name: 'Phi-4 Mini (3.8B)', size: '2.4 GB', ram: '4GB', desc: 'May 2026 update: Best-in-class reasoning for home servers.' },
+  { id: 'phi4:latest', name: 'Phi-4 (14B)', size: '8.4 GB', ram: '16GB', desc: 'Powerful logic and STEM reasoning. The 2026 flagship mini.' },
+  { id: 'qwen3:4b', name: 'Qwen 3 (4B)', size: '2.6 GB', ram: '6GB', desc: 'Fast, reliable and optimized for tool calling.' },
+  { id: 'qwen3:7b', name: 'Qwen 3 (7B)', size: '4.8 GB', ram: '8GB', desc: 'The new standard for general purpose local tasks.' },
+  { id: 'qwen3-coder:latest', name: 'Qwen 3 Coder', size: '5.2 GB', ram: '12GB', desc: 'Specialized for Linux automation and shell scripting.' },
+  { id: 'llama4:scout', name: 'Llama 4 Scout (MoE)', size: '12 GB', ram: '24GB', desc: 'Meta\'s latest MoE model. Extremely smart with tool use.' },
+  { id: 'llama3.2:3b', name: 'Llama 3.2 (3B)', size: '2.0 GB', ram: '6GB', desc: 'Balanced and efficient classic for legacy support.' },
+  { id: 'mistral-medium:3.5', name: 'Mistral 3.5 Medium', size: '14 GB', ram: '32GB', desc: 'European flagship with 256k context window.' },
 ];
 
 export default function AIManager() {
