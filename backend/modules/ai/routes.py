@@ -18,19 +18,41 @@ ai_bp = Blueprint("ai", __name__)
 
 OLLAMA_API = os.environ.get("OLLAMA_API", "http://127.0.0.1:11434/api")
 
-def check_ollama():
+def get_local_ip():
     try:
-        # Just check if the port is reachable, no complex logic
         import socket
-        from urllib.parse import urlparse
-        parsed = urlparse(OLLAMA_API.replace("/api", ""))
-        host = parsed.hostname or "127.0.0.1"
-        port = parsed.port or 11434
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(1.0)
-            return s.connect_ex((host, port)) == 0
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0)
+        s.connect(('10.254.254.254', 1))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
     except:
-        return False
+        return "127.0.0.1"
+
+def check_ollama():
+    global OLLAMA_API
+    local_ip = get_local_ip()
+    # List of possible endpoints
+    targets = [
+        "http://127.0.0.1:11434",
+        "http://localhost:11434",
+        f"http://{local_ip}:11434",
+        "http://host.docker.internal:11434",
+        "http://ollama:11434"
+    ]
+    
+    import requests
+    for base in targets:
+        try:
+            # Just check the root, it's the fastest
+            r = requests.get(base, timeout=2.0)
+            if r.status_code == 200:
+                OLLAMA_API = f"{base}/api"
+                return True
+        except:
+            continue
+    return False
 
 @ai_bp.route("/status", methods=["GET"])
 @jwt_required()
