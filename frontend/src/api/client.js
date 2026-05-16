@@ -93,6 +93,49 @@ class ApiClient {
   del(endpoint) {
     return this.delete(endpoint);
   }
+
+  async stream(endpoint, body, onMessage) {
+    const url = `${API_BASE}${endpoint}`;
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
+    };
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Stream error (${response.status}): ${text.slice(0, 100)}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.replace('data: ', ''));
+            onMessage(data);
+          } catch (e) {
+            console.error('Error parsing stream chunk', e);
+          }
+        }
+      }
+    }
+  }
 }
 
 const api = new ApiClient();

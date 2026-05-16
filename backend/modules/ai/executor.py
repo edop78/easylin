@@ -127,7 +127,7 @@ AVAILABLE_TOOLS = {
 TOOLS_DEFINITION = [
     {"type": "function", "function": {"name": "get_system_info", "description": "Get CPU, RAM and Disk metrics.", "parameters": {"type": "object", "properties": {}}}},
     {"type": "function", "function": {"name": "list_containers", "description": "List all Docker containers.", "parameters": {"type": "object", "properties": {}}}},
-    {"type": "function", "function": {"name": "manage_container", "description": "Start, stop, restart or remove a Docker container.", "parameters": {"type": "object", "properties": {"container_id": {"type": "string"}, "action": {"type": "string", "enum": ["start", "stop", "restart", "remove"]}}, "required": ["container_id", "action"]}}},
+    {"type": "function", "function": {"name": "manage_container", "description": "Start, stop, restart or remove a Docker container using its ID or NAME.", "parameters": {"type": "object", "properties": {"container_id": {"type": "string", "description": "The ID or NAME of the container"}, "action": {"type": "string", "enum": ["start", "stop", "restart", "remove"]}}, "required": ["container_id", "action"]}}},
     {"type": "function", "function": {"name": "execute_command", "description": "Run shell commands.", "parameters": {"type": "object", "properties": {"command": {"type": "string"}}}}},
     {"type": "function", "function": {"name": "read_file", "description": "Read file content.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}}}},
     {"type": "function", "function": {"name": "write_file", "description": "Write/Modify file content.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}}}},

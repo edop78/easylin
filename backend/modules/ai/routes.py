@@ -9,6 +9,10 @@ except ImportError:
     from database import get_db
 
 from .executor import AVAILABLE_TOOLS, TOOLS_DEFINITION
+try:
+    from backend.config import Config
+except ImportError:
+    from config import Config
 
 ai_bp = Blueprint("ai", __name__)
 
@@ -16,10 +20,10 @@ ai_bp = Blueprint("ai", __name__)
 OLLAMA_API = "http://127.0.0.1:11434/api"
 
 import socket
+import concurrent.futures
 
 def get_local_ip():
     try:
-        # Create a dummy socket to detect the preferred local IP
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
         ip = s.getsockname()[0]
@@ -27,8 +31,6 @@ def get_local_ip():
         return ip
     except:
         return "127.0.0.1"
-
-import concurrent.futures
 
 def probe_url(url):
     try:
@@ -40,11 +42,9 @@ def probe_url(url):
     return None
 
 def check_ollama():
-    """Detect Ollama by probing common endpoints and scanning the local subnet."""
     global OLLAMA_API
     local_ip = get_local_ip()
     base_ip = ".".join(local_ip.split(".")[:-1]) + "."
-    
     endpoints = [
         "http://127.0.0.1:11434/",
         "http://localhost:11434/",
@@ -52,85 +52,37 @@ def check_ollama():
         "http://host.docker.internal:11434/",
         "http://ollama:11434/"
     ]
-    
-    # 1. Try common endpoints first (fast)
     for url in endpoints:
         if probe_url(url):
             OLLAMA_API = f"{url.rstrip('/')}/api"
             return True
-
-    # 2. Parallel scan of the subnet (brute force)
-    scan_urls = [f"http://{base_ip}{i}:11434/" for i in range(1, 255)]
-    with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
-        future_to_url = {executor.submit(probe_url, url): url for url in scan_urls}
-        for future in concurrent.futures.as_completed(future_to_url):
-            found_url = future.result()
-            if found_url:
-                OLLAMA_API = f"{found_url.rstrip('/')}/api"
-                return True
-            
     return False
 
 @ai_bp.route("/status", methods=["GET"])
 @jwt_required()
 def get_status():
-    local_ip = get_local_ip()
     is_active = check_ollama()
-    return jsonify({
-        "active": is_active,
-        "api_url": OLLAMA_API,
-        "detected_ip": local_ip,
-        "message": "Ollama is running" if is_active else f"Ollama not reachable at {OLLAMA_API}. Detected host IP: {local_ip}"
-    })
+    return jsonify({"active": is_active, "api_url": OLLAMA_API})
 
 @ai_bp.route("/models", methods=["GET"])
 @jwt_required()
 def list_models():
     if not check_ollama():
         return jsonify({"models": [], "error": "Ollama offline"}), 503
-    
     try:
         res = requests.get(f"{OLLAMA_API}/tags")
         return jsonify(res.json())
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@ai_bp.route("/pull", methods=["POST"])
-@jwt_required()
-def pull_model():
-    data = request.get_json()
-    model_name = data.get("name")
-    
-    if not model_name:
-        return jsonify({"error": "Model name required"}), 400
-
-    if not check_ollama():
-        return jsonify({"error": "Ollama offline"}), 503
-
-    try:
-        # We use stream=True to avoid loading the entire response into memory,
-        # but we iterate through it and return only the final result.
-        res = requests.post(f"{OLLAMA_API}/pull", json={"name": model_name}, stream=True, timeout=None)
-        
-        final_status = "unknown"
-        for line in res.iter_lines():
-            if line:
-                try:
-                    chunk = json.loads(line.decode('utf-8'))
-                    if 'status' in chunk:
-                        final_status = chunk['status']
-                    if 'error' in chunk:
-                        return jsonify({"error": chunk['error']}), 400
-                except:
-                    continue
-        
-        if final_status == "success":
-            return jsonify({"success": True, "message": f"Model {model_name} pulled successfully"})
-        else:
-            return jsonify({"success": True, "message": f"Pull finished with status: {final_status}"})
-                
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+SYSTEM_PROMPT = """You are the EasyLin Autonomous AI Agent. 
+You have DIRECT access to the host system via tools. 
+IMPORTANT RULES:
+1. If you need to know about containers, services or files, USE THE TOOLS FIRST. Do not ask the user for IDs or paths if you can find them using list_containers, list_processes, etc.
+2. Be concise and professional.
+3. If a tool returns an error, explain it simply.
+4. You can manage Docker containers, system services, packages and files.
+"""
 
 @ai_bp.route("/chat", methods=["POST"])
 @jwt_required()
@@ -145,99 +97,64 @@ def chat():
     # Save user message
     user_msg = messages[-1]
     conn = get_db()
-        
-    conn.execute(
-        "INSERT INTO chat_messages (model, role, content) VALUES (?, ?, ?)",
-        (model, user_msg['role'], user_msg['content'])
-    )
+    conn.execute("INSERT INTO chat_messages (model, role, content) VALUES (?, ?, ?)", (model, user_msg['role'], user_msg['content']))
     conn.commit()
+    conn.close()
 
-    try:
-        # Loop for tool calling (up to 5 turns to prevent infinite loops)
+    def generate():
+        # Inject system prompt if not present
         current_messages = messages.copy()
-        
-        for _ in range(5):
-            res = requests.post(f"{OLLAMA_API}/chat", json={
-                "model": model,
-                "messages": current_messages,
-                "tools": TOOLS_DEFINITION,
-                "stream": False
-            }, timeout=120)
+        if not any(m.get('role') == 'system' for m in current_messages):
+            current_messages.insert(0, {"role": "system", "content": SYSTEM_PROMPT})
             
+        assistant_full_content = ""
+        
+        for turn in range(5):
             try:
-                res_data = res.json()
-            except Exception:
-                if conn: conn.close()
-                return jsonify({"error": f"Ollama returned non-JSON response ({res.status_code})", "details": res.text[:200]}), 502
+                res = requests.post(f"{OLLAMA_API}/chat", json={
+                    "model": model,
+                    "messages": current_messages,
+                    "tools": TOOLS_DEFINITION,
+                    "stream": True 
+                }, stream=True, timeout=120)
                 
-            message = res_data.get('message', {})
-            
-            # Check for tool calls
-            tool_calls = message.get('tool_calls', [])
-            if not tool_calls:
-                # No more tools, final response
-                # Save assistant response
-                if message.get('content'):
-                    conn.execute(
-                        "INSERT INTO chat_messages (model, role, content) VALUES (?, ?, ?)",
-                        (model, 'assistant', message['content'])
-                    )
-                    conn.commit()
-                conn.close()
-                return jsonify(res_data)
-
-            # Process tool calls
-            current_messages.append(message) # Add assistant's tool call message
-            
-            for tool_call in tool_calls:
-                func_name = tool_call.get('function', {}).get('name')
-                args = tool_call.get('function', {}).get('arguments', {})
+                tool_calls = []
+                turn_assistant_message = {"role": "assistant", "content": ""}
                 
-                if func_name in AVAILABLE_TOOLS:
-                    print(f"DEBUG: AI calling tool {func_name} with args {args}")
-                    result = AVAILABLE_TOOLS[func_name](**args)
-                    
-                    current_messages.append({
-                        "role": "tool",
-                        "content": str(result),
-                        "name": func_name
-                    })
-                else:
-                    current_messages.append({
-                        "role": "tool",
-                        "content": f"ERROR: Tool {func_name} not found",
-                        "name": func_name
-                    })
+                for line in res.iter_lines():
+                    if line:
+                        chunk = json.loads(line.decode('utf-8'))
+                        msg_chunk = chunk.get('message', {})
+                        if msg_chunk.get('tool_calls'):
+                            tool_calls.extend(msg_chunk['tool_calls'])
+                        content = msg_chunk.get('content', '')
+                        if content:
+                            turn_assistant_message['content'] += content
+                            assistant_full_content += content
+                            yield f"data: {json.dumps({'content': content})}\n\n"
+                        if chunk.get('done'): break
+                
+                if not tool_calls:
+                    if assistant_full_content:
+                        db_conn = get_db()
+                        db_conn.execute("INSERT INTO chat_messages (model, role, content) VALUES (?, ?, ?)", (model, 'assistant', assistant_full_content))
+                        db_conn.commit()
+                        db_conn.close()
+                    return
 
-        # If we reached 5 turns, return whatever we have
-        conn.close()
-        return jsonify(res_data)
-        
-    except Exception as e:
-        if conn: conn.close()
-        return jsonify({"error": str(e)}), 500
+                current_messages.append(turn_assistant_message)
+                for tool_call in tool_calls:
+                    func_name = tool_call.get('function', {}).get('name')
+                    args = tool_call.get('function', {}).get('arguments', {})
+                    if func_name in AVAILABLE_TOOLS:
+                        yield f"data: {json.dumps({'status': f'AI is using {func_name}...'})}\n\n"
+                        result = AVAILABLE_TOOLS[func_name](**args)
+                        current_messages.append({"role": "tool", "content": str(result), "name": func_name})
+            except Exception as e:
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                return
 
-@ai_bp.route("/permissions", methods=["GET"])
-@jwt_required()
-def get_permissions():
-    conn = get_db()
-    cursor = conn.execute("SELECT * FROM ai_permissions")
-    permissions = [dict(row) for row in cursor.fetchall()]
-    conn.close()
-    return jsonify({"permissions": permissions})
-
-@ai_bp.route("/permissions", methods=["POST"])
-@jwt_required()
-def update_permission():
-    data = request.get_json()
-    capability = data.get("capability")
-    enabled = 1 if data.get("enabled") else 0
-    
-    conn = get_db()
-    conn.execute("UPDATE ai_permissions SET enabled = ? WHERE capability = ?", (enabled, capability))
-    conn.commit()
-    conn.close()
-    return jsonify({"success": True})
+    return Response(generate(), mimetype='text/event-stream')
 
 @ai_bp.route("/chat/history", methods=["GET"])
 @jwt_required()
@@ -245,14 +162,9 @@ def get_chat_history():
     model = request.args.get("model")
     conn = get_db()
     if model:
-        cursor = conn.execute(
-            "SELECT role, content FROM chat_messages WHERE model = ? ORDER BY created_at ASC",
-            (model,)
-        )
+        cursor = conn.execute("SELECT role, content FROM chat_messages WHERE model = ? ORDER BY created_at ASC", (model,))
     else:
-        cursor = conn.execute(
-            "SELECT role, content FROM chat_messages ORDER BY created_at ASC"
-        )
+        cursor = conn.execute("SELECT role, content FROM chat_messages ORDER BY created_at ASC")
     messages = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return jsonify({"messages": messages})
@@ -271,12 +183,51 @@ def clear_chat_history():
     conn.close()
     return jsonify({"success": True})
 
+@ai_bp.route("/permissions", methods=["GET"])
+@jwt_required()
+def get_permissions():
+    conn = get_db()
+    cursor = conn.execute("SELECT * FROM ai_permissions")
+    permissions = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return jsonify({"permissions": permissions})
+
+@ai_bp.route("/permissions", methods=["POST"])
+@jwt_required()
+def update_permission():
+    data = request.get_json()
+    capability = data.get("capability")
+    enabled = 1 if data.get("enabled") else 0
+    conn = get_db()
+    conn.execute("UPDATE ai_permissions SET enabled = ? WHERE capability = ?", (enabled, capability))
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
+
+@ai_bp.route("/pull", methods=["POST"])
+@jwt_required()
+def pull_model():
+    data = request.get_json()
+    model_name = data.get("name")
+    if not model_name: return jsonify({"error": "Model name required"}), 400
+    if not check_ollama(): return jsonify({"error": "Ollama offline"}), 503
+    try:
+        res = requests.post(f"{OLLAMA_API}/pull", json={"name": model_name}, stream=True, timeout=None)
+        final_status = "unknown"
+        for line in res.iter_lines():
+            if line:
+                chunk = json.loads(line.decode('utf-8'))
+                if 'status' in chunk: final_status = chunk['status']
+                if 'error' in chunk: return jsonify({"error": chunk['error']}), 400
+        return jsonify({"success": True, "message": f"Pull finished: {final_status}"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @ai_bp.route("/delete", methods=["DELETE"])
 @jwt_required()
 def delete_model():
     data = request.get_json()
     model_name = data.get("name")
-    
     try:
         res = requests.delete(f"{OLLAMA_API}/delete", json={"name": model_name})
         return jsonify({"success": True, "message": f"Model {model_name} deleted"})

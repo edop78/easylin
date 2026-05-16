@@ -96,13 +96,48 @@ export default function AIManager() {
     setInput('');
     setChatLoading(true);
     
+    // Add temporary assistant message for streaming
+    setMessages(prev => [...prev, { role: 'assistant', content: '', isStreaming: true }]);
+    
     try {
-      const res = await api.post('/ai/chat', {
+      let fullContent = '';
+      await api.stream('/ai/chat', {
         model: selectedModel,
         messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content }))
+      }, (chunk) => {
+        if (chunk.content) {
+          fullContent += chunk.content;
+          setMessages(prev => {
+            const newMsgs = [...prev];
+            const last = newMsgs[newMsgs.length - 1];
+            if (last && last.role === 'assistant') {
+              last.content = fullContent;
+              last.status = null;
+            }
+            return newMsgs;
+          });
+        } else if (chunk.status) {
+          setMessages(prev => {
+            const newMsgs = [...prev];
+            const last = newMsgs[newMsgs.length - 1];
+            if (last && last.role === 'assistant') {
+              last.status = chunk.status;
+            }
+            return newMsgs;
+          });
+        } else if (chunk.error) {
+          setError(chunk.error);
+        }
       });
       
-      setMessages(prev => [...prev, { role: 'assistant', content: res.message.content }]);
+      // Mark as done streaming
+      setMessages(prev => {
+        const newMsgs = [...prev];
+        const last = newMsgs[newMsgs.length - 1];
+        if (last) last.isStreaming = false;
+        return newMsgs;
+      });
+
     } catch (err) {
       setError(err.message || "Chat error. Is the model loaded correctly?");
     } finally {
@@ -291,7 +326,25 @@ export default function AIManager() {
                   messages.map((m, i) => (
                     <div key={i} className={`message-row ${m.role}`}>
                       <div className="message-bubble">
-                         <div className="message-content">{m.content}</div>
+                         <div className="message-content">
+                            {m.content}
+                            {m.status && (
+                              <div style={{ 
+                                fontSize: '11px', 
+                                color: 'var(--accent-blue)', 
+                                marginTop: '6px', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '5px',
+                                background: 'rgba(0,0,0,0.2)',
+                                padding: '4px 8px',
+                                borderRadius: '4px'
+                              }}>
+                                <RefreshCw size={10} className="animate-spin" />
+                                {m.status}
+                              </div>
+                            )}
+                         </div>
                       </div>
                     </div>
                   ))
