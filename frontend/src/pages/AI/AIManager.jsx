@@ -220,9 +220,9 @@ export default function AIManager() {
                      }
                    }}
                  >
-                   {SUGGESTED_MODELS.map(m => (
-                     <option key={m.id} value={m.id}>{m.name}</option>
-                   ))}
+                    {SUGGESTED_MODELS.map(m => (
+                      <option key={m.id} value={m.id}>{m.name} (RAM {m.ram})</option>
+                    ))}
                    <option value="custom">-- Other (Enter name) --</option>
                  </select>
                ) : (
@@ -237,43 +237,56 @@ export default function AIManager() {
                  </div>
                )}
 
-               {!isCustomModel && (
-                 <div style={{ fontSize: '10px', color: 'var(--accent-blue)', opacity: 0.8, padding: '0 4px', display: 'flex', justifyContent: 'space-between' }}>
-                   <span>{SUGGESTED_MODELS.find(m => m.id === pullModel)?.desc}</span>
-                   <span style={{ fontWeight: 600 }}>{SUGGESTED_MODELS.find(m => m.id === pullModel)?.size}</span>
-                 </div>
-               )}
+                {!isCustomModel && (() => {
+                  const modelInfo = SUGGESTED_MODELS.find(m => m.id === pullModel);
+                  return (
+                    <div style={{ fontSize: '10px', color: 'var(--accent-blue)', opacity: 0.8, padding: '0 4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>{modelInfo?.desc}</span>
+                        <span style={{ fontWeight: 600 }}>{modelInfo?.size}</span>
+                      </div>
+                      {modelInfo?.ram && (
+                        <div style={{ color: '#22c55e', fontWeight: 600 }}>Recommended RAM: {modelInfo.ram}</div>
+                      )}
+                    </div>
+                  );
+                })()}
 
-               <button className="btn btn-primary btn-sm" style={{ width: '100%' }} onClick={handlePull} disabled={pulling || !status?.active}>
-                  {pulling ? <RefreshCw size={14} className="spin" /> : <Download size={14} />} 
-                  {pulling ? ' Downloading...' : ' Download Model'}
-               </button>
+                <button className="btn btn-primary btn-sm" style={{ width: '100%' }} onClick={handlePull} disabled={pulling || !status?.active}>
+                   {pulling ? <RefreshCw size={14} className="spin" /> : <Download size={14} />} 
+                   {pulling ? ' Downloading...' : ' Download Model'}
+                </button>
             </div>
 
             <div className="models-list">
                {modelsLoading ? <div className="spinner-sm" /> : (
                 modelsData?.models?.length > 0 ? (
                   <>
-                    {modelsData.models.map((m, i) => (
-                      <div key={i} className={`model-item ${selectedModel === m.name ? 'active' : ''}`} onClick={() => setSelectedModel(m.name)}>
-                        <div className="model-info">
-                          <span className="model-name">{m.name}</span>
-                          <div style={{ display: 'flex', gap: '6px' }}>
-                            <span className="model-size" style={{ fontSize: '10px', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>{(m.size / (1024**3)).toFixed(2)} GB</span>
-                            <span style={{ fontSize: '10px', background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>RAM {m.ram}</span>
+                    {modelsData.models.map((m, i) => {
+                      const suggestedInfo = SUGGESTED_MODELS.find(sm => m.name.startsWith(sm.id.split(':')[0]));
+                      return (
+                        <div key={i} className={`model-item ${selectedModel === m.name ? 'active' : ''}`} onClick={() => setSelectedModel(m.name)}>
+                          <div className="model-info">
+                            <span className="model-name">{m.name}</span>
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              <span className="model-size" style={{ fontSize: '10px', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>{(m.size / (1024**3)).toFixed(2)} GB</span>
+                              {suggestedInfo?.ram && (
+                                <span style={{ fontSize: '10px', background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>RAM {suggestedInfo.ram}</span>
+                              )}
+                            </div>
+                            <div className="model-size">
+                              {m.details?.parameter_size} • {m.details?.quantization_level || 'N/A'}
+                            </div>
+                            <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                              Modified: {new Date(m.modified_at).toLocaleDateString('en-US')}
+                            </div>
                           </div>
-                          <div className="model-size">
-                            {m.details?.parameter_size} • {m.details?.quantization_level || 'N/A'}
-                          </div>
-                          <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                            Modified: {new Date(m.modified_at).toLocaleDateString('en-US')}
-                          </div>
+                          <button className="btn-icon delete" title="Delete Model" onClick={(e) => { e.stopPropagation(); handleDelete(m.name); }}>
+                            <Trash2 size={14} />
+                          </button>
                         </div>
-                        <button className="btn-icon delete" title="Delete Model" onClick={(e) => { e.stopPropagation(); handleDelete(m.name); }}>
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                     <div className="models-total-info">
                       <div className="total-label">Total Storage Used</div>
                       <div className="total-value">
