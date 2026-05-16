@@ -12,8 +12,7 @@ class Config:
     JWT_ACCESS_TOKEN_EXPIRES = 86400  # 24 hours
     
     # Database
-    PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    DATABASE_PATH = os.environ.get("DATABASE_PATH", os.path.join(PROJECT_ROOT, "easylin.db"))
+    DATABASE_PATH = r"c:\Users\edo_p\OneDrive\Desktop\Antigravity PJ\EasyLin\easylin.db"
 
     # Host filesystem mount point
     HOST_ROOT = os.environ.get("HOST_ROOT", "/host")

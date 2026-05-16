@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, Response
 import requests
 import json
+import os
 from flask_jwt_extended import jwt_required
 try:
     from backend.database import get_db
@@ -144,10 +145,6 @@ def chat():
     # Save user message
     user_msg = messages[-1]
     conn = get_db()
-    
-    # DEBUG LOGGING
-    with open('scratch/chat_debug.log', 'a') as f:
-        f.write(f"Saving USER msg for model {model}: {user_msg['content']}\n")
         
     conn.execute(
         "INSERT INTO chat_messages (model, role, content) VALUES (?, ?, ?)",
@@ -181,10 +178,6 @@ def chat():
                 # No more tools, final response
                 # Save assistant response
                 if message.get('content'):
-                    # DEBUG LOGGING
-                    with open('scratch/chat_debug.log', 'a') as f:
-                        f.write(f"Saving ASSISTANT msg for model {model}: {message['content'][:50]}...\n")
-                        
                     conn.execute(
                         "INSERT INTO chat_messages (model, role, content) VALUES (?, ?, ?)",
                         (model, 'assistant', message['content'])
