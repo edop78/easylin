@@ -34,27 +34,24 @@ def get_local_ip():
 
 def probe_url(url):
     try:
-        res = requests.get(url, timeout=1.0)
-        if res.status_code == 200 and "ollama" in res.text.lower():
-            return url
+        # Increased timeout to be more resilient under load
+        res = requests.get(url, timeout=3.0)
+        return res.status_code == 200
     except:
-        pass
-    return None
+        return False
 
 def check_ollama():
     global OLLAMA_API
-    local_ip = get_local_ip()
-    base_ip = ".".join(local_ip.split(".")[:-1]) + "."
+    # Prioritize 127.0.0.1 and localhost
     endpoints = [
-        "http://127.0.0.1:11434/",
-        "http://localhost:11434/",
-        f"http://{local_ip}:11434/",
-        "http://host.docker.internal:11434/",
-        "http://ollama:11434/"
+        "http://127.0.0.1:11434",
+        "http://localhost:11434",
+        "http://host.docker.internal:11434",
+        "http://ollama:11434"
     ]
     for url in endpoints:
         if probe_url(url):
-            OLLAMA_API = f"{url.rstrip('/')}/api"
+            OLLAMA_API = f"{url}/api"
             return True
     return False
 
