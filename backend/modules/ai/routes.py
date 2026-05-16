@@ -107,32 +107,37 @@ CRITICAL PROTOCOLS:
 @ai_bp.route("/chat", methods=["POST"])
 @jwt_required()
 def chat():
-    data = request.get_json()
-    model = data.get("model")
-    messages = data.get("messages", [])
-    
-    if not model or not messages:
-        return jsonify({"error": "Model and messages required"}), 400
-
-    # Save user message
-    user_msg = messages[-1]
-    conn = get_db()
-    conn.execute("INSERT INTO chat_messages (model, role, content) VALUES (?, ?, ?)", (model, user_msg['role'], user_msg['content']))
-    conn.commit()
-    conn.close()
-
-    def generate():
-        # Inject system prompt if not present
-        current_messages = messages.copy()
-        if not any(m.get('role') == 'system' for m in current_messages):
-            current_messages.insert(0, {"role": "system", "content": SYSTEM_PROMPT})
-            
-        assistant_full_content = ""
+    try:
+        data = request.get_json()
+        model = data.get("model")
+        messages = data.get("messages", [])
         
-        for turn in range(5):
-            try:
-                # Pre-flight check: Verify if the port is actually open to avoid long hangs
-                import socket
+        if not model or not messages:
+            return jsonify({"error": "Model and messages required"}), 400
+
+        # Save user message with protection
+        try:
+            user_msg = messages[-1]
+            conn = get_db()
+            conn.execute("INSERT INTO chat_messages (model, role, content) VALUES (?, ?, ?)", (model, user_msg['role'], user_msg['content']))
+            conn.commit()
+            conn.close()
+        except Exception as db_e:
+            print(f"Database error in chat: {db_e}")
+            # We continue even if DB save fails to keep chat alive
+
+        def generate():
+            # Inject system prompt if not present
+            current_messages = messages.copy()
+            if not any(m.get('role') == 'system' for m in current_messages):
+                current_messages.insert(0, {"role": "system", "content": SYSTEM_PROMPT})
+                
+            assistant_full_content = ""
+            
+            for turn in range(5):
+                try:
+                    # Pre-flight check: Verify if the port is actually open to avoid long hangs
+                    import socket
                 from urllib.parse import urlparse
                 parsed_url = urlparse(OLLAMA_API)
                 host = parsed_url.hostname or '127.0.0.1'
@@ -199,7 +204,11 @@ def chat():
                 yield f"data: {json.dumps({'error': f'Backend error: {str(e)}'})}\n\n"
                 return
 
-    return Response(generate(), mimetype='text/event-stream')
+        return Response(generate(), mimetype='text/event-stream')
+
+    except Exception as e:
+        print(f"CRITICAL ERROR in chat route: {e}")
+        return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
 
 @ai_bp.route("/chat/history", methods=["GET"])
 @jwt_required()
