@@ -68,7 +68,7 @@ def chat():
         if not model or not messages:
             return jsonify({"error": "Model and messages required"}), 400
 
-        # Save user message with protection
+        # Save user message
         try:
             user_msg = messages[-1]
             conn = get_db()
@@ -77,10 +77,8 @@ def chat():
             conn.close()
         except Exception as db_e:
             print(f"Database error in chat: {db_e}")
-            # We continue even if DB save fails to keep chat alive
 
         def generate():
-            # Inject system prompt if not present
             current_messages = messages.copy()
             if not any(m.get('role') == 'system' for m in current_messages):
                 current_messages.insert(0, {"role": "system", "content": SYSTEM_PROMPT})
@@ -89,79 +87,69 @@ def chat():
             
             for turn in range(5):
                 try:
-                    # Pre-flight check: Verify if the port is actually open to avoid long hangs
+                    # Pre-flight check
                     import socket
-                from urllib.parse import urlparse
-                parsed_url = urlparse(OLLAMA_API)
-                host = parsed_url.hostname or '127.0.0.1'
-                port = parsed_url.port or 11434
-                
-                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                    s.settimeout(2.0)
-                    if s.connect_ex((host, port)) != 0:
-                        yield f"data: {json.dumps({'error': f'Cannot reach Ollama at {OLLAMA_API}. Check if service is running and port is open.'})}\n\n"
+                    from urllib.parse import urlparse
+                    parsed_url = urlparse(OLLAMA_API)
+                    host = parsed_url.hostname or '127.0.0.1'
+                    port = parsed_url.port or 11434
+                    
+                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                        s.settimeout(2.0)
+                        if s.connect_ex((host, port)) != 0:
+                            yield f"data: {json.dumps({'error': f'Cannot reach Ollama at {OLLAMA_API}'})}\n\n"
+                            return
+
+                    res = requests.post(f"{OLLAMA_API}/chat", json={
+                        "model": model,
+                        "messages": current_messages,
+                        "tools": TOOLS_DEFINITION,
+                        "stream": True 
+                    }, stream=True, timeout=120)
+                    
+                    tool_calls = []
+                    turn_assistant_message = {"role": "assistant", "content": ""}
+                    
+                    for line in res.iter_lines(chunk_size=1, decode_unicode=True):
+                        if line:
+                            chunk = json.loads(line)
+                            msg_chunk = chunk.get('message', {})
+                            if msg_chunk.get('tool_calls'):
+                                tool_calls.extend(msg_chunk['tool_calls'])
+                            content = msg_chunk.get('content', '')
+                            if content:
+                                turn_assistant_message['content'] += content
+                                assistant_full_content += content
+                                yield f"data: {json.dumps({'content': content})}\n\n"
+                            if chunk.get('done'): break
+                        else:
+                            yield ": heartbeat\n\n"
+                    
+                    if not tool_calls:
+                        if assistant_full_content:
+                            db_conn = get_db()
+                            db_conn.execute("INSERT INTO chat_messages (model, role, content) VALUES (?, ?, ?)", (model, 'assistant', assistant_full_content))
+                            db_conn.commit()
+                            db_conn.close()
                         return
 
-                # Log connection attempt for server-side debugging
-                print(f"DEBUG: Attempting AI request to {OLLAMA_API} using model {model}")
-                yield f"data: {json.dumps({'status': f'Connecting to Ollama ({host})...'})}\n\n"
-                
-                res = requests.post(f"{OLLAMA_API}/chat", json={
-                    "model": model,
-                    "messages": current_messages,
-                    "tools": TOOLS_DEFINITION,
-                    "stream": True 
-                }, stream=True, timeout=120)
-                
-                tool_calls = []
-                turn_assistant_message = {"role": "assistant", "content": ""}
-                
-                # Iterate with a mechanism to keep the connection alive
-                for line in res.iter_lines(chunk_size=1, decode_unicode=True):
-                    if line:
-                        chunk = json.loads(line)
-                        msg_chunk = chunk.get('message', {})
-                        
-                        if msg_chunk.get('tool_calls'):
-                            tool_calls.extend(msg_chunk['tool_calls'])
-                            
-                        content = msg_chunk.get('content', '')
-                        if content:
-                            turn_assistant_message['content'] += content
-                            assistant_full_content += content
-                            yield f"data: {json.dumps({'content': content})}\n\n"
-                        
-                        if chunk.get('done'): break
-                    else:
-                        # Empty line acts as heartbeat
-                        yield ": heartbeat\n\n"
-                
-                if not tool_calls:
-                    if assistant_full_content:
-                        db_conn = get_db()
-                        db_conn.execute("INSERT INTO chat_messages (model, role, content) VALUES (?, ?, ?)", (model, 'assistant', assistant_full_content))
-                        db_conn.commit()
-                        db_conn.close()
+                    current_messages.append(turn_assistant_message)
+                    for tool_call in tool_calls:
+                        func_name = tool_call.get('function', {}).get('name')
+                        args = tool_call.get('function', {}).get('arguments', {})
+                        if func_name in AVAILABLE_TOOLS:
+                            yield f"data: {json.dumps({'status': f'Executing {func_name}...'})}\n\n"
+                            result = AVAILABLE_TOOLS[func_name](**args)
+                            current_messages.append({"role": "tool", "content": str(result), "name": func_name})
+                except Exception as e:
+                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
                     return
-
-                current_messages.append(turn_assistant_message)
-                for tool_call in tool_calls:
-                    func_name = tool_call.get('function', {}).get('name')
-                    args = tool_call.get('function', {}).get('arguments', {})
-                    if func_name in AVAILABLE_TOOLS:
-                        # Give immediate feedback to prevent timeout during tool execution
-                        yield f"data: {json.dumps({'status': f'Executing {func_name}...'})}\n\n"
-                        result = AVAILABLE_TOOLS[func_name](**args)
-                        current_messages.append({"role": "tool", "content": str(result), "name": func_name})
-            except Exception as e:
-                yield f"data: {json.dumps({'error': f'Backend error: {str(e)}'})}\n\n"
-                return
 
         return Response(generate(), mimetype='text/event-stream')
 
     except Exception as e:
         print(f"CRITICAL ERROR in chat route: {e}")
-        return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
+        return jsonify({"error": str(e)}), 500
 
 @ai_bp.route("/chat/history", methods=["GET"])
 @jwt_required()
