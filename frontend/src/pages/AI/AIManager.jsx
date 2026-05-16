@@ -206,109 +206,156 @@ export default function AIManager() {
       <div className="ai-grid">
         {/* MODELLI E GESTIONE */}
         <div className="ai-sidebar">
-          <div className="card">
-            <div className="pull-controls card" style={{ padding: '16px', background: 'rgba(0,0,0,0.2)', border: '1px dashed var(--border-color)' }}>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                   <Download size={12} /> Model Library
-                </div>
-                
-                <button 
-                  className="btn btn-ghost btn-sm" 
-                  style={{ width: '100%', justifyContent: 'space-between', marginBottom: '12px', border: '1px solid var(--border-color)' }}
-                  onClick={() => setTzModal(true)}
-                  disabled={pulling}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Package size={14} className="text-blue" />
-                    <span>{isCustomModel ? 'Custom Model...' : (SUGGESTED_MODELS.find(m => m.id === pullModel)?.name || 'Select Model...')}</span>
-                  </div>
-                  <RefreshCw size={12} style={{ opacity: 0.5 }} />
-                </button>
-
-                {!isCustomModel && (() => {
-                  const modelInfo = SUGGESTED_MODELS.find(m => m.id === pullModel);
-                  return (
-                    <div style={{ fontSize: '10px', color: 'var(--accent-blue)', opacity: 0.8, padding: '0 4px 12px 4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span>{modelInfo?.desc}</span>
-                        <span style={{ fontWeight: 600 }}>{modelInfo?.size}</span>
-                      </div>
-                      {modelInfo?.ram && (
-                        <div style={{ color: '#22c55e', fontWeight: 600 }}>Recommended RAM: {modelInfo.ram}</div>
-                      )}
-                    </div>
-                  );
-                })()}
-
-                {isCustomModel && (
-                  <div style={{ display: 'flex', gap: '8px', width: '100%', marginBottom: '12px' }}>
-                    <input 
-                      className="input-sm" 
-                      placeholder="Model name (e.g. llama3)" 
-                      value={customModelName}
-                      onChange={(e) => setCustomModelName(e.target.value)}
-                      style={{ background: 'rgba(0,0,0,0.3)' }}
-                    />
-                    <button className="btn btn-sm btn-ghost" onClick={() => { setIsCustomModel(false); setPullModel(SUGGESTED_MODELS[0].id); }}><X size={14} /></button>
-                  </div>
-                )}
-
-                <button className="btn btn-primary btn-sm" style={{ width: '100%' }} onClick={handlePull} disabled={pulling || !status?.active}>
-                   {pulling ? <RefreshCw size={14} className="spin" /> : <Download size={14} />} 
-                   {pulling ? ' Downloading...' : ' Download Model'}
-                </button>
-             </div>
-
-            <div className="models-list">
-               {modelsLoading ? <div className="spinner-sm" /> : (
-                modelsData?.models?.length > 0 ? (
-                  <>
-                    {modelsData.models.map((m, i) => {
-                      const suggestedInfo = SUGGESTED_MODELS.find(sm => m.name.startsWith(sm.id.split(':')[0]));
-                      return (
-                        <div key={i} className={`model-item ${selectedModel === m.name ? 'active' : ''}`} onClick={() => setSelectedModel(m.name)}>
-                          <div className="model-info">
-                            <span className="model-name">{m.name}</span>
-                            <div style={{ display: 'flex', gap: '6px' }}>
-                              <span className="model-size" style={{ fontSize: '10px', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>{(m.size / (1024**3)).toFixed(2)} GB</span>
-                              {suggestedInfo?.ram && (
-                                <span style={{ fontSize: '10px', background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>RAM {suggestedInfo.ram}</span>
-                              )}
-                            </div>
-                            <div className="model-size">
-                              {m.details?.parameter_size} • {m.details?.quantization_level || 'N/A'}
-                            </div>
-                            <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                              Modified: {new Date(m.modified_at).toLocaleDateString('en-US')}
-                            </div>
-                          </div>
-                          <button className="btn-icon delete" title="Delete Model" onClick={(e) => { e.stopPropagation(); handleDelete(m.name); }}>
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      );
-                    })}
-                    <div className="models-total-info">
-                      <div className="total-label">Total Storage Used</div>
-                      <div className="total-value">
-                        {(modelsData.models.reduce((acc, m) => acc + m.size, 0) / (1024**3)).toFixed(2)} GB
-                      </div>
-                    </div>
-                  </>
-                ) : <div className="empty-state">No models found.</div>
-              )}
+          {/* LIBRARY SECTION */}
+          <div className="card library-section" style={{ padding: '20px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', boxShadow: '0 8px 32px rgba(0,0,0,0.2)', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+              <div style={{ background: 'var(--accent-blue-transparent)', padding: '8px', borderRadius: '8px' }}>
+                <Download size={18} className="text-blue" />
+              </div>
+              <div>
+                <div style={{ fontSize: '14px', fontWeight: 700 }}>Model Library</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Get new AI brains</div>
+              </div>
             </div>
+            
+            <button 
+              className="btn btn-ghost" 
+              style={{ 
+                width: '100%', 
+                justifyContent: 'space-between', 
+                marginBottom: '16px', 
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid var(--border-color)',
+                padding: '12px 16px',
+                height: 'auto'
+              }}
+              onClick={() => setTzModal(true)}
+              disabled={pulling}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Package size={16} className="text-blue" />
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600 }}>{isCustomModel ? 'Custom Model' : (SUGGESTED_MODELS.find(m => m.id === pullModel)?.name || 'Select Model')}</div>
+                  <div style={{ fontSize: '10px', opacity: 0.5 }}>Click to browse catalog</div>
+                </div>
+              </div>
+              <RefreshCw size={14} style={{ opacity: 0.4 }} />
+            </button>
+
+            {!isCustomModel && (() => {
+              const modelInfo = SUGGESTED_MODELS.find(m => m.id === pullModel);
+              return (
+                <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '12px', marginBottom: '16px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px', fontStyle: 'italic' }}>
+                    "{modelInfo?.desc}"
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <div style={{ background: 'rgba(255,255,255,0.03)', padding: '6px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Size</div>
+                      <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent-blue)' }}>{modelInfo?.size}</div>
+                    </div>
+                    <div style={{ background: 'rgba(34, 197, 94, 0.05)', padding: '6px', borderRadius: '6px', border: '1px solid rgba(34, 197, 94, 0.1)' }}>
+                      <div style={{ fontSize: '9px', color: '#22c55e', textTransform: 'uppercase' }}>Min RAM</div>
+                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#22c55e' }}>{modelInfo?.ram}</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {isCustomModel && (
+              <div style={{ marginBottom: '16px' }}>
+                <div className="input-wrapper" style={{ marginBottom: '8px', position: 'relative' }}>
+                  <input 
+                    className="input-sm" 
+                    placeholder="Enter model name..." 
+                    value={customModelName}
+                    onChange={(e) => setCustomModelName(e.target.value)}
+                    style={{ background: 'rgba(0,0,0,0.3)', width: '100%', paddingRight: '40px' }}
+                  />
+                  <button className="btn btn-sm btn-ghost" style={{ position: 'absolute', right: '4px', top: '50%', transform: 'translateY(-50%)' }} onClick={() => { setIsCustomModel(false); setPullModel(SUGGESTED_MODELS[0].id); }}><X size={14} /></button>
+                </div>
+              </div>
+            )}
+
+            <button className="btn btn-primary" style={{ width: '100%', height: '42px', borderRadius: '10px' }} onClick={handlePull} disabled={pulling || !status?.active}>
+               {pulling ? <RefreshCw size={16} className="spin" /> : <Download size={16} />} 
+               <span style={{ marginLeft: '8px' }}>{pulling ? 'Downloading...' : 'Install AI Model'}</span>
+            </button>
           </div>
 
-          <div className="card stats-mini" style={{ padding: '16px' }}>
-             <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>External Access</div>
-             <div className="stat-item" style={{ marginBottom: '8px' }}>
-                <Cpu size={14} /> <span style={{ fontSize: '12px' }}>Engine: Ollama</span>
-             </div>
-             <div className="stat-item" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>API Address (for external apps):</div>
-                <code style={{ fontSize: '11px', color: 'var(--accent-blue)' }}>http://{status?.detected_ip || 'localhost'}:11434</code>
-             </div>
+          {/* INSTALLED MODELS SECTION */}
+          <div className="card" style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'transparent', border: 'none', boxShadow: 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', padding: '0 4px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Local Models</div>
+              <div style={{ fontSize: '10px', background: 'var(--accent-blue-transparent)', color: 'var(--accent-blue)', padding: '2px 8px', borderRadius: '20px', fontWeight: 600 }}>
+                {modelsData?.models?.length || 0} Total
+              </div>
+            </div>
+
+            <div className="models-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+               {modelsLoading ? <div className="spinner-sm" style={{ margin: '40px auto' }} /> : (
+                 modelsData?.models?.length > 0 ? (
+                   <>
+                     {modelsData.models.map((m, i) => {
+                       const suggestedInfo = SUGGESTED_MODELS.find(sm => m.name.startsWith(sm.id.split(':')[0]));
+                       return (
+                        <div key={i} className={`model-item ${selectedModel === m.name ? 'active' : ''}`} 
+                             onClick={() => setSelectedModel(m.name)}
+                             style={{ 
+                               background: selectedModel === m.name ? 'var(--accent-blue-transparent)' : 'rgba(255,255,255,0.03)',
+                               border: `1px solid ${selectedModel === m.name ? 'var(--accent-blue)' : 'var(--border-color)'}`,
+                               padding: '14px',
+                               borderRadius: '12px',
+                               transition: '0.3s'
+                             }}>
+                          <div className="model-info">
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                              <span className="model-name" style={{ fontWeight: 700, fontSize: '14px' }}>{m.name}</span>
+                              <button className="btn-icon delete" style={{ padding: '4px', opacity: 0.5 }} title="Delete Model" onClick={(e) => { e.stopPropagation(); handleDelete(m.name); }}>
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                            
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                              <span style={{ fontSize: '10px', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                {(m.size / (1024**3)).toFixed(2)} GB
+                              </span>
+                              {suggestedInfo?.ram && (
+                                <span style={{ fontSize: '10px', background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e', padding: '2px 8px', borderRadius: '4px', fontWeight: 600, border: '1px solid rgba(34, 197, 94, 0.2)' }}>
+                                  RAM {suggestedInfo.ram}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                       );
+                     })}
+
+                     <div className="total-storage-pill" style={{ 
+                       marginTop: 'auto', 
+                       padding: '12px 16px', 
+                       background: 'rgba(0,0,0,0.3)', 
+                       borderRadius: '12px', 
+                       border: '1px solid var(--border-color)',
+                       display: 'flex',
+                       justifyContent: 'space-between',
+                       alignItems: 'center'
+                     }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Total Storage</div>
+                        <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--accent-blue)' }}>
+                          {(modelsData.models.reduce((acc, m) => acc + m.size, 0) / (1024**3)).toFixed(2)} GB
+                        </div>
+                     </div>
+                   </>
+                 ) : (
+                   <div className="empty-state" style={{ textAlign: 'center', padding: '40px 20px', opacity: 0.5 }}>
+                     <Bot size={32} style={{ marginBottom: '12px' }} />
+                     <div style={{ fontSize: '13px' }}>No local models installed</div>
+                   </div>
+                 )
+               )}
+            </div>
           </div>
         </div>
 
