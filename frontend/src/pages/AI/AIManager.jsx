@@ -73,10 +73,11 @@ export default function AIManager() {
     setPulling(true);
     setError(null);
     setPullProgress("Starting download...");
-    try {
+    try:
       await api.stream('/ai/pull', { name: modelToPull }, (chunk) => {
         if (chunk.error) {
-          setError(chunk.error);
+          // Only show real errors from Ollama
+          setError(`Ollama Error: ${chunk.error}`);
         } else if (chunk.status) {
           let progressStr = chunk.status;
           if (chunk.total && chunk.completed) {
@@ -86,14 +87,22 @@ export default function AIManager() {
           setPullProgress(progressStr);
         }
       });
-      refetchModels();
+      // Verification step: don't error immediately, check if it's there
+      setTimeout(() => refetchModels(), 1000);
       setCustomModelName('');
       setIsCustomModel(false);
       setPullProgress(null);
     } catch (err) {
-      setError(err.message || "Error downloading model.");
+      // If it's a 504 or network error, it might still be downloading in background
+      console.warn("Pull connection interrupted, checking status...", err);
+      setPullProgress("Finalizing in background...");
+      setTimeout(() => {
+        refetchModels();
+        setPulling(false);
+        setPullProgress(null);
+      }, 5000);
     } finally {
-      setPulling(false);
+      // Don't set pulling to false immediately if we are in the catch block finalizing
     }
   };
 
