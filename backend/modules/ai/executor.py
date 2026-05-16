@@ -94,9 +94,28 @@ def tool_list_processes():
         procs.append(p.info)
     return json.dumps(procs[:100]) # Limit to top 100
 
+def tool_manage_container(container_id, action):
+    if not check_permission('docker_mgmt'):
+        return "ERROR: Permission 'docker_mgmt' is disabled."
+    if action not in ['start', 'stop', 'restart', 'remove']:
+        return "ERROR: Invalid action."
+    try:
+        # Use curl to Docker socket for speed and reliability
+        method = "POST"
+        url = f"http://localhost/containers/{container_id}/{action}"
+        if action == "remove":
+            method = "DELETE"
+            url = f"http://localhost/containers/{container_id}?force=true"
+        
+        result = subprocess.run(['curl', '-X', method, '--unix-socket', '/var/run/docker.sock', url], capture_output=True, text=True, timeout=15)
+        return "SUCCESS" if result.returncode == 0 else f"FAILED: {result.stdout}"
+    except Exception as e:
+        return f"ERROR: {str(e)}"
+
 AVAILABLE_TOOLS = {
     "get_system_info": tool_get_system_info,
     "list_containers": tool_list_containers,
+    "manage_container": tool_manage_container,
     "execute_command": tool_execute_command,
     "read_file": tool_read_file,
     "write_file": tool_write_file,
@@ -108,6 +127,7 @@ AVAILABLE_TOOLS = {
 TOOLS_DEFINITION = [
     {"type": "function", "function": {"name": "get_system_info", "description": "Get CPU, RAM and Disk metrics.", "parameters": {"type": "object", "properties": {}}}},
     {"type": "function", "function": {"name": "list_containers", "description": "List all Docker containers.", "parameters": {"type": "object", "properties": {}}}},
+    {"type": "function", "function": {"name": "manage_container", "description": "Start, stop, restart or remove a Docker container.", "parameters": {"type": "object", "properties": {"container_id": {"type": "string"}, "action": {"type": "string", "enum": ["start", "stop", "restart", "remove"]}}, "required": ["container_id", "action"]}}},
     {"type": "function", "function": {"name": "execute_command", "description": "Run shell commands.", "parameters": {"type": "object", "properties": {"command": {"type": "string"}}}}},
     {"type": "function", "function": {"name": "read_file", "description": "Read file content.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}}}},
     {"type": "function", "function": {"name": "write_file", "description": "Write/Modify file content.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}}}},
