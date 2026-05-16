@@ -153,7 +153,7 @@ def chat():
             "model": model,
             "messages": messages,
             "stream": False
-        })
+        }, timeout=120)
         res_data = res.json()
         
         # Save assistant response

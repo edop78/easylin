@@ -101,7 +101,7 @@ export default function AIManager() {
       
       setMessages(prev => [...prev, { role: 'assistant', content: res.message.content }]);
     } catch (err) {
-      setError("Chat error. Is the model loaded correctly?");
+      setError(err.message || "Errore nella chat. Il modello è caricato correttamente?");
     } finally {
       setChatLoading(false);
     }
