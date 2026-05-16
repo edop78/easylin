@@ -113,8 +113,22 @@ def chat():
         
         for turn in range(5):
             try:
-                # Add a small heartbeat or status message immediately to keep connection alive
-                yield f"data: {json.dumps({'status': 'AI is thinking...'})}\n\n"
+                # Pre-flight check: Verify if the port is actually open to avoid long hangs
+                import socket
+                from urllib.parse import urlparse
+                parsed_url = urlparse(OLLAMA_API)
+                host = parsed_url.hostname or '127.0.0.1'
+                port = parsed_url.port or 11434
+                
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.settimeout(2.0)
+                    if s.connect_ex((host, port)) != 0:
+                        yield f"data: {json.dumps({'error': f'Cannot reach Ollama at {OLLAMA_API}. Check if service is running and port is open.'})}\n\n"
+                        return
+
+                # Log connection attempt for server-side debugging
+                print(f"DEBUG: Attempting AI request to {OLLAMA_API} using model {model}")
+                yield f"data: {json.dumps({'status': f'Connecting to Ollama ({host})...'})}\n\n"
                 
                 res = requests.post(f"{OLLAMA_API}/chat", json={
                     "model": model,
