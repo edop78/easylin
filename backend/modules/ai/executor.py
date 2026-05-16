@@ -100,15 +100,29 @@ def tool_manage_container(container_id, action):
     if action not in ['start', 'stop', 'restart', 'remove']:
         return "ERROR: Invalid action."
     try:
-        # Use curl to Docker socket for speed and reliability
+        # Use curl to Docker socket and capture HTTP status code
         method = "POST"
         url = f"http://localhost/containers/{container_id}/{action}"
         if action == "remove":
             method = "DELETE"
             url = f"http://localhost/containers/{container_id}?force=true"
         
-        result = subprocess.run(['curl', '-X', method, '--unix-socket', '/var/run/docker.sock', url], capture_output=True, text=True, timeout=15)
-        return "SUCCESS" if result.returncode == 0 else f"FAILED: {result.stdout}"
+        # We capture the HTTP status code to be sure
+        cmd = ['curl', '-s', '-o', '/dev/null', '-w', '%{http_code}', '-X', method, '--unix-socket', '/var/run/docker.sock', url]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        
+        status_code = result.stdout.strip()
+        
+        # 204 is Success for stop/start/restart, 201 for start sometimes, 200 for remove
+        if status_code in ['200', '201', '204']:
+            return f"SUCCESS: Container {container_id} {action}ed (HTTP {status_code})"
+        elif status_code == '404':
+            return f"ERROR: Container '{container_id}' not found."
+        elif status_code == '304':
+            return f"INFO: Container '{container_id}' was already in the desired state ({action})."
+        else:
+            return f"FAILED: Docker returned HTTP {status_code}. Possible permission or state issue."
+            
     except Exception as e:
         return f"ERROR: {str(e)}"
 
