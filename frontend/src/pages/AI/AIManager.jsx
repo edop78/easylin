@@ -203,10 +203,19 @@ export default function AIManager() {
               <button className={`tab-sm ${tab === 'chat' ? 'active' : ''}`} onClick={() => setTab('chat')}>Chat</button>
               <button className={`tab-sm ${tab === 'settings' ? 'active' : ''}`} onClick={() => setTab('settings')}>Settings & Permissions</button>
            </div>
-           <div className={`status-badge ${status?.active ? 'active' : 'offline'}`}>
+           <div className={`status-badge ${status?.active ? 'active' : 'offline'}`} style={{ marginRight: '8px' }}>
               {status?.active ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
               {status?.active ? 'Ollama Online' : 'Ollama Offline'}
            </div>
+           {status?.host_ram && (
+             <div className={`status-badge ${status.host_ram.percent > 90 ? 'offline' : (status.host_ram.percent > 75 ? 'warning' : 'active')}`} style={{ marginRight: '8px' }}>
+                <Cpu size={14} />
+                RAM: {status.host_ram.percent}%
+                <small style={{ marginLeft: '4px', opacity: 0.7, fontSize: '9px' }}>
+                  ({(status.host_ram.available / (1024**3)).toFixed(1)}GB free)
+                </small>
+             </div>
+           )}
            <button className="btn btn-ghost" onClick={() => { refetchStatus(); refetchModels(); }}>
               <RefreshCw size={16} />
            </button>

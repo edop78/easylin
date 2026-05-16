@@ -62,7 +62,25 @@ def check_ollama():
 @jwt_required()
 def get_status():
     is_active = check_ollama()
-    return jsonify({"active": is_active, "api_url": OLLAMA_API})
+    # Try to get host RAM info using psutil
+    host_ram = None
+    try:
+        import psutil
+        vm = psutil.virtual_memory()
+        host_ram = {
+            "total": vm.total,
+            "available": vm.available,
+            "used": vm.used,
+            "percent": vm.percent
+        }
+    except Exception as e:
+        print(f"Warning: could not get RAM info: {e}")
+        
+    return jsonify({
+        "active": is_active, 
+        "api_url": OLLAMA_API,
+        "host_ram": host_ram
+    })
 
 @ai_bp.route("/models", methods=["GET"])
 @jwt_required()
