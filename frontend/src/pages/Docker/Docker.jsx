@@ -144,7 +144,7 @@ export default function Docker() {
       const app = MARKET_APPS.find(a => a.id === appId);
       await api.post('/docker/market/install', { app_id: appId });
       
-      // FORCED: Open the cazzo di finestra immediately
+      // FORCED: Open the log window immediately
       setActiveTaskLogs({ id: appId, name: app?.name || appId });
       
       setTimeout(() => refetchMarket(), 500);

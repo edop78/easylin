@@ -9,12 +9,12 @@ import {
 } from 'lucide-react';
 
 const SUGGESTED_MODELS = [
-  { id: 'qwen2.5:1.5b', name: 'Qwen 2.5 (1.5B)', size: '1.0 GB', desc: 'Leggero, ideale per server con poca RAM (<4GB).' },
-  { id: 'qwen2.5:7b', name: 'Qwen 2.5 (7B)', size: '4.7 GB', desc: 'Equilibrato, ottimo per uso generale.' },
-  { id: 'llama3.1:8b', name: 'Llama 3.1 (8B)', size: '4.7 GB', desc: 'Avanzato, il più potente di Meta.' },
-  { id: 'mistral:latest', name: 'Mistral (7B)', size: '4.1 GB', desc: 'Affidabile, veloce e preciso.' },
-  { id: 'codegemma:2b', name: 'CodeGemma (2B)', size: '1.7 GB', desc: 'Specializzato per lo sviluppo software.' },
-  { id: 'phi3:mini', name: 'Phi-3 Mini', size: '2.3 GB', desc: 'Incredibilmente compatto ma intelligente.' },
+  { id: 'qwen2.5:1.5b', name: 'Qwen 2.5 (1.5B)', size: '1.0 GB', desc: 'Lightweight, ideal for servers with low RAM (<4GB).' },
+  { id: 'qwen2.5:7b', name: 'Qwen 2.5 (7B)', size: '4.7 GB', desc: 'Balanced, great for general use.' },
+  { id: 'llama3.1:8b', name: 'Llama 3.1 (8B)', size: '4.7 GB', desc: 'Advanced, the most powerful from Meta.' },
+  { id: 'mistral:latest', name: 'Mistral (7B)', size: '4.1 GB', desc: 'Reliable, fast and precise.' },
+  { id: 'codegemma:2b', name: 'CodeGemma (2B)', size: '1.7 GB', desc: 'Specialized for software development.' },
+  { id: 'phi3:mini', name: 'Phi-3 Mini', size: '2.3 GB', desc: 'Incredibly compact yet intelligent.' },
 ];
 
 export default function AIManager() {
@@ -68,7 +68,7 @@ export default function AIManager() {
       setCustomModelName('');
       setIsCustomModel(false);
     } catch (err) {
-      setError(err.message || "Errore durante il download del modello.");
+      setError(err.message || "Error downloading model.");
     } finally {
       setPulling(false);
     }
@@ -81,7 +81,7 @@ export default function AIManager() {
       refetchModels();
       if (selectedModel === name) setSelectedModel('');
     } catch (err) {
-      setError(err.message || "Errore durante l'eliminazione del modello.");
+      setError(err.message || "Error deleting model.");
     }
   };
 
@@ -101,19 +101,19 @@ export default function AIManager() {
       
       setMessages(prev => [...prev, { role: 'assistant', content: res.message.content }]);
     } catch (err) {
-      setError(err.message || "Errore nella chat. Il modello è caricato correttamente?");
+      setError(err.message || "Chat error. Is the model loaded correctly?");
     } finally {
       setChatLoading(false);
     }
   };
 
   const handleClearChat = async () => {
-    if (!confirm("Sei sicuro di voler cancellare la cronologia della chat per questo modello?")) return;
+    if (!confirm("Are you sure you want to clear the chat history for this model?")) return;
     try {
       await api.post('/ai/chat/clear', { model: selectedModel });
       setMessages([]);
     } catch (err) {
-      setError("Errore nella cancellazione della chat");
+      setError("Error clearing chat history");
     }
   };
 
@@ -137,12 +137,12 @@ export default function AIManager() {
           <Info size={24} />
           <div style={{ flex: 1 }}>
             <strong style={{ display: 'block', marginBottom: '4px' }}>
-              {status?.message || (statusLoading ? 'Caricamento stato...' : 'Ollama non rilevato')}
+              {status?.message || (statusLoading ? 'Loading status...' : 'Ollama not detected')}
             </strong> 
-            {status?.detected_ip ? `Indirizzo IP rilevato: ${status.detected_ip}` : 'Verifica che il motore Ollama sia installato e attivo.'}
+            {status?.detected_ip ? `Detected IP Address: ${status.detected_ip}` : 'Ensure Ollama engine is installed and active.'}
           </div>
           <Link to="/docker" className="btn btn-sm btn-primary" style={{ whiteSpace: 'nowrap', textDecoration: 'none' }}>
-            Vai allo Store
+            Go to Store
           </Link>
         </div>
       )}
@@ -153,7 +153,7 @@ export default function AIManager() {
           <div className="card">
             <div className="card-header" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
               <div className="card-title"><Settings size={16} /> Models Library</div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Scarica e gestisci i tuoi cervelli locali.</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Download and manage your local brains.</div>
             </div>
             
             <div className="pull-section" style={{ flexDirection: 'column', gap: '10px' }}>
@@ -172,13 +172,13 @@ export default function AIManager() {
                    {SUGGESTED_MODELS.map(m => (
                      <option key={m.id} value={m.id}>{m.name}</option>
                    ))}
-                   <option value="custom">-- Altro (Inserisci nome) --</option>
+                   <option value="custom">-- Other (Enter name) --</option>
                  </select>
                ) : (
                  <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
                    <input 
                      className="input-sm" 
-                     placeholder="Nome modello (es. llama3)" 
+                     placeholder="Model name (e.g. llama3)" 
                      value={customModelName}
                      onChange={(e) => setCustomModelName(e.target.value)}
                    />
@@ -195,7 +195,7 @@ export default function AIManager() {
 
                <button className="btn btn-primary btn-sm" style={{ width: '100%' }} onClick={handlePull} disabled={pulling || !status?.active}>
                   {pulling ? <RefreshCw size={14} className="spin" /> : <Download size={14} />} 
-                  {pulling ? ' Scaricando...' : ' Scarica Modello'}
+                  {pulling ? ' Downloading...' : ' Download Model'}
                </button>
             </div>
 
@@ -211,33 +211,33 @@ export default function AIManager() {
                             {(m.size / (1024**3)).toFixed(2)} GB • {m.details?.parameter_size} • {m.details?.quantization_level || 'N/A'}
                           </div>
                           <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                            Modificato: {new Date(m.modified_at).toLocaleDateString('it-IT')}
+                            Modified: {new Date(m.modified_at).toLocaleDateString('en-US')}
                           </div>
                         </div>
-                        <button className="btn-icon delete" title="Elimina Modello" onClick={(e) => { e.stopPropagation(); handleDelete(m.name); }}>
+                        <button className="btn-icon delete" title="Delete Model" onClick={(e) => { e.stopPropagation(); handleDelete(m.name); }}>
                           <Trash2 size={14} />
                         </button>
                       </div>
                     ))}
                     <div className="models-total-info">
-                      <div className="total-label">Spazio Occupato Totale</div>
+                      <div className="total-label">Total Storage Used</div>
                       <div className="total-value">
                         {(modelsData.models.reduce((acc, m) => acc + m.size, 0) / (1024**3)).toFixed(2)} GB
                       </div>
                     </div>
                   </>
-                ) : <div className="empty-state">Nessun modello trovato.</div>
+                ) : <div className="empty-state">No models found.</div>
               )}
             </div>
           </div>
 
           <div className="card stats-mini" style={{ padding: '16px' }}>
-             <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Accesso Esterno</div>
+             <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>External Access</div>
              <div className="stat-item" style={{ marginBottom: '8px' }}>
-                <Cpu size={14} /> <span style={{ fontSize: '12px' }}>Motore: Ollama</span>
+                <Cpu size={14} /> <span style={{ fontSize: '12px' }}>Engine: Ollama</span>
              </div>
              <div className="stat-item" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Indirizzo API (per app esterne):</div>
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>API Address (for external apps):</div>
                 <code style={{ fontSize: '11px', color: 'var(--accent-blue)' }}>http://{status?.detected_ip || 'localhost'}:11434</code>
              </div>
           </div>
@@ -250,7 +250,7 @@ export default function AIManager() {
               <div className="chat-header-info">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Bot size={18} className="text-blue" />
-                  <span style={{ fontSize: '13px' }}>Modello attivo: <strong>{selectedModel}</strong></span>
+                  <span style={{ fontSize: '13px' }}>Active model: <strong>{selectedModel}</strong></span>
                 </div>
                 {modelsData?.models?.find(m => m.name === selectedModel) && (
                   <div className="model-stats-pill">
@@ -259,7 +259,7 @@ export default function AIManager() {
                   </div>
                 )}
                 <button className="btn btn-sm btn-ghost text-red" style={{ marginLeft: 'auto', fontSize: '11px', gap: '4px' }} onClick={handleClearChat}>
-                  <Trash2 size={12} /> Svuota Chat
+                  <Trash2 size={12} /> Clear Chat
                 </button>
               </div>
             )}
@@ -267,8 +267,8 @@ export default function AIManager() {
               {messages.length === 0 ? (
                 <div className="chat-welcome">
                   <Bot size={48} className="bot-icon" />
-                  <h2>Benvenuto nell'AI Locale di EasyLin</h2>
-                  <p>Seleziona un modello dalla libreria e inizia a chattare. Tutto ciò che scrivi resta nel tuo server.</p>
+                  <h2>Welcome to EasyLin Local AI</h2>
+                  <p>Select a model from the library and start chatting. Everything you write stays on your server.</p>
                 </div>
               ) : (
                 messages.map((m, i) => (
