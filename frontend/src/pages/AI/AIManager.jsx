@@ -21,7 +21,7 @@ const SUGGESTED_MODELS = [
 export default function AIManager() {
   const { data: status, loading: statusLoading, error: statusError, refetch: refetchStatus } = useApi('/ai/status');
   const { data: modelsData, loading: modelsLoading, refetch: refetchModels } = useApi('/ai/models');
-  const { data: permissionsData, refetch: refetchPermissions } = useApi('/ai/permissions');
+  const { data: permissionsData, loading: permissionsLoading, error: permissionsError, refetch: refetchPermissions } = useApi('/ai/permissions');
   
   const [tab, setTab] = useState('chat'); // 'chat' or 'settings'
   const [messages, setMessages] = useState([]);
@@ -345,7 +345,19 @@ export default function AIManager() {
                 gap: '16px', 
                 padding: '20px' 
               }}>
-                {permissionsData?.permissions?.map(p => (
+                {permissionsLoading && (
+                  <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px' }}>
+                    <RefreshCw className="animate-spin" size={32} style={{ opacity: 0.5 }} />
+                    <p style={{ marginTop: '12px', color: 'var(--text-muted)' }}>Loading permissions...</p>
+                  </div>
+                )}
+                {permissionsError && (
+                  <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px' }}>
+                    <AlertCircle size={32} className="text-red" />
+                    <p style={{ marginTop: '12px', color: 'var(--text-red)' }}>Error: {permissionsError}</p>
+                  </div>
+                )}
+                {!permissionsLoading && !permissionsError && permissionsData?.permissions?.map(p => (
                   <div key={p.capability} className="permission-item" style={{ 
                     display: 'flex', 
                     justifyContent: 'space-between', 
