@@ -29,9 +29,13 @@ def create_app():
     limiter = Limiter(
         key_func=get_remote_address,
         app=app,
-        default_limits=["200 per day", "50 per hour"],
+        default_limits=["1000 per day", "200 per hour"],
         storage_uri="memory://",
     )
+    
+    @app.errorhandler(429)
+    def ratelimit_handler(e):
+        return jsonify({"error": "Rate limit exceeded", "message": str(e.description)}), 429
     
     # Rendi il limiter accessibile globalmente se necessario (opzionale)
     app.limiter = limiter

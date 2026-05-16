@@ -162,7 +162,12 @@ def chat():
                 "stream": False
             }, timeout=120)
             
-            res_data = res.json()
+            try:
+                res_data = res.json()
+            except Exception:
+                if conn: conn.close()
+                return jsonify({"error": f"Ollama returned non-JSON response ({res.status_code})", "details": res.text[:200]}), 502
+                
             message = res_data.get('message', {})
             
             # Check for tool calls
