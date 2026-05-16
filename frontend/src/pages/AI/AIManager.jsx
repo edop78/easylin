@@ -5,7 +5,8 @@ import api from '../../api/client';
 import { 
   Bot, Send, Download, Trash2, Cpu, Activity, 
   MessageSquare, Settings, AlertCircle, CheckCircle, 
-  RefreshCw, Terminal, Info, X, Shield, FileText, Container
+  RefreshCw, Terminal, Info, X, Shield, FileText, Container,
+  Save, Globe, Package, Users, GitBranch
 } from 'lucide-react';
 
 const SUGGESTED_MODELS = [
@@ -332,12 +333,18 @@ export default function AIManager() {
               <div className="card-header">
                 <div className="card-title"><Shield size={18} /> AI Agent Permissions Matrix</div>
               </div>
-              <div className="permissions-list" style={{ padding: '20px' }}>
-                <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '24px' }}>
+              <div style={{ padding: '0 20px', marginTop: '20px' }}>
+                <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>
                   Enable the following capabilities to allow the AI to interact with your system. 
-                  <strong> Warning:</strong> Enabling shell execution gives the AI full root access to your host.
+                  <strong> Warning:</strong> Enabling high-risk operations (Shell, File Write) gives the AI full access to your host.
                 </p>
-                
+              </div>
+              <div className="permissions-grid" style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', 
+                gap: '16px', 
+                padding: '20px' 
+              }}>
                 {permissionsData?.permissions?.map(p => (
                   <div key={p.capability} className="permission-item" style={{ 
                     display: 'flex', 
@@ -346,7 +353,6 @@ export default function AIManager() {
                     padding: '16px', 
                     background: 'rgba(255,255,255,0.03)', 
                     borderRadius: '12px', 
-                    marginBottom: '12px',
                     border: '1px solid var(--border-color)'
                   }}>
                     <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
@@ -358,15 +364,49 @@ export default function AIManager() {
                         display: 'flex', 
                         alignItems: 'center', 
                         justifyContent: 'center',
-                        color: p.enabled ? 'var(--accent-blue)' : 'var(--text-muted)'
+                        color: p.enabled ? 'var(--accent-blue)' : 'var(--text-muted)',
+                        position: 'relative'
                       }}>
                         {p.capability === 'shell_exec' ? <Terminal size={20} /> : 
                          p.capability === 'docker_mgmt' ? <Container size={20} /> :
                          p.capability === 'file_read' ? <FileText size={20} /> :
-                         p.capability === 'system_info' ? <Activity size={20} /> : <Shield size={20} />}
+                         p.capability === 'file_write' ? <Save size={20} /> :
+                         p.capability === 'system_info' ? <Activity size={20} /> : 
+                         p.capability === 'service_mgmt' ? <Settings size={20} /> :
+                         p.capability === 'package_mgmt' ? <Package size={20} /> :
+                         p.capability === 'process_mgmt' ? <Cpu size={20} /> :
+                         p.capability === 'network_view' ? <Globe size={20} /> :
+                         p.capability === 'firewall_mgmt' ? <Shield size={20} /> :
+                         p.capability === 'user_mgmt' ? <Users size={20} /> :
+                         p.capability === 'git_mgmt' ? <GitBranch size={20} /> :
+                         <Shield size={20} />}
+                        
+                        {/* Criticality Indicator */}
+                        <div style={{ 
+                          position: 'absolute', 
+                          top: '-4px', 
+                          right: '-4px', 
+                          width: '12px', 
+                          height: '12px', 
+                          borderRadius: '50%', 
+                          border: '2px solid var(--card-bg, #1a1a1a)',
+                          backgroundColor: p.level === 'high' ? '#ef4444' : p.level === 'medium' ? '#f59e0b' : '#22c55e'
+                        }} title={`Criticality: ${p.level}`} />
                       </div>
                       <div>
-                        <div style={{ fontSize: '14px', fontWeight: 600 }}>{p.capability.replace('_', ' ').toUpperCase()}</div>
+                        <div style={{ fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          {p.capability.replace('_', ' ').toUpperCase()}
+                          <span style={{ 
+                            fontSize: '9px', 
+                            padding: '1px 6px', 
+                            borderRadius: '4px', 
+                            backgroundColor: p.level === 'high' ? 'rgba(239, 68, 68, 0.1)' : p.level === 'medium' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(34, 197, 94, 0.1)',
+                            color: p.level === 'high' ? '#ef4444' : p.level === 'medium' ? '#f59e0b' : '#22c55e',
+                            textTransform: 'uppercase'
+                          }}>
+                            {p.level}
+                          </span>
+                        </div>
                         <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{p.description}</div>
                       </div>
                     </div>

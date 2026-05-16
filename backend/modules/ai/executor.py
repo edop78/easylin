@@ -16,139 +16,102 @@ def check_permission(capability):
 
 def tool_get_system_info():
     if not check_permission('system_info'):
-        return "ERROR: Permission 'system_info' is disabled in AI Settings."
-    
+        return "ERROR: Permission 'system_info' is disabled."
     return json.dumps({
-        "cpu_usage_percent": psutil.cpu_percent(interval=0.1),
-        "memory": {
-            "total": psutil.virtual_memory().total,
-            "available": psutil.virtual_memory().available,
-            "percent": psutil.virtual_memory().percent
-        },
-        "disk": {
-            "total": psutil.disk_usage('/').total,
-            "used": psutil.disk_usage('/').used,
-            "free": psutil.disk_usage('/').free,
-            "percent": psutil.disk_usage('/').percent
-        },
-        "load_avg": os.getloadavg() if hasattr(os, 'getloadavg') else "N/A"
+        "cpu": psutil.cpu_percent(interval=0.1),
+        "memory": psutil.virtual_memory()._asdict(),
+        "disk": psutil.disk_usage('/')._asdict()
     })
 
 def tool_list_containers():
     if not check_permission('docker_mgmt'):
-        return "ERROR: Permission 'docker_mgmt' is disabled in AI Settings."
-    
+        return "ERROR: Permission 'docker_mgmt' is disabled."
     try:
-        # Use curl against the local docker socket
-        result = subprocess.run(
-            ['curl', '--unix-socket', '/var/run/docker.sock', 'http://localhost/containers/json?all=1'],
-            capture_output=True, text=True, timeout=10
-        )
-        return result.stdout if result.returncode == 0 else f"ERROR: {result.stderr}"
+        result = subprocess.run(['curl', '--unix-socket', '/var/run/docker.sock', 'http://localhost/containers/json?all=1'], capture_output=True, text=True, timeout=10)
+        return result.stdout
     except Exception as e:
-        return f"ERROR: Could not communicate with Docker: {str(e)}"
+        return f"ERROR: {str(e)}"
 
 def tool_execute_command(command):
     if not check_permission('shell_exec'):
-        return "ERROR: Permission 'shell_exec' is disabled. This is a HIGH SECURITY RISK and must be manually enabled by the administrator."
-    
+        return "ERROR: Permission 'shell_exec' is disabled. High-risk operation."
     try:
-        # Security: block some obviously dangerous commands even if enabled? 
-        # For now, we trust the permission matrix.
-        result = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=15)
-        return json.dumps({
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-            "exit_code": result.returncode
-        })
+        result = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=30)
+        return json.dumps({"stdout": result.stdout, "stderr": result.stderr, "exit_code": result.returncode})
     except Exception as e:
-        return f"ERROR: Execution failed: {str(e)}"
+        return f"ERROR: {str(e)}"
 
 def tool_read_file(path):
     if not check_permission('file_read'):
         return "ERROR: Permission 'file_read' is disabled."
-    
-    # Security: prevent reading outside /host or sensitive paths if needed
-    # But user asked for autonomy.
     try:
-        # If running in container, host root is at /host
-        real_path = path
-        if not path.startswith('/host') and os.path.exists('/host'):
-             real_path = os.path.join('/host', path.lstrip('/'))
-             
-        if not os.path.exists(real_path):
-            return f"ERROR: File {path} not found."
-            
+        real_path = path if path.startswith('/host') else os.path.join('/host', path.lstrip('/'))
         with open(real_path, 'r', errors='replace') as f:
-            content = f.read(10000) # Limit to 10kb
-            return content
+            return f.read(10000)
     except Exception as e:
-        return f"ERROR: Could not read file: {str(e)}"
+        return f"ERROR: {str(e)}"
 
-# Mapping of tool names to functions
+def tool_write_file(path, content):
+    if not check_permission('file_write'):
+        return "ERROR: Permission 'file_write' is disabled."
+    try:
+        real_path = path if path.startswith('/host') else os.path.join('/host', path.lstrip('/'))
+        os.makedirs(os.path.dirname(real_path), exist_ok=True)
+        with open(real_path, 'w') as f:
+            f.write(content)
+        return "SUCCESS: File written successfully."
+    except Exception as e:
+        return f"ERROR: {str(e)}"
+
+def tool_manage_service(service, action):
+    if not check_permission('service_mgmt'):
+        return "ERROR: Permission 'service_mgmt' is disabled."
+    if action not in ['start', 'stop', 'restart', 'status']:
+        return "ERROR: Invalid action."
+    try:
+        result = subprocess.run(['systemctl', action, service], capture_output=True, text=True, timeout=15)
+        return f"STDOUT: {result.stdout}\nSTDERR: {result.stderr}"
+    except Exception as e:
+        return f"ERROR: {str(e)}"
+
+def tool_manage_package(package, action):
+    if not check_permission('package_mgmt'):
+        return "ERROR: Permission 'package_mgmt' is disabled."
+    if action not in ['install', 'remove']:
+        return "ERROR: Invalid action."
+    try:
+        cmd = ['apt-get', 'install', '-y', package] if action == 'install' else ['apt-get', 'remove', '-y', package]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        return f"STDOUT: {result.stdout}\nSTDERR: {result.stderr}"
+    except Exception as e:
+        return f"ERROR: {str(e)}"
+
+def tool_list_processes():
+    if not check_permission('process_mgmt'):
+        return "ERROR: Permission 'process_mgmt' is disabled."
+    procs = []
+    for p in psutil.process_iter(['pid', 'name', 'username', 'cpu_percent', 'memory_percent']):
+        procs.append(p.info)
+    return json.dumps(procs[:100]) # Limit to top 100
+
 AVAILABLE_TOOLS = {
     "get_system_info": tool_get_system_info,
     "list_containers": tool_list_containers,
     "execute_command": tool_execute_command,
-    "read_file": tool_read_file
+    "read_file": tool_read_file,
+    "write_file": tool_write_file,
+    "manage_service": tool_manage_service,
+    "manage_package": tool_manage_package,
+    "list_processes": tool_list_processes
 }
 
-# Definitions for Ollama
 TOOLS_DEFINITION = [
-    {
-        "type": "function",
-        "function": {
-            "name": "get_system_info",
-            "description": "Get real-time system metrics like CPU, RAM, Disk and Load average.",
-            "parameters": {
-                "type": "object",
-                "properties": {}
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "list_containers",
-            "description": "List all Docker containers on the server with their status.",
-            "parameters": {
-                "type": "object",
-                "properties": {}
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "execute_command",
-            "description": "Run a shell command on the host server. Use with caution.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "command": {
-                        "type": "string",
-                        "description": "The command to execute, e.g. 'ls -la /'"
-                    }
-                },
-                "required": ["command"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "read_file",
-            "description": "Read the content of a file from the server.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "Absolute path to the file"
-                    }
-                },
-                "required": ["path"]
-            }
-        }
-    }
+    {"type": "function", "function": {"name": "get_system_info", "description": "Get CPU, RAM and Disk metrics.", "parameters": {"type": "object", "properties": {}}}},
+    {"type": "function", "function": {"name": "list_containers", "description": "List all Docker containers.", "parameters": {"type": "object", "properties": {}}}},
+    {"type": "function", "function": {"name": "execute_command", "description": "Run shell commands.", "parameters": {"type": "object", "properties": {"command": {"type": "string"}}}}},
+    {"type": "function", "function": {"name": "read_file", "description": "Read file content.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}}}},
+    {"type": "function", "function": {"name": "write_file", "description": "Write/Modify file content.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}}}},
+    {"type": "function", "function": {"name": "manage_service", "description": "Manage system services (start, stop, restart, status).", "parameters": {"type": "object", "properties": {"service": {"type": "string"}, "action": {"type": "string"}}}}},
+    {"type": "function", "function": {"name": "manage_package", "description": "Install or remove packages via APT.", "parameters": {"type": "object", "properties": {"package": {"type": "string"}, "action": {"type": "string"}}}}},
+    {"type": "function", "function": {"name": "list_processes", "description": "List active system processes.", "parameters": {"type": "object", "properties": {}}}}
 ]
