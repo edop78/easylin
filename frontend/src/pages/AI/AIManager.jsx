@@ -10,12 +10,16 @@ import {
 } from 'lucide-react';
 
 const SUGGESTED_MODELS = [
-  { id: 'qwen2.5:1.5b', name: 'Qwen 2.5 (1.5B)', size: '1.0 GB', ram: '4GB', desc: 'Lightweight, ideal for servers with low RAM (<4GB).' },
-  { id: 'qwen2.5:7b', name: 'Qwen 2.5 (7B)', size: '4.7 GB', ram: '8GB', desc: 'Balanced, great for general use.' },
-  { id: 'llama3.1:8b', name: 'Llama 3.1 (8B)', size: '4.7 GB', ram: '16GB', desc: 'Advanced, the most powerful from Meta.' },
-  { id: 'mistral:latest', name: 'Mistral (7B)', size: '4.1 GB', ram: '8GB', desc: 'Reliable, fast and precise.' },
-  { id: 'codegemma:2b', name: 'CodeGemma (2B)', size: '1.7 GB', ram: '4GB', desc: 'Specialized for software development.' },
-  { id: 'phi3:mini', name: 'Phi-3 Mini', size: '2.3 GB', ram: '4GB', desc: 'Incredibly compact yet intelligent.' },
+  { id: 'qwen2.5:0.5b', name: 'Qwen 2.5 (0.5B)', size: '390 MB', ram: '2GB', desc: 'Ultra-lightweight, extremely fast for basic tasks.' },
+  { id: 'qwen2.5:1.5b', name: 'Qwen 2.5 (1.5B)', size: '1.0 GB', ram: '4GB', desc: 'Lightweight, ideal for most home servers.' },
+  { id: 'qwen2.5:3b', name: 'Qwen 2.5 (3B)', size: '1.9 GB', ram: '6GB', desc: 'Smart and balanced, high reasoning for its size.' },
+  { id: 'qwen2.5:7b', name: 'Qwen 2.5 (7B)', size: '4.7 GB', ram: '8GB', desc: 'The gold standard for general purpose local AI.' },
+  { id: 'gemma2:2b', name: 'Gemma 2 (2B)', size: '1.6 GB', ram: '4GB', desc: 'Google\'s latest compact model, very efficient.' },
+  { id: 'gemma2:9b', name: 'Gemma 2 (9B)', size: '5.4 GB', ram: '12GB', desc: 'Google\'s state-of-the-art balanced model.' },
+  { id: 'llama3.1:8b', name: 'Llama 3.1 (8B)', size: '4.7 GB', ram: '12GB', desc: 'Meta\'s flagship, extremely reliable and versatile.' },
+  { id: 'mistral:latest', name: 'Mistral (7B)', size: '4.1 GB', ram: '8GB', desc: 'Classic European model, fast and precise.' },
+  { id: 'phi3.5:latest', name: 'Phi-3.5 Mini', size: '2.2 GB', ram: '4GB', desc: 'Microsoft\'s latest update, high logic in tiny size.' },
+  { id: 'qwen2.5:32b', name: 'Qwen 2.5 (32B)', size: '19 GB', ram: '32GB', desc: 'Professional grade reasoning (Requires high RAM).' },
 ];
 
 export default function AIManager() {
