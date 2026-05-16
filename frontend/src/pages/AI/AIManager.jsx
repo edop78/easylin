@@ -369,15 +369,24 @@ export default function AIManager() {
                     <Bot size={18} className="text-blue" />
                     <span style={{ fontSize: '13px' }}>Active model: <strong>{selectedModel}</strong></span>
                   </div>
-                  {modelsData?.models?.find(m => m.name === selectedModel) && (
-                    <div className="model-stats-pill">
-                      <Activity size={12} />
-                      <span>{(modelsData.models.find(m => m.name === selectedModel).size / (1024**3)).toFixed(2)} GB</span>
-                    </div>
-                  )}
-                  <button className="btn btn-sm btn-ghost text-red" style={{ marginLeft: 'auto', fontSize: '11px', gap: '4px' }} onClick={handleClearChat}>
-                    <Trash2 size={12} /> Clear Chat
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
+                    {chatLoading && (
+                      <button className="btn btn-sm btn-danger fade-in" 
+                              style={{ background: '#ef4444', color: 'white', border: 'none', padding: '4px 12px', fontSize: '11px', fontWeight: 700, borderRadius: '6px' }}
+                              onClick={() => { setChatLoading(false); setError("Operation stopped by user."); }}>
+                        STOP AI
+                      </button>
+                    )}
+                    {modelsData?.models?.find(m => m.name === selectedModel) && (
+                      <div className="model-stats-pill">
+                        <Activity size={12} />
+                        <span>{(modelsData.models.find(m => m.name === selectedModel).size / (1024**3)).toFixed(2)} GB</span>
+                      </div>
+                    )}
+                    <button className="btn btn-sm btn-ghost text-red" style={{ fontSize: '11px', gap: '4px' }} onClick={handleClearChat}>
+                      <Trash2 size={12} /> Clear Chat
+                    </button>
+                  </div>
                 </div>
               )}
               <div className="chat-messages">
