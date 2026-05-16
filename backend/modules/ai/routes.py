@@ -113,6 +113,9 @@ def chat():
         
         for turn in range(5):
             try:
+                # Add a small heartbeat or status message immediately to keep connection alive
+                yield f"data: {json.dumps({'status': 'AI is thinking...'})}\n\n"
+                
                 res = requests.post(f"{OLLAMA_API}/chat", json={
                     "model": model,
                     "messages": current_messages,
@@ -123,18 +126,25 @@ def chat():
                 tool_calls = []
                 turn_assistant_message = {"role": "assistant", "content": ""}
                 
-                for line in res.iter_lines():
+                # Iterate with a mechanism to keep the connection alive
+                for line in res.iter_lines(chunk_size=1, decode_unicode=True):
                     if line:
-                        chunk = json.loads(line.decode('utf-8'))
+                        chunk = json.loads(line)
                         msg_chunk = chunk.get('message', {})
+                        
                         if msg_chunk.get('tool_calls'):
                             tool_calls.extend(msg_chunk['tool_calls'])
+                            
                         content = msg_chunk.get('content', '')
                         if content:
                             turn_assistant_message['content'] += content
                             assistant_full_content += content
                             yield f"data: {json.dumps({'content': content})}\n\n"
+                        
                         if chunk.get('done'): break
+                    else:
+                        # Empty line acts as heartbeat
+                        yield ": heartbeat\n\n"
                 
                 if not tool_calls:
                     if assistant_full_content:
@@ -149,11 +159,12 @@ def chat():
                     func_name = tool_call.get('function', {}).get('name')
                     args = tool_call.get('function', {}).get('arguments', {})
                     if func_name in AVAILABLE_TOOLS:
-                        yield f"data: {json.dumps({'status': f'AI is using {func_name}...'})}\n\n"
+                        # Give immediate feedback to prevent timeout during tool execution
+                        yield f"data: {json.dumps({'status': f'Executing {func_name}...'})}\n\n"
                         result = AVAILABLE_TOOLS[func_name](**args)
                         current_messages.append({"role": "tool", "content": str(result), "name": func_name})
             except Exception as e:
-                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                yield f"data: {json.dumps({'error': f'Backend error: {str(e)}'})}\n\n"
                 return
 
     return Response(generate(), mimetype='text/event-stream')
