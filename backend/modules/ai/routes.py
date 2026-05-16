@@ -49,31 +49,42 @@ def get_status():
         "host_ram": host_ram
     })
 
+def get_local_ip():
+    try:
+        import socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0)
+        s.connect(('10.254.254.254', 1))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except:
+        return "127.0.0.1"
+
 @ai_bp.route("/models", methods=["GET"])
 @jwt_required()
 def list_models():
-    # Try multiple common endpoints for models
+    local_ip = get_local_ip()
+    # Broad scan of possible endpoints
     endpoints = [
-        OLLAMA_API,
+        os.environ.get("OLLAMA_API", "http://host.docker.internal:11434/api"),
         "http://127.0.0.1:11434/api",
+        f"http://{local_ip}:11434/api",
         "http://localhost:11434/api",
-        "http://host.docker.internal:11434/api"
+        "http://ollama:11434/api"
     ]
     
-    last_error = "Could not connect to any Ollama endpoint"
     for api_url in endpoints:
         try:
-            res = requests.get(f"{api_url}/tags", timeout=3.0)
+            res = requests.get(f"{api_url.rstrip('/')}/tags", timeout=1.5)
             if res.status_code == 200:
-                # If this works, update the global OLLAMA_API for other routes
                 global OLLAMA_API
-                OLLAMA_API = api_url
+                OLLAMA_API = api_url.rstrip('/')
                 return jsonify(res.json())
-        except Exception as e:
-            last_error = str(e)
+        except:
             continue
             
-    return jsonify({"models": [], "error": last_error}), 200 # Return 200 with empty list to avoid UI crash
+    return jsonify({"models": [], "error": "No Ollama service found"}), 200
 
 SYSTEM_PROMPT = """You are the EasyLin Autonomous AI Agent. 
 You have DIRECT access to the host system via specialized tools. 
