@@ -298,7 +298,7 @@ export default function AIManager() {
                  modelsData?.models?.length > 0 ? (
                    <>
                      {modelsData.models.map((m, i) => {
-                       const suggestedInfo = SUGGESTED_MODELS.find(sm => m.name.startsWith(sm.id.split(':')[0]));
+                       const suggestedInfo = SUGGESTED_MODELS.find(sm => m.name.startsWith(sm.id));
                        return (
                         <div key={i} className={`model-item ${selectedModel === m.name ? 'active' : ''}`} 
                              onClick={() => setSelectedModel(m.name)}
