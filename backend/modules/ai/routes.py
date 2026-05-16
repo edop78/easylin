@@ -52,13 +52,28 @@ def get_status():
 @ai_bp.route("/models", methods=["GET"])
 @jwt_required()
 def list_models():
-    if not check_ollama():
-        return jsonify({"models": [], "error": "Ollama offline"}), 503
-    try:
-        res = requests.get(f"{OLLAMA_API}/tags")
-        return jsonify(res.json())
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    # Try multiple common endpoints for models
+    endpoints = [
+        OLLAMA_API,
+        "http://127.0.0.1:11434/api",
+        "http://localhost:11434/api",
+        "http://host.docker.internal:11434/api"
+    ]
+    
+    last_error = "Could not connect to any Ollama endpoint"
+    for api_url in endpoints:
+        try:
+            res = requests.get(f"{api_url}/tags", timeout=3.0)
+            if res.status_code == 200:
+                # If this works, update the global OLLAMA_API for other routes
+                global OLLAMA_API
+                OLLAMA_API = api_url
+                return jsonify(res.json())
+        except Exception as e:
+            last_error = str(e)
+            continue
+            
+    return jsonify({"models": [], "error": last_error}), 200 # Return 200 with empty list to avoid UI crash
 
 SYSTEM_PROMPT = """You are the EasyLin Autonomous AI Agent. 
 You have DIRECT access to the host system via specialized tools. 
