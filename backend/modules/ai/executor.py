@@ -27,8 +27,22 @@ def tool_list_containers():
     if not check_permission('docker_mgmt'):
         return "ERROR: Permission 'docker_mgmt' is disabled."
     try:
-        result = subprocess.run(['curl', '--unix-socket', '/var/run/docker.sock', 'http://localhost/containers/json?all=1'], capture_output=True, text=True, timeout=10)
-        return result.stdout
+        result = subprocess.run(['curl', '-s', '--unix-socket', '/var/run/docker.sock', 'http://localhost/containers/json?all=1'], capture_output=True, text=True, timeout=10)
+        if result.returncode != 0:
+            return f"ERROR: Could not connect to Docker socket: {result.stderr}"
+        
+        containers = json.loads(result.stdout)
+        summary = []
+        for c in containers:
+            names = ", ".join(c.get('Names', [])).replace("/", "")
+            summary.append({
+                "Names": names,
+                "Image": c.get('Image'),
+                "State": c.get('State'),
+                "Status": c.get('Status'),
+                "ID": c.get('Id')[:12]
+            })
+        return json.dumps(summary, indent=2)
     except Exception as e:
         return f"ERROR: {str(e)}"
 
