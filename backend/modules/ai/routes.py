@@ -120,7 +120,8 @@ def chat():
                     tool_calls = []
                     turn_assistant_message = {"role": "assistant", "content": ""}
                     
-                    # Optimized stream reading (None lets requests handle buffering)
+                    # Optimized stream reading
+                    last_heartbeat = time.time()
                     for line in res.iter_lines(decode_unicode=True):
                         if line:
                             try:
@@ -138,6 +139,10 @@ def chat():
                                 print(f"DEBUG: JSON parse error in stream: {json_e}")
                                 continue
                         else:
+                            # Periodic heartbeat every 2 seconds if no data
+                            if time.time() - last_heartbeat > 2.0:
+                                yield f"data: {json.dumps({'status': 'Thinking...'})}\n\n"
+                                last_heartbeat = time.time()
                             yield ": heartbeat\n\n"
                     
                     print(f"DEBUG: Ollama thinking time: {time.time() - start_time:.2f}s")
