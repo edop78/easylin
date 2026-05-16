@@ -16,37 +16,25 @@ except ImportError:
 
 ai_bp = Blueprint("ai", __name__)
 
-OLLAMA_API = os.environ.get("OLLAMA_API", "http://host.docker.internal:11434/api")
+OLLAMA_API = os.environ.get("OLLAMA_API", "http://127.0.0.1:11434/api")
 
 def check_ollama():
-    # Emergency Force Online: we assume it's there to unblock the UI
-    global OLLAMA_API
-    # We try a quick ping but don't let it block the UI if it's slow
-    return True
+    try:
+        import requests
+        # Simple, direct check of the tags endpoint which is very reliable
+        res = requests.get(f"{OLLAMA_API}/tags", timeout=2.0)
+        return res.status_code == 200
+    except:
+        return False
 
 @ai_bp.route("/status", methods=["GET"])
 @jwt_required()
 def get_status():
-    # Always report Online to allow UI to work, let actual calls fail with real errors
-    is_active = True 
-    # Try to get host RAM info using psutil
-    host_ram = None
-    try:
-        import psutil
-        vm = psutil.virtual_memory()
-        host_ram = {
-            "total": vm.total,
-            "available": vm.available,
-            "used": vm.used,
-            "percent": vm.percent
-        }
-    except:
-        pass
-        
+    is_active = check_ollama()
     return jsonify({
         "active": is_active, 
         "api_url": OLLAMA_API,
-        "host_ram": host_ram
+        "message": "Ollama engine is active" if is_active else "Ollama not detected"
     })
 
 def get_local_ip():
