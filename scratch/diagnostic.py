@@ -63,13 +63,22 @@ def check_database():
 def check_resources():
     print("\n--- Resource Diagnostics ---")
     try:
-        import psutil
-        vm = psutil.virtual_memory()
-        print(f"Total RAM: {vm.total / (1024**3):.2f} GB")
-        print(f"Available RAM: {vm.available / (1024**3):.2f} GB")
-        print(f"Used RAM: {vm.percent}%")
-        if vm.percent > 90:
-            print("[WARNING] RAM usage is critical! This will make AI extremely slow.")
+        # Fallback to shell commands if psutil is missing
+        import os
+        mem_info = os.popen('free -m').readlines()
+        if len(mem_info) > 1:
+            line = mem_info[1].split()
+            total = int(line[1])
+            used = int(line[2])
+            free = int(line[3])
+            pct = (used / total) * 100
+            print(f"Total RAM: {total} MB")
+            print(f"Used RAM: {used} MB ({pct:.1f}%)")
+            print(f"Free RAM: {free} MB")
+            if pct > 90:
+                print("[WARNING] RAM usage is critical! This will make AI extremely slow.")
+        else:
+            print("[ERROR] Could not parse memory info from 'free' command.")
     except Exception as e:
         print(f"[ERROR] Could not check resources: {e}")
 
