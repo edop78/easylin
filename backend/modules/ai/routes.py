@@ -145,9 +145,18 @@ def chat():
                         func_name = tool_call.get('function', {}).get('name')
                         args = tool_call.get('function', {}).get('arguments', {})
                         if func_name in AVAILABLE_TOOLS:
-                            yield f"data: {json.dumps({'status': f'Executing {func_name}...'})}\n\n"
-                            result = AVAILABLE_TOOLS[func_name](**args)
-                            current_messages.append({"role": "tool", "content": str(result), "name": func_name})
+                            # CRITICAL: Keep connection alive during potentially slow tool execution
+                            yield f"data: {json.dumps({'status': f'AI is executing {func_name}...'})}\n\n"
+                            try:
+                                result = AVAILABLE_TOOLS[func_name](**args)
+                                # Send result update to keep heartbeat
+                                yield f"data: {json.dumps({'status': f'Tool {func_name} completed.'})}\n\n"
+                                current_messages.append({"role": "tool", "content": str(result), "name": func_name})
+                            except Exception as tool_e:
+                                error_msg = f"Error executing tool {func_name}: {str(tool_e)}"
+                                print(f"DEBUG: {error_msg}")
+                                current_messages.append({"role": "tool", "content": error_msg, "name": func_name})
+                                yield f"data: {json.dumps({'status': 'Tool failed, handling error...'})}\n\n"
                 except Exception as e:
                     yield f"data: {json.dumps({'error': str(e)})}\n\n"
                     return
