@@ -107,6 +107,9 @@ def chat():
                             return
 
                     yield f"data: {json.dumps({'status': 'Ollama reached, waiting for response...'})}\n\n"
+                    import time
+                    start_time = time.time()
+                    
                     res = requests.post(f"{OLLAMA_API}/chat", json={
                         "model": model,
                         "messages": current_messages,
@@ -117,21 +120,27 @@ def chat():
                     tool_calls = []
                     turn_assistant_message = {"role": "assistant", "content": ""}
                     
-                    for line in res.iter_lines(chunk_size=1, decode_unicode=True):
+                    # Optimized stream reading (None lets requests handle buffering)
+                    for line in res.iter_lines(decode_unicode=True):
                         if line:
-                            chunk = json.loads(line)
-                            msg_chunk = chunk.get('message', {})
-                            if msg_chunk.get('tool_calls'):
-                                tool_calls.extend(msg_chunk['tool_calls'])
-                            content = msg_chunk.get('content', '')
-                            if content:
-                                turn_assistant_message['content'] += content
-                                assistant_full_content += content
-                                yield f"data: {json.dumps({'content': content})}\n\n"
-                            if chunk.get('done'): break
+                            try:
+                                chunk = json.loads(line)
+                                msg_chunk = chunk.get('message', {})
+                                if msg_chunk.get('tool_calls'):
+                                    tool_calls.extend(msg_chunk['tool_calls'])
+                                content = msg_chunk.get('content', '')
+                                if content:
+                                    turn_assistant_message['content'] += content
+                                    assistant_full_content += content
+                                    yield f"data: {json.dumps({'content': content})}\n\n"
+                                if chunk.get('done'): break
+                            except Exception as json_e:
+                                print(f"DEBUG: JSON parse error in stream: {json_e}")
+                                continue
                         else:
                             yield ": heartbeat\n\n"
                     
+                    print(f"DEBUG: Ollama thinking time: {time.time() - start_time:.2f}s")
                     if not tool_calls:
                         if assistant_full_content:
                             db_conn = get_db()
