@@ -93,7 +93,10 @@ def chat():
                 current_messages = messages.copy()
                 
             if not any(m.get('role') == 'system' for m in current_messages):
-                current_messages.insert(0, {"role": "system", "content": SYSTEM_PROMPT})
+                if should_send_tools:
+                    current_messages.insert(0, {"role": "system", "content": SYSTEM_PROMPT})
+                else:
+                    current_messages.insert(0, {"role": "system", "content": "You are the EasyLin AI Assistant, a helpful Linux server companion. Answer general questions in a friendly, conversational way, keeping responses brief."})
                 
             assistant_full_content = ""
             
