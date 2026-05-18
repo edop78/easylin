@@ -152,7 +152,7 @@ def chat():
                     payload = {
                         "model": model,
                         "messages": current_messages,
-                        "stream": True
+                        "stream": not should_send_tools # Disable streaming when tools are active to get perfect structured tool calls
                     }
                     if should_send_tools:
                         payload["tools"] = active_tools
