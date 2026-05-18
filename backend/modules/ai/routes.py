@@ -197,32 +197,31 @@ def chat():
                     print(f"DEBUG: Ollama thinking time: {time.time() - start_time:.2f}s")
                     
                     # Fallback text-based tool call parser (in case the model or Ollama outputs raw JSON/markdown instead of structured tool calls)
+                    # Fallback text-based tool call parser (in case the model or Ollama outputs raw JSON/markdown instead of structured tool calls)
                     if not tool_calls:
                         import re
-                        parsed_list = None
+                        parsed_list = []
                         
-                        # Case 1: JSON array of tool calls: ```json [ ... ] ``` or raw [ ... ]
-                        array_match = re.search(r'```json\s*(\[.*?\])\s*```', assistant_full_content, re.DOTALL)
-                        if not array_match:
-                            array_match = re.search(r'(\[.*?\])', assistant_full_content, re.DOTALL)
-                            
-                        if array_match:
+                        # Case 1: Find all JSON arrays in the response (e.g. [[...]] or multiple [...] [...])
+                        array_matches = re.findall(r'(\[.*?\])', assistant_full_content, re.DOTALL)
+                        for array_str in array_matches:
                             try:
-                                parsed_list = json.loads(array_match.group(1).strip())
+                                items = json.loads(array_str.strip())
+                                if isinstance(items, list):
+                                    parsed_list.extend(items)
                             except Exception as array_e:
-                                print(f"DEBUG: Failed to parse array fallback: {array_e}")
+                                print(f"DEBUG: Failed to parse array fallback chunk: {array_e}")
                                 
-                        # Case 2: Single JSON object tool call: ```json { ... } ``` or raw { ... }
+                        # Case 2: Find all JSON objects in the response if no arrays were found
                         if not parsed_list:
-                            json_match = re.search(r'```json\s*(\{.*?\})\s*```', assistant_full_content, re.DOTALL)
-                            if not json_match:
-                                json_match = re.search(r'(\{.*?"name"\s*:\s*".*?"\s*,\s*"arguments"\s*:\s*\{.*?\}\s*\})', assistant_full_content, re.DOTALL)
-                            if json_match:
+                            object_matches = re.findall(r'(\{.*?\})', assistant_full_content, re.DOTALL)
+                            for obj_str in object_matches:
                                 try:
-                                    parsed_obj = json.loads(json_match.group(1).strip())
-                                    parsed_list = [parsed_obj]
-                                except Exception as obj_e:
-                                    print(f"DEBUG: Failed to parse object fallback: {obj_e}")
+                                    item = json.loads(obj_str.strip())
+                                    if isinstance(item, dict) and (item.get('name') or item.get('function') or item.get('type') == 'function'):
+                                        parsed_list.append(item)
+                                except Exception:
+                                    pass
                                     
                         # Case 3: Text function call with JSON arguments: function_name { ... }
                         if not parsed_list:
@@ -230,7 +229,6 @@ def chat():
                             if text_match:
                                 try:
                                     func_name = text_match.group(1).strip()
-                                    # Ensure it matches one of our actual available tools to prevent matching random text
                                     if func_name in AVAILABLE_TOOLS:
                                         func_args = json.loads(text_match.group(2).strip())
                                         parsed_list = [{
@@ -254,9 +252,13 @@ def chat():
                                     
                                 # Generic parameter / properties fallbacks
                                 if func_args is None:
-                                    func_args = parsed_tool.get('parameters', {}).get('properties') or parsed_tool.get('properties')
+                                    func_args = parsed_tool.get('parameters', {}).get('properties') or parsed_tool.get('properties') or parsed_tool.get('parameters', {})
                                     
-                                if func_name and func_args is not None:
+                                # CRITICAL FIX: Default empty arguments to {} if they are None (so parameterless tools are never discarded)
+                                if func_args is None:
+                                    func_args = {}
+                                    
+                                if func_name:
                                     tool_calls.append({
                                         'id': f'call_fallback_{idx}',
                                         'type': 'function',
