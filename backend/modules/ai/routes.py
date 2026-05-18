@@ -152,7 +152,7 @@ def chat():
                     payload = {
                         "model": model,
                         "messages": current_messages,
-                        "stream": not should_send_tools, # Disable streaming when tools are active to get perfect structured tool calls
+                        "stream": True, # Always enable streaming to keep connection active and prevent reverse proxy / browser network timeouts on slow CPU prefill
                         "options": {
                             "temperature": 0.0
                         }
