@@ -17,6 +17,8 @@ const MAINTENANCE_TASKS = [
   { id: 'vacuum-logs', cat: 'clean', name: 'Clean Logs', icon: Trash2, desc: 'Deletes system logs older than 7 days to free up space.', color: 'cyan' },
   { id: 'purge-configs', cat: 'clean', name: 'Purge Configs', icon: Trash2, desc: 'Removes residual configuration files from uninstalled packages.', color: 'amber' },
   { id: 'docker-prune', cat: 'clean', name: 'Docker Prune', icon: Trash2, desc: 'Removes all unused Docker containers, networks, and images.', color: 'blue' },
+  { id: 'docker-volume-prune', cat: 'clean', name: 'Docker Volume Prune', icon: Trash2, desc: 'Removes all unused Docker volumes to reclaim storage.', color: 'blue' },
+  { id: 'docker-builder-prune', cat: 'clean', name: 'Docker Build Cache Prune', icon: Trash2, desc: 'Clears the Docker BuildKit cache to reclaim hidden build space.', color: 'blue' },
 ];
 
 export default function UpdateClean() {

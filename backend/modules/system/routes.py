@@ -378,7 +378,9 @@ def maintenance_action():
         "clean": "apt-get clean",
         "vacuum-logs": "journalctl --vacuum-time=7d",
         "purge-configs": "dpkg -l | grep '^rc' | awk '{print $2}' | xargs -r dpkg --purge",
-        "docker-prune": "docker system prune -f"
+        "docker-prune": "docker system prune -f",
+        "docker-volume-prune": "docker volume prune -f",
+        "docker-builder-prune": "docker builder prune -a -f"
     }
     
     cmd = commands.get(command_id)
@@ -423,7 +425,9 @@ MAINTENANCE_COMMANDS = {
     "clean": "apt-get clean",
     "vacuum-logs": "journalctl --vacuum-time=7d",
     "purge-configs": "dpkg -l | grep '^rc' | awk '{print $2}' | xargs -r dpkg --purge",
-    "docker-prune": "docker system prune -f"
+    "docker-prune": "docker system prune -f",
+    "docker-volume-prune": "docker volume prune -f",
+    "docker-builder-prune": "docker builder prune -a -f"
 }
 
 class MaintenanceTaskManager:
