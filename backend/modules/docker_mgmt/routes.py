@@ -646,6 +646,10 @@ def parse_docker_run(command_str):
         cmd = cmd[7:].strip()
     if cmd.startswith("run "):
         cmd = cmd[4:].strip()
+    elif cmd.startswith("pull "):
+        cmd = cmd[5:].strip()
+    elif cmd.startswith("create "):
+        cmd = cmd[7:].strip()
         
     try:
         args = shlex.split(cmd)
