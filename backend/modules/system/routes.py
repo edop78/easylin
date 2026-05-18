@@ -410,10 +410,10 @@ import threading
 MAINTENANCE_COMMANDS = {
     # Updates
     "update": "DEBIAN_FRONTEND=noninteractive apt-get update",
-    "upgrade": "DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
-    "full-upgrade": "DEBIAN_FRONTEND=noninteractive apt-get full-upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
-    "dist-upgrade": "DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
-    "fix-broken": "DEBIAN_FRONTEND=noninteractive apt-get install -f -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
+    "upgrade": "apt-mark hold docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
+    "full-upgrade": "apt-mark hold docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && DEBIAN_FRONTEND=noninteractive apt-get full-upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
+    "dist-upgrade": "apt-mark hold docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
+    "fix-broken": "apt-mark hold docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && DEBIAN_FRONTEND=noninteractive apt-get install -f -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
     "fix-dpkg": "dpkg --configure -a",
     "release-upgrade": "do-release-upgrade -f DistUpgradeViewNonInteractive",
     "release-upgrade-dev": "do-release-upgrade -d -f DistUpgradeViewNonInteractive",
