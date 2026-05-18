@@ -27,10 +27,34 @@ export default function UpdateClean() {
 
   const runTask = async (task) => {
     setRunning(task.id);
-    setResult(null);
+    setResult({ success: true, stdout: 'Initializing task stream...\n', stderr: '', task: task.name });
+    let fullStdout = '';
+    let fullStderr = '';
     try {
-      const response = await api.post('/system/maintenance', { command: task.id });
-      setResult({ ...response, task: task.name });
+      await api.stream('/system/maintenance/stream', { command: task.id }, (chunk) => {
+        if (chunk.stdout) {
+          fullStdout += chunk.stdout;
+          setResult(prev => ({
+            ...prev,
+            stdout: fullStdout
+          }));
+        }
+        if (chunk.stderr) {
+          fullStderr += chunk.stderr;
+          setResult(prev => ({
+            ...prev,
+            stderr: fullStderr
+          }));
+        }
+        if (chunk.done) {
+          setResult(prev => ({
+            ...prev,
+            success: chunk.success,
+            stdout: chunk.stdout !== undefined && chunk.stdout !== '' ? chunk.stdout : fullStdout,
+            stderr: chunk.stderr !== undefined && chunk.stderr !== '' ? chunk.stderr : fullStderr
+          }));
+        }
+      });
     } catch (err) {
       setResult({ success: false, stderr: err.message, task: task.name });
     } finally {

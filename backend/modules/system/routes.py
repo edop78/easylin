@@ -358,17 +358,17 @@ def maintenance_action():
     
     commands = {
         # Updates
-        "update": "apt-get update",
-        "upgrade": "apt-get upgrade -y",
-        "full-upgrade": "apt-get full-upgrade -y",
-        "dist-upgrade": "apt-get dist-upgrade -y",
-        "fix-broken": "apt-get install -f -y",
+        "update": "DEBIAN_FRONTEND=noninteractive apt-get update",
+        "upgrade": "DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
+        "full-upgrade": "DEBIAN_FRONTEND=noninteractive apt-get full-upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
+        "dist-upgrade": "DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
+        "fix-broken": "DEBIAN_FRONTEND=noninteractive apt-get install -f -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
         "fix-dpkg": "dpkg --configure -a",
         "release-upgrade": "do-release-upgrade -f DistUpgradeViewNonInteractive",
         "release-upgrade-dev": "do-release-upgrade -d -f DistUpgradeViewNonInteractive",
         
         # Cleaning
-        "autoremove": "apt-get autoremove -y",
+        "autoremove": "DEBIAN_FRONTEND=noninteractive apt-get autoremove -y",
         "clean": "apt-get clean",
         "vacuum-logs": "journalctl --vacuum-time=7d",
         "purge-configs": "dpkg -l | grep '^rc' | awk '{print $2}' | xargs -r dpkg --purge",
@@ -398,6 +398,122 @@ def maintenance_action():
     # Ensure result has success field for frontend
     res["success"] = res.get("returncode") == 0
     return jsonify(res)
+
+@system_bp.route("/maintenance/stream", methods=["POST"])
+@jwt_required()
+def maintenance_action_stream():
+    """Stream tasks from the Update & Clean page to prevent timeouts."""
+    from flask import Response
+    import subprocess
+    import shlex
+    
+    data = request.get_json()
+    command_id = data.get("command")
+    
+    commands = {
+        # Updates
+        "update": "DEBIAN_FRONTEND=noninteractive apt-get update",
+        "upgrade": "DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
+        "full-upgrade": "DEBIAN_FRONTEND=noninteractive apt-get full-upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
+        "dist-upgrade": "DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
+        "fix-broken": "DEBIAN_FRONTEND=noninteractive apt-get install -f -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
+        "fix-dpkg": "dpkg --configure -a",
+        "release-upgrade": "do-release-upgrade -f DistUpgradeViewNonInteractive",
+        "release-upgrade-dev": "do-release-upgrade -d -f DistUpgradeViewNonInteractive",
+        
+        # Cleaning
+        "autoremove": "DEBIAN_FRONTEND=noninteractive apt-get autoremove -y",
+        "clean": "apt-get clean",
+        "vacuum-logs": "journalctl --vacuum-time=7d",
+        "purge-configs": "dpkg -l | grep '^rc' | awk '{print $2}' | xargs -r dpkg --purge",
+        "docker-prune": "docker system prune -f"
+    }
+    
+    cmd = commands.get(command_id)
+    if not cmd:
+        return jsonify({"success": False, "stderr": f"Unknown command: {command_id}"}), 400
+
+    def generate():
+        yield f"data: {json.dumps({'stdout': f'Starting maintenance task: {command_id}...\n'})}\n\n"
+        
+        output_buffer = []
+        full_cmd = cmd
+        if Config.IN_DOCKER:
+            full_cmd = f"nsenter --target 1 --mount --uts --ipc --net --pid -- /bin/bash -c {shlex.quote(cmd)}"
+            
+        try:
+            process = subprocess.Popen(
+                full_cmd,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                universal_newlines=True
+            )
+            
+            for line in iter(process.stdout.readline, ""):
+                output_buffer.append(line)
+                yield f"data: {json.dumps({'stdout': line})}\n\n"
+                
+            process.stdout.close()
+            returncode = process.wait()
+            
+            full_output = "".join(output_buffer)
+            
+            # Auto-repair if dpkg was interrupted
+            if returncode != 0 and "dpkg was interrupted" in full_output:
+                yield f"data: {json.dumps({'stdout': '\n[Auto-Fix] Rilevato blocco dpkg. Esecuzione di dpkg --configure -a in corso...\n'})}\n\n"
+                
+                repair_cmd = "dpkg --configure -a"
+                if Config.IN_DOCKER:
+                    repair_cmd = f"nsenter --target 1 --mount --uts --ipc --net --pid -- {repair_cmd}"
+                    
+                repair_proc = subprocess.Popen(
+                    repair_cmd,
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    universal_newlines=True
+                )
+                
+                for line in iter(repair_proc.stdout.readline, ""):
+                    yield f"data: {json.dumps({'stdout': f'[Auto-Fix] {line}'})}\n\n"
+                    
+                repair_proc.stdout.close()
+                repair_rc = repair_proc.wait()
+                
+                if repair_rc == 0:
+                    yield f"data: {json.dumps({'stdout': '\n[Auto-Fix] Ripristino completato con successo! Riavvio del comando originale...\n\n'})}\n\n"
+                    
+                    # Riprova il comando originale dopo il fix
+                    process2 = subprocess.Popen(
+                        full_cmd,
+                        shell=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        bufsize=1,
+                        universal_newlines=True
+                    )
+                    
+                    for line in iter(process2.stdout.readline, ""):
+                        yield f"data: {json.dumps({'stdout': line})}\n\n"
+                        
+                    process2.stdout.close()
+                    returncode = process2.wait()
+                else:
+                    yield f"data: {json.dumps({'stdout': '\n[Auto-Fix Failed] Tentativo di ripristino automatico fallito.\n'})}\n\n"
+            
+            success = (returncode == 0)
+            yield f"data: {json.dumps({'done': True, 'success': success, 'stdout': ''})}\n\n"
+            
+        except Exception as e:
+            yield f"data: {json.dumps({'done': True, 'success': False, 'stderr': str(e)})}\n\n"
+
+    return Response(generate(), mimetype='text/event-stream')
 
 @system_bp.route("/apt-clean", methods=["POST"])
 @jwt_required()
