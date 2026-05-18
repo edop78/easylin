@@ -93,7 +93,13 @@ def chat():
             # Immediate heartbeat to prevent 504 Gateway Timeout
             yield f"data: {json.dumps({'status': 'AI Agent initializing...'})}\n\n"
             
-            current_messages = messages.copy()
+            # Sliding memory window: send only the last 5 messages to Ollama to keep CPU context small
+            sliding_window_size = 5
+            if len(messages) > sliding_window_size:
+                current_messages = messages[-sliding_window_size:]
+            else:
+                current_messages = messages.copy()
+                
             if not any(m.get('role') == 'system' for m in current_messages):
                 current_messages.insert(0, {"role": "system", "content": SYSTEM_PROMPT})
                 
