@@ -380,6 +380,21 @@ def maintenance_action():
         return jsonify({"success": False, "stderr": f"Unknown command: {command_id}"}), 400
         
     res = run_host_command(cmd)
+
+    # Auto-repair if dpkg was interrupted (common Debian/Ubuntu package manager lock/crash issue)
+    err_msg = (res.get("stderr") or "") + (res.get("stdout") or "")
+    if res.get("returncode") != 0 and "dpkg was interrupted" in err_msg:
+        # Tenta di eseguire dpkg --configure -a in automatico sull'host
+        repair_res = run_host_command("dpkg --configure -a")
+        if repair_res.get("returncode") == 0:
+            # Riprova il comando originale dopo il fix
+            res = run_host_command(cmd)
+            # Aggiunge una nota informativa all'output
+            res["stdout"] = f"[Auto-Fix] Rilevato blocco 'dpkg was interrupted'. Risolto automaticamente con 'dpkg --configure -a'.\n\n" + (res.get("stdout") or "")
+        else:
+            # Se anche il ripristino automatico fallisce, segnalalo con i dettagli per aiutare la diagnostica
+            res["stderr"] = (res.get("stderr") or "") + f"\n\n[Auto-Fix Failed] Tentativo di ripristino automatico fallito:\n{repair_res.get('stderr') or repair_res.get('stdout')}"
+            
     # Ensure result has success field for frontend
     res["success"] = res.get("returncode") == 0
     return jsonify(res)
