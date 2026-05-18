@@ -7,6 +7,12 @@ import datetime
 import os
 import sys
 import json
+import subprocess
+import shlex
+try:
+    from config import Config
+except ImportError:
+    from backend.config import Config
 
 system_bp = Blueprint("system", __name__)
 
@@ -404,12 +410,6 @@ def maintenance_action():
 def maintenance_action_stream():
     """Stream tasks from the Update & Clean page to prevent timeouts."""
     from flask import Response
-    import subprocess
-    import shlex
-    try:
-        from config import Config
-    except ImportError:
-        from backend.config import Config
     
     data = request.get_json()
     command_id = data.get("command")
@@ -438,15 +438,15 @@ def maintenance_action_stream():
         return jsonify({"success": False, "stderr": f"Unknown command: {command_id}"}), 400
 
     def generate():
-        start_payload = {'stdout': f'Starting maintenance task: {command_id}...\n'}
-        yield f"data: {json.dumps(start_payload)}\n\n"
-        
-        output_buffer = []
-        full_cmd = cmd
-        if Config.IN_DOCKER:
-            full_cmd = f"nsenter --target 1 --mount --uts --ipc --net --pid -- /bin/bash -c {shlex.quote(cmd)}"
-            
         try:
+            start_payload = {'stdout': f'Starting maintenance task: {command_id}...\n'}
+            yield f"data: {json.dumps(start_payload)}\n\n"
+            
+            output_buffer = []
+            full_cmd = cmd
+            if Config.IN_DOCKER:
+                full_cmd = f"nsenter --target 1 --mount --uts --ipc --net --pid -- /bin/bash -c {shlex.quote(cmd)}"
+                
             process = subprocess.Popen(
                 full_cmd,
                 shell=True,
