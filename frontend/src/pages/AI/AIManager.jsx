@@ -602,12 +602,12 @@ export default function AIManager() {
       {/* Model Selection Modal (Timezone Style) */}
       {tzModal && (
         <div className="modal-overlay fade-in" onClick={() => setTzModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px' }}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
             <div className="modal-header">
               <div className="modal-title"><Package size={18} /> Select Model from Library</div>
               <button className="btn btn-sm btn-ghost" onClick={() => setTzModal(false)}><X size={16} /></button>
             </div>
-            <div className="modal-body" style={{ maxHeight: '450px', overflowY: 'auto', padding: '12px' }}>
+            <div className="modal-body" style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 24px 20px' }}>
               <div className="tz-list">
                 {SUGGESTED_MODELS.map(m => (
                   <div key={m.id} 
