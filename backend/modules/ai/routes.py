@@ -244,24 +244,30 @@ def chat():
                                 if isinstance(item, list):
                                     parsed_list.extend(item)
                                 elif isinstance(item, dict):
-                                    parsed_list.append(item)
+                                    # ONLY keep if it is a tool call object, not a flat arguments map
+                                    if item.get('name') or item.get('function') or item.get('type') == 'function':
+                                        parsed_list.append(item)
                             except Exception as block_e:
                                 print(f"DEBUG: Failed to parse balanced block: {block_e}")
                                 
                         # Case 3: Text function call fallback: function_name { ... }
                         if not parsed_list:
-                            text_match = re.search(r'([a-zA-Z_][a-zA-Z0-9_]*)\s*(\{.*?\})', assistant_full_content, re.DOTALL)
+                            text_match = re.search(r'([a-zA-Z_][a-zA-Z0-9_]*)\s*(\{)', assistant_full_content)
                             if text_match:
-                                try:
-                                    func_name = text_match.group(1).strip()
-                                    if func_name in AVAILABLE_TOOLS:
-                                        func_args = json.loads(text_match.group(2).strip())
-                                        parsed_list = [{
-                                            'name': func_name,
-                                            'arguments': func_args
-                                        }]
-                                except Exception as text_e:
-                                    print(f"DEBUG: Failed to parse text match fallback: {text_e}")
+                                func_name = text_match.group(1).strip()
+                                if func_name in AVAILABLE_TOOLS:
+                                    start_idx = text_match.start(2)
+                                    subtext = assistant_full_content[start_idx:]
+                                    subblocks = extract_json_blocks(subtext)
+                                    if subblocks:
+                                        try:
+                                            func_args = json.loads(subblocks[0].strip())
+                                            parsed_list = [{
+                                                'name': func_name,
+                                                'arguments': func_args
+                                            }]
+                                        except Exception as text_e:
+                                            print(f"DEBUG: Failed to parse text match fallback: {text_e}")
                                     
                         if parsed_list and isinstance(parsed_list, list):
                             tool_calls = []
