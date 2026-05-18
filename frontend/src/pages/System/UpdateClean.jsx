@@ -27,34 +27,37 @@ export default function UpdateClean() {
 
   const runTask = async (task) => {
     setRunning(task.id);
-    setResult({ success: true, stdout: 'Initializing task stream...\n', stderr: '', task: task.name });
-    let fullStdout = '';
-    let fullStderr = '';
+    setResult({ success: true, stdout: 'Starting maintenance task...\n', stderr: '', task: task.name });
+    
     try {
-      await api.stream('/system/maintenance/stream', { command: task.id }, (chunk) => {
-        if (chunk.stdout) {
-          fullStdout += chunk.stdout;
+      // 1. Start the asynchronous background task on the server
+      const startRes = await api.post('/system/maintenance/start', { command: task.id });
+      if (!startRes.success) {
+        throw new Error(startRes.error || 'Failed to start task');
+      }
+
+      // 2. Poll the status GET endpoint every 1.5 seconds until the task completes
+      let polling = true;
+      while (polling) {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        const statusRes = await api.get(`/system/maintenance/status/${task.id}`);
+        
+        setResult(prev => ({
+          ...prev,
+          stdout: statusRes.stdout || '',
+          success: statusRes.success !== false
+        }));
+
+        if (!statusRes.running) {
+          polling = false;
           setResult(prev => ({
             ...prev,
-            stdout: fullStdout
+            success: statusRes.success,
+            stdout: statusRes.stdout || ''
           }));
         }
-        if (chunk.stderr) {
-          fullStderr += chunk.stderr;
-          setResult(prev => ({
-            ...prev,
-            stderr: fullStderr
-          }));
-        }
-        if (chunk.done) {
-          setResult(prev => ({
-            ...prev,
-            success: chunk.success,
-            stdout: chunk.stdout !== undefined && chunk.stdout !== '' ? chunk.stdout : fullStdout,
-            stderr: chunk.stderr !== undefined && chunk.stderr !== '' ? chunk.stderr : fullStderr
-          }));
-        }
-      });
+      }
     } catch (err) {
       setResult({ success: false, stderr: err.message, task: task.name });
     } finally {

@@ -405,79 +405,78 @@ def maintenance_action():
     res["success"] = res.get("returncode") == 0
     return jsonify(res)
 
-@system_bp.route("/maintenance/stream", methods=["POST"])
-@jwt_required()
-def maintenance_action_stream():
-    """Stream tasks from the Update & Clean page to prevent timeouts."""
-    from flask import Response
-    
-    data = request.get_json()
-    command_id = data.get("command")
-    
-    commands = {
-        # Updates
-        "update": "DEBIAN_FRONTEND=noninteractive apt-get update",
-        "upgrade": "DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
-        "full-upgrade": "DEBIAN_FRONTEND=noninteractive apt-get full-upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
-        "dist-upgrade": "DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
-        "fix-broken": "DEBIAN_FRONTEND=noninteractive apt-get install -f -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
-        "fix-dpkg": "dpkg --configure -a",
-        "release-upgrade": "do-release-upgrade -f DistUpgradeViewNonInteractive",
-        "release-upgrade-dev": "do-release-upgrade -d -f DistUpgradeViewNonInteractive",
-        
-        # Cleaning
-        "autoremove": "DEBIAN_FRONTEND=noninteractive apt-get autoremove -y",
-        "clean": "apt-get clean",
-        "vacuum-logs": "journalctl --vacuum-time=7d",
-        "purge-configs": "dpkg -l | grep '^rc' | awk '{print $2}' | xargs -r dpkg --purge",
-        "docker-prune": "docker system prune -f"
-    }
-    
-    cmd = commands.get(command_id)
-    if not cmd:
-        return jsonify({"success": False, "stderr": f"Unknown command: {command_id}"}), 400
+import threading
 
-    def generate():
+MAINTENANCE_COMMANDS = {
+    # Updates
+    "update": "DEBIAN_FRONTEND=noninteractive apt-get update",
+    "upgrade": "DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
+    "full-upgrade": "DEBIAN_FRONTEND=noninteractive apt-get full-upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
+    "dist-upgrade": "DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
+    "fix-broken": "DEBIAN_FRONTEND=noninteractive apt-get install -f -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
+    "fix-dpkg": "dpkg --configure -a",
+    "release-upgrade": "do-release-upgrade -f DistUpgradeViewNonInteractive",
+    "release-upgrade-dev": "do-release-upgrade -d -f DistUpgradeViewNonInteractive",
+    
+    # Cleaning
+    "autoremove": "DEBIAN_FRONTEND=noninteractive apt-get autoremove -y",
+    "clean": "apt-get clean",
+    "vacuum-logs": "journalctl --vacuum-time=7d",
+    "purge-configs": "dpkg -l | grep '^rc' | awk '{print $2}' | xargs -r dpkg --purge",
+    "docker-prune": "docker system prune -f"
+}
+
+class MaintenanceTaskManager:
+    def __init__(self):
+        self.active_task = None
+        self.lock = threading.Lock()
+        
+        # Persistent storage for task logs
+        if os.path.exists("/app/data"):
+            self.logs_dir = "/app/data/maintenance_logs"
+        else:
+            self.logs_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../maintenance_logs"))
+            
+        os.makedirs(self.logs_dir, exist_ok=True)
+
+    def get_log_path(self, task_id):
+        return os.path.join(self.logs_dir, f"{task_id}.log")
+
+    def start_task(self, task_id, cmd):
+        with self.lock:
+            # Check if there is an active running task
+            if self.active_task and self.active_task.get("status") == "running":
+                return False, "Un'altra attività di manutenzione è già in corso."
+
+            self.active_task = {
+                "task_id": task_id,
+                "status": "running",
+                "success": None,
+                "start_time": datetime.datetime.now().isoformat()
+            }
+            
+            # Clear previous log file
+            log_path = self.get_log_path(task_id)
+            with open(log_path, "w", encoding="utf-8") as f:
+                f.write(f"=== Starting maintenance task: {task_id} ===\n\n")
+
+            # Start thread
+            thread = threading.Thread(target=self._run_task, args=(task_id, cmd))
+            thread.daemon = True
+            thread.start()
+            return True, "Attività avviata."
+
+    def _run_task(self, task_id, cmd):
+        log_path = self.get_log_path(task_id)
+        
+        full_cmd = cmd
+        if Config.IN_DOCKER:
+            full_cmd = f"nsenter --target 1 --mount --uts --ipc --net --pid -- /bin/bash -c {shlex.quote(cmd)}"
+
         try:
-            start_payload = {'stdout': f'Starting maintenance task: {command_id}...\n'}
-            yield f"data: {json.dumps(start_payload)}\n\n"
-            
-            output_buffer = []
-            full_cmd = cmd
-            if Config.IN_DOCKER:
-                full_cmd = f"nsenter --target 1 --mount --uts --ipc --net --pid -- /bin/bash -c {shlex.quote(cmd)}"
-                
-            process = subprocess.Popen(
-                full_cmd,
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-                universal_newlines=True
-            )
-            
-            for line in iter(process.stdout.readline, ""):
-                output_buffer.append(line)
-                payload = {'stdout': line}
-                yield f"data: {json.dumps(payload)}\n\n"
-                
-            process.stdout.close()
-            returncode = process.wait()
-            
-            full_output = "".join(output_buffer)
-            
-            # Auto-repair if dpkg was interrupted
-            if returncode != 0 and "dpkg was interrupted" in full_output:
-                repair_payload = {'stdout': '\n[Auto-Fix] Rilevato blocco dpkg. Esecuzione di dpkg --configure -a in corso...\n'}
-                yield f"data: {json.dumps(repair_payload)}\n\n"
-                
-                repair_cmd = "dpkg --configure -a"
-                if Config.IN_DOCKER:
-                    repair_cmd = f"nsenter --target 1 --mount --uts --ipc --net --pid -- {repair_cmd}"
-                    
-                repair_proc = subprocess.Popen(
-                    repair_cmd,
+            with open(log_path, "a", encoding="utf-8", buffering=1) as log_file:
+                process = subprocess.Popen(
+                    full_cmd,
                     shell=True,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
@@ -486,20 +485,29 @@ def maintenance_action_stream():
                     universal_newlines=True
                 )
                 
-                for line in iter(repair_proc.stdout.readline, ""):
-                    payload = {'stdout': f'[Auto-Fix] {line}'}
-                    yield f"data: {json.dumps(payload)}\n\n"
+                for line in iter(process.stdout.readline, ""):
+                    log_file.write(line)
+                    log_file.flush()
                     
-                repair_proc.stdout.close()
-                repair_rc = repair_proc.wait()
+                process.stdout.close()
+                returncode = process.wait()
                 
-                if repair_rc == 0:
-                    success_payload = {'stdout': '\n[Auto-Fix] Ripristino completato con successo! Riavvio del comando originale...\n\n'}
-                    yield f"data: {json.dumps(success_payload)}\n\n"
+                full_output = ""
+                if os.path.exists(log_path):
+                    with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+                        full_output = f.read()
+
+                # Auto-repair if dpkg was interrupted
+                if returncode != 0 and "dpkg was interrupted" in full_output:
+                    log_file.write("\n[Auto-Fix] Rilevato blocco dpkg. Esecuzione di dpkg --configure -a in corso...\n")
+                    log_file.flush()
                     
-                    # Riprova il comando originale dopo il fix
-                    process2 = subprocess.Popen(
-                        full_cmd,
+                    repair_cmd = "dpkg --configure -a"
+                    if Config.IN_DOCKER:
+                        repair_cmd = f"nsenter --target 1 --mount --uts --ipc --net --pid -- {repair_cmd}"
+                        
+                    repair_proc = subprocess.Popen(
+                        repair_cmd,
                         shell=True,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.STDOUT,
@@ -508,28 +516,104 @@ def maintenance_action_stream():
                         universal_newlines=True
                     )
                     
-                    for line in iter(process2.stdout.readline, ""):
-                        payload = {'stdout': line}
-                        yield f"data: {json.dumps(payload)}\n\n"
+                    for line in iter(repair_proc.stdout.readline, ""):
+                        log_file.write(f"[Auto-Fix] {line}")
+                        log_file.flush()
                         
-                    process2.stdout.close()
-                    returncode = process2.wait()
-                else:
-                    fail_payload = {'stdout': '\n[Auto-Fix Failed] Tentativo di ripristino automatico fallito.\n'}
-                    yield f"data: {json.dumps(fail_payload)}\n\n"
-            
-            success = (returncode == 0)
-            done_payload = {'done': True, 'success': success, 'stdout': ''}
-            yield f"data: {json.dumps(done_payload)}\n\n"
-            
+                    repair_proc.stdout.close()
+                    repair_rc = repair_proc.wait()
+                    
+                    if repair_rc == 0:
+                        log_file.write("\n[Auto-Fix] Ripristino completato con successo! Riavvio del comando originale...\n\n")
+                        log_file.flush()
+                        
+                        # Riprova il comando originale dopo il fix
+                        process2 = subprocess.Popen(
+                            full_cmd,
+                            shell=True,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT,
+                            text=True,
+                            bufsize=1,
+                            universal_newlines=True
+                        )
+                        
+                        for line in iter(process2.stdout.readline, ""):
+                            log_file.write(line)
+                            log_file.flush()
+                            
+                        process2.stdout.close()
+                        returncode = process2.wait()
+                    else:
+                        log_file.write("\n[Auto-Fix Failed] Tentativo di ripristino automatico fallito.\n")
+                        log_file.flush()
+                
+                success = (returncode == 0)
+                
+            with self.lock:
+                if self.active_task and self.active_task["task_id"] == task_id:
+                    self.active_task["status"] = "done"
+                    self.active_task["success"] = success
+                    self.active_task["end_time"] = datetime.datetime.now().isoformat()
+                    
         except Exception as e:
-            err_payload = {'done': True, 'success': False, 'stderr': str(e)}
-            yield f"data: {json.dumps(err_payload)}\n\n"
+            try:
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write(f"\nExecution error: {str(e)}\n")
+            except:
+                pass
+            with self.lock:
+                if self.active_task and self.active_task["task_id"] == task_id:
+                    self.active_task["status"] = "done"
+                    self.active_task["success"] = False
+                    self.active_task["end_time"] = datetime.datetime.now().isoformat()
 
-    response = Response(generate(), mimetype='text/event-stream')
-    response.headers['X-Accel-Buffering'] = 'no'
-    response.headers['Cache-Control'] = 'no-cache'
-    return response
+    def get_status(self, task_id):
+        with self.lock:
+            log_path = self.get_log_path(task_id)
+            log_content = ""
+            if os.path.exists(log_path):
+                try:
+                    with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+                        log_content = f.read()
+                except Exception as e:
+                    log_content = f"Error reading log file: {str(e)}"
+            
+            is_running = (self.active_task and self.active_task["task_id"] == task_id and self.active_task["status"] == "running")
+            success = self.active_task["success"] if (self.active_task and self.active_task["task_id"] == task_id) else None
+            
+            return {
+                "task_id": task_id,
+                "running": is_running,
+                "success": success,
+                "stdout": log_content
+            }
+
+task_manager = MaintenanceTaskManager()
+
+@system_bp.route("/maintenance/start", methods=["POST"])
+@jwt_required()
+def maintenance_start():
+    """Start a maintenance task in a background worker thread."""
+    data = request.get_json()
+    command_id = data.get("command")
+    
+    cmd = MAINTENANCE_COMMANDS.get(command_id)
+    if not cmd:
+        return jsonify({"success": False, "error": f"Unknown command: {command_id}"}), 400
+        
+    started, message = task_manager.start_task(command_id, cmd)
+    if not started:
+        return jsonify({"success": False, "error": message}), 409
+        
+    return jsonify({"success": True, "message": message})
+
+@system_bp.route("/maintenance/status/<task_id>", methods=["GET"])
+@jwt_required()
+def maintenance_status(task_id):
+    """Retrieve status and stdout logs of a background maintenance task."""
+    status = task_manager.get_status(task_id)
+    return jsonify(status)
 
 @system_bp.route("/apt-clean", methods=["POST"])
 @jwt_required()
