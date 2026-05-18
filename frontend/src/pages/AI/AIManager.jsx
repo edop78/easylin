@@ -41,6 +41,16 @@ export default function AIManager() {
 
   const chatEndRef = useRef(null);
 
+  // Unified model selector helper to prevent state conflicts
+  const handleSelectModel = (modelName) => {
+    setSelectedModel(modelName);
+    if (modelName) {
+      localStorage.setItem('easylin_selected_ai_model', modelName);
+    } else {
+      localStorage.removeItem('easylin_selected_ai_model');
+    }
+  };
+
   useEffect(() => {
     if (modelsData?.models?.length > 0) {
       const persistedModel = localStorage.getItem('easylin_selected_ai_model');
@@ -49,17 +59,10 @@ export default function AIManager() {
         setSelectedModel(persistedModel);
       } else if (!selectedModel) {
         const defaultModel = modelsData.models[0].name;
-        setSelectedModel(defaultModel);
-        localStorage.setItem('easylin_selected_ai_model', defaultModel);
+        handleSelectModel(defaultModel);
       }
     }
-  }, [modelsData, selectedModel]);
-
-  useEffect(() => {
-    if (selectedModel) {
-      localStorage.setItem('easylin_selected_ai_model', selectedModel);
-    }
-  }, [selectedModel]);
+  }, [modelsData]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -126,7 +129,7 @@ export default function AIManager() {
     try {
       await api.delete('/ai/delete', { data: { name } });
       refetchModels();
-      if (selectedModel === name) setSelectedModel('');
+      if (selectedModel === name) handleSelectModel('');
     } catch (err) {
       setError(err.message || "Error deleting model.");
     }
@@ -338,7 +341,7 @@ export default function AIManager() {
                        const suggestedInfo = SUGGESTED_MODELS.find(sm => m.name.startsWith(sm.id));
                        return (
                         <div key={i} className={`model-item ${selectedModel === m.name ? 'active' : ''}`} 
-                             onClick={() => setSelectedModel(m.name)}
+                             onClick={() => handleSelectModel(m.name)}
                              style={{ 
                                background: selectedModel === m.name ? 'var(--accent-blue-transparent)' : 'rgba(255,255,255,0.03)',
                                border: `1px solid ${selectedModel === m.name ? 'var(--accent-blue)' : 'var(--border-color)'}`,
