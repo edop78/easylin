@@ -288,15 +288,13 @@ export default function AIManager() {
 
             {isCustomModel && (
               <div style={{ marginBottom: '16px' }}>
-                <div className="input-wrapper" style={{ marginBottom: '8px', position: 'relative' }}>
+                <div className="input-wrapper" style={{ marginBottom: '8px', position: 'relative', paddingRight: '40px' }}>
                   <input 
-                    className="input-sm" 
                     placeholder="Enter model name..." 
                     value={customModelName}
                     onChange={(e) => setCustomModelName(e.target.value)}
-                    style={{ background: 'rgba(0,0,0,0.3)', width: '100%', paddingRight: '40px' }}
                   />
-                  <button className="btn btn-sm btn-ghost" style={{ position: 'absolute', right: '4px', top: '50%', transform: 'translateY(-50%)' }} onClick={() => { setIsCustomModel(false); setPullModel(SUGGESTED_MODELS[0].id); }}><X size={14} /></button>
+                  <button className="btn btn-sm btn-ghost" style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)' }} onClick={() => { setIsCustomModel(false); setPullModel(SUGGESTED_MODELS[0].id); }}><X size={14} /></button>
                 </div>
               </div>
             )}
@@ -722,6 +720,7 @@ export default function AIManager() {
         .chat-input-area { padding: 20px; border-top: 1px solid var(--border-color); }
         .input-wrapper { display: flex; gap: 12px; background: rgba(255,255,255,0.04); padding: 8px; border-radius: 16px; border: 1px solid var(--border-color); }
         .input-wrapper textarea { flex: 1; background: transparent; border: none; color: var(--text-primary); padding: 8px 12px; resize: none; font-family: inherit; outline: none; }
+        .input-wrapper input { flex: 1; background: transparent; border: none; color: var(--text-primary); padding: 8px 12px; font-family: inherit; outline: none; }
         .chat-error { color: #ef4444; font-size: 12px; margin-bottom: 8px; text-align: center; }
 
         .typing-dots { display: flex; gap: 4px; padding: 4px 0; }
