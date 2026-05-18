@@ -224,13 +224,26 @@ def chat():
                         if parsed_list and isinstance(parsed_list, list):
                             tool_calls = []
                             for idx, parsed_tool in enumerate(parsed_list):
-                                if parsed_tool.get('name') and parsed_tool.get('arguments') is not None:
+                                func_name = parsed_tool.get('name')
+                                func_args = parsed_tool.get('arguments')
+                                
+                                # Extract nested structure if present
+                                if parsed_tool.get('type') == 'function' or parsed_tool.get('function'):
+                                    func_obj = parsed_tool.get('function', {})
+                                    func_name = func_obj.get('name') or func_name
+                                    func_args = func_obj.get('arguments') or func_obj.get('parameters', {}).get('properties') or func_args
+                                    
+                                # Generic parameter / properties fallbacks
+                                if func_args is None:
+                                    func_args = parsed_tool.get('parameters', {}).get('properties') or parsed_tool.get('properties')
+                                    
+                                if func_name and func_args is not None:
                                     tool_calls.append({
                                         'id': f'call_fallback_{idx}',
                                         'type': 'function',
                                         'function': {
-                                            'name': parsed_tool['name'],
-                                            'arguments': parsed_tool['arguments']
+                                            'name': func_name,
+                                            'arguments': func_args
                                         }
                                     })
                             if tool_calls:
