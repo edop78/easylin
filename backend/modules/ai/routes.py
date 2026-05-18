@@ -224,6 +224,22 @@ def chat():
                                 except Exception as obj_e:
                                     print(f"DEBUG: Failed to parse object fallback: {obj_e}")
                                     
+                        # Case 3: Text function call with JSON arguments: function_name { ... }
+                        if not parsed_list:
+                            text_match = re.search(r'([a-zA-Z_][a-zA-Z0-9_]*)\s*(\{.*?\})', assistant_full_content, re.DOTALL)
+                            if text_match:
+                                try:
+                                    func_name = text_match.group(1).strip()
+                                    # Ensure it matches one of our actual available tools to prevent matching random text
+                                    if func_name in AVAILABLE_TOOLS:
+                                        func_args = json.loads(text_match.group(2).strip())
+                                        parsed_list = [{
+                                            'name': func_name,
+                                            'arguments': func_args
+                                        }]
+                                except Exception as text_e:
+                                    print(f"DEBUG: Failed to parse text match fallback: {text_e}")
+                                    
                         if parsed_list and isinstance(parsed_list, list):
                             tool_calls = []
                             for idx, parsed_tool in enumerate(parsed_list):
