@@ -55,6 +55,7 @@ CORE DIRECTIVES:
 3. DOCKER FLOW: If asked about a container, ALWAYS run 'list_containers' first to verify names.
 4. VERIFICATION: Only report success if the tool returns a SUCCESS message.
 5. BE CONCISE: Act first, report briefly. No unnecessary conversational filler.
+6. SYSTEM STATS: If asked about CPU, RAM, disk or system metrics, YOU MUST call 'get_system_info' tool first. NEVER guess or make up numbers.
 """
 
 @ai_bp.route("/chat", methods=["POST"])
