@@ -276,30 +276,98 @@ def chat():
                         # Database storage disabled: relying entirely on ephemeral frontend memory cache
                         return
 
-                    current_messages.append(turn_assistant_message)
+                    # Build a friendly, high-fidelity Italian response directly in Python
+                    # to completely bypass the extremely slow CPU prefill of a second Ollama turn!
+                    friendly_response = ""
                     for tool_call in tool_calls:
                         func_name = tool_call.get('function', {}).get('name')
                         args = tool_call.get('function', {}).get('arguments', {})
+                        
                         if func_name in AVAILABLE_TOOLS:
-                            # CRITICAL: Keep connection alive during potentially slow tool execution
-                            yield f"data: {json.dumps({'status': f'AI is executing {func_name}...'})}\n\n"
-                            print(f"DEBUG: AI calling tool '{func_name}' with args: {args}")
-                            
                             try:
-                                # Extra heartbeat right before call
-                                yield f"data: {json.dumps({'status': f'Waiting for {func_name} response...'})}\n\n"
-                                
+                                yield f"data: {json.dumps({'status': f'AI is executing {func_name}...'})}\n\n"
                                 result = AVAILABLE_TOOLS[func_name](**args)
                                 
-                                print(f"DEBUG: Tool '{func_name}' returned result.")
-                                yield f"data: {json.dumps({'status': f'Tool {func_name} execution finished.'})}\n\n"
-                                
-                                current_messages.append({"role": "tool", "content": str(result), "name": func_name})
+                                if func_name == "manage_container":
+                                    action = args.get('action')
+                                    c_id = args.get('container_id')
+                                    if "SUCCESS" in str(result) or "INFO" in str(result):
+                                        friendly_response += f"Ho completato l'operazione di **{action}** sul container Docker **{c_id}** con successo! 🐳✨\n\n"
+                                    else:
+                                        friendly_response += f"L'operazione di **{action}** sul container **{c_id}** ha riscontrato un problema:\n`{result}`\n\n"
+                                        
+                                elif func_name == "list_containers":
+                                    try:
+                                        containers = json.loads(result)
+                                        if not containers:
+                                            friendly_response += "Non ci sono container Docker attivi su questo server. 🐳\n\n"
+                                        else:
+                                            friendly_response += "Ecco la lista aggiornata dei container Docker presenti sul server:\n\n"
+                                            for c in containers:
+                                                status_emoji = "🟢" if c['State'] == "running" else "🔴"
+                                                friendly_response += f"{status_emoji} **{c['Names']}** ({c['Image']})\n   *Stato: {c['Status']} | ID: `{c['ID']}`*\n\n"
+                                    except Exception:
+                                        friendly_response += f"Ecco l'elenco dei container Docker:\n```\n{result}\n```\n\n"
+                                        
+                                elif func_name == "get_system_info":
+                                    try:
+                                        stats = json.loads(result)
+                                        friendly_response += f"Ecco lo stato attuale delle risorse del server:\n\n" \
+                                                             f"🖥️ **CPU**: {stats['cpu']:.1f}%\n" \
+                                                             f"🧠 **RAM**: {(stats['memory']['used'] / (1024**3)):.2f} GB di {(stats['memory']['total'] / (1024**3)):.2f} GB utilizzata ({stats['memory']['percent']}%)\n" \
+                                                             f"💾 **Disco**: {(stats['disk']['used'] / (1024**3)):.2f} GB di {(stats['disk']['total'] / (1024**3)):.2f} GB utilizzata ({stats['disk']['percent']}%)\n\n" \
+                                                             f"Tutto è perfettamente sotto controllo! 👍\n\n"
+                                    except Exception:
+                                        friendly_response += f"Ecco i dati delle risorse di sistema:\n```\n{result}\n```\n\n"
+                                        
+                                elif func_name == "execute_command":
+                                    try:
+                                        res_obj = json.loads(result)
+                                        friendly_response += f"Comando eseguito con codice di uscita **{res_obj['exit_code']}**.\n\n"
+                                        if res_obj['stdout']:
+                                            friendly_response += f"**Output**:\n```\n{res_obj['stdout']}\n```\n"
+                                        if res_obj['stderr']:
+                                            friendly_response += f"**Errori**:\n```\n{res_obj['stderr']}\n```\n"
+                                    except Exception:
+                                        friendly_response += f"Risultato del comando shell:\n```\n{result}\n```\n\n"
+                                        
+                                elif func_name == "manage_service":
+                                    friendly_response += f"Ho gestito il servizio di sistema **{args.get('service')}** (azione: **{args.get('action')}**) con successo! ⚙️\n\n`{result}`\n\n"
+                                    
+                                elif func_name == "read_file":
+                                    friendly_response += f"Ecco il contenuto del file richiesto (`{args.get('path')}`):\n\n```\n{result}\n```\n\n"
+                                    
+                                elif func_name == "write_file":
+                                    friendly_response += f"File scritto con successo sul server (`{args.get('path')}`)! 📝\n\n"
+                                    
+                                elif func_name == "manage_package":
+                                    friendly_response += f"Pacchetto **{args.get('package')}** gestito con successo (azione: **{args.get('action')}**)! 📦\n\n`{result}`\n\n"
+                                    
+                                elif func_name == "list_processes":
+                                    try:
+                                        procs = json.loads(result)
+                                        friendly_response += f"Ecco i principali processi attivi ordinati per consumo:\n\n"
+                                        for p in procs[:10]:
+                                            friendly_response += f"▪️ **{p['name']}** (PID: {p['pid']}) | CPU: {p['cpu_percent']}% | RAM: {p['memory_percent']:.1f}%\n"
+                                        friendly_response += "\n"
+                                    except Exception:
+                                        friendly_response += f"Ecco l'elenco dei processi:\n```\n{result}\n```\n\n"
+                                        
+                                else:
+                                    friendly_response += f"Strumento `{func_name}` eseguito con successo:\n```\n{result}\n```\n\n"
+                                    
                             except Exception as tool_e:
-                                error_msg = f"Error executing tool {func_name}: {str(tool_e)}"
-                                print(f"ERROR in tool '{func_name}': {error_msg}")
-                                current_messages.append({"role": "tool", "content": error_msg, "name": func_name})
-                                yield f"data: {json.dumps({'status': 'Tool failed, proceeding with error context...'})}\n\n"
+                                friendly_response += f"❌ Errore durante l'esecuzione di `{func_name}`: {str(tool_e)}\n\n"
+                                
+                    if friendly_response:
+                        yield f"data: {json.dumps({'status': 'Risposta finale in generazione...'})}\n\n"
+                        # Stream the response character by character to create a beautiful, smooth writing typing effect in the React UI!
+                        for i in range(0, len(friendly_response), 5):
+                            chunk = friendly_response[i:i+5]
+                            yield f"data: {json.dumps({'content': chunk})}\n\n"
+                            time.sleep(0.01)
+                            
+                    return
                 except Exception as e:
                     yield f"data: {json.dumps({'error': str(e)})}\n\n"
                     return
