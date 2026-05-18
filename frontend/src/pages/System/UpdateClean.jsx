@@ -14,11 +14,11 @@ const MAINTENANCE_TASKS = [
   
   { id: 'autoremove', cat: 'clean', name: 'APT Autoremove', icon: Trash2, desc: 'Removes packages that were installed as dependencies but are no longer needed.', color: 'amber' },
   { id: 'clean', cat: 'clean', name: 'APT Clean', icon: Trash2, desc: 'Clears out the local repository of retrieved package files.', color: 'amber' },
-  { id: 'vacuum-logs', cat: 'clean', name: 'Clean Logs', icon: Trash2, desc: 'Deletes system logs older than 7 days to free up space.', color: 'cyan' },
+  { id: 'vacuum-logs', cat: 'clean', name: 'Clean Logs', icon: Trash2, desc: 'Deletes system logs older than 7 days to free up space.', color: 'amber' },
   { id: 'purge-configs', cat: 'clean', name: 'Purge Configs', icon: Trash2, desc: 'Removes residual configuration files from uninstalled packages.', color: 'amber' },
-  { id: 'docker-prune', cat: 'clean', name: 'Docker Prune', icon: Trash2, desc: 'Removes all unused Docker containers, networks, and images.', color: 'blue' },
-  { id: 'docker-volume-prune', cat: 'clean', name: 'Docker Volume Prune', icon: Trash2, desc: 'Removes all unused Docker volumes to reclaim storage.', color: 'blue' },
-  { id: 'docker-builder-prune', cat: 'clean', name: 'Docker Build Cache Prune', icon: Trash2, desc: 'Clears the Docker BuildKit cache to reclaim hidden build space.', color: 'blue' },
+  { id: 'docker-prune', cat: 'clean', name: 'Docker Prune', icon: Trash2, desc: 'Removes all unused Docker containers, networks, and images.', color: 'amber' },
+  { id: 'docker-volume-prune', cat: 'clean', name: 'Docker Volume Prune', icon: Trash2, desc: 'Removes all unused Docker volumes to reclaim storage.', color: 'amber' },
+  { id: 'docker-builder-prune', cat: 'clean', name: 'Docker Build Cache Prune', icon: Trash2, desc: 'Clears the Docker BuildKit cache to reclaim hidden build space.', color: 'amber' },
 ];
 
 export default function UpdateClean() {
