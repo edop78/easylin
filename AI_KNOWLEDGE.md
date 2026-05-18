@@ -1,5 +1,10 @@
 # EasyLin AI Module - Technical Knowledge Base
 
+## CRITICAL: Containerized Execution Context
+- **EasyLin Runs Inside Docker**: EasyLin is designed as a privileged containerized application.
+- **Self-Destruction Warning**: Because it runs within Docker, **never** execute any administrative command that mutates or restarts the Docker service or the Docker engine itself (such as upgrading `docker-ce`, `docker-ce-cli`, or `containerd.io`). Doing so will instantly terminate the Docker daemon, killing the EasyLin container mid-execution, severing the network connection (502 Bad Gateway), and leaving package locks broken.
+- **Safeguard**: Always run `apt-mark hold` on all Docker-related packages before initiating automated host package upgrades.
+
 ## 1. Network Architecture
 - **Mode**: `network_mode: host` (defined in `docker-compose.yml`).
 - **Communication**: The backend container shares the host network stack.
