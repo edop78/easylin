@@ -38,23 +38,42 @@ export default function UpdateClean() {
 
       // 2. Poll the status GET endpoint every 1.5 seconds until the task completes
       let polling = true;
+      let consecutiveErrors = 0;
+      const maxConsecutiveErrors = 5;
+
       while (polling) {
         await new Promise(resolve => setTimeout(resolve, 1500));
         
-        const statusRes = await api.get(`/system/maintenance/status/${task.id}`);
-        
-        setResult(prev => ({
-          ...prev,
-          stdout: statusRes.stdout || '',
-          success: statusRes.success !== false
-        }));
-
-        if (!statusRes.running) {
-          polling = false;
+        try {
+          const statusRes = await api.get(`/system/maintenance/status/${task.id}`);
+          consecutiveErrors = 0; // Reset error counter on success
+          
           setResult(prev => ({
             ...prev,
-            success: statusRes.success,
-            stdout: statusRes.stdout || ''
+            stdout: statusRes.stdout || '',
+            success: statusRes.success !== false
+          }));
+
+          if (!statusRes.running) {
+            polling = false;
+            setResult(prev => ({
+              ...prev,
+              success: statusRes.success,
+              stdout: statusRes.stdout || ''
+            }));
+          }
+        } catch (pollErr) {
+          consecutiveErrors++;
+          console.warn(`Polling status failed (attempt ${consecutiveErrors}/${maxConsecutiveErrors}):`, pollErr);
+          
+          if (consecutiveErrors >= maxConsecutiveErrors) {
+            throw new Error(`Lost connection to server: ${pollErr.message}`);
+          }
+          
+          // Print a friendly reconnection message inside the console log
+          setResult(prev => ({
+            ...prev,
+            stdout: prev.stdout + `\n[System] Temporary network interruption. Reconnecting... (Attempt ${consecutiveErrors}/${maxConsecutiveErrors})\n`
           }));
         }
       }
