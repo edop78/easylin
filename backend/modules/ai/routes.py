@@ -202,28 +202,53 @@ def chat():
                         import re
                         parsed_list = []
                         
-                        # Case 1: Find all JSON arrays in the response (e.g. [[...]] or multiple [...] [...])
-                        array_matches = re.findall(r'(\[.*?\])', assistant_full_content, re.DOTALL)
-                        for array_str in array_matches:
+                        # Robust depth-balanced bracket/brace extractor to handle nested lists or objects
+                        def extract_json_blocks(text):
+                            blocks = []
+                            n = len(text)
+                            i = 0
+                            while i < n:
+                                if text[i] == '[':
+                                    start = i
+                                    depth = 1
+                                    i += 1
+                                    while i < n and depth > 0:
+                                        if text[i] == '[':
+                                            depth += 1
+                                        elif text[i] == ']':
+                                            depth -= 1
+                                        i += 1
+                                    if depth == 0:
+                                        blocks.append(text[start:i])
+                                elif text[i] == '{':
+                                    start = i
+                                    depth = 1
+                                    i += 1
+                                    while i < n and depth > 0:
+                                        if text[i] == '{':
+                                            depth += 1
+                                        elif text[i] == '}':
+                                            depth -= 1
+                                        i += 1
+                                    if depth == 0:
+                                        blocks.append(text[start:i])
+                                else:
+                                    i += 1
+                            return blocks
+
+                        # Extract all top-level balanced JSON blocks
+                        blocks = extract_json_blocks(assistant_full_content)
+                        for block in blocks:
                             try:
-                                items = json.loads(array_str.strip())
-                                if isinstance(items, list):
-                                    parsed_list.extend(items)
-                            except Exception as array_e:
-                                print(f"DEBUG: Failed to parse array fallback chunk: {array_e}")
+                                item = json.loads(block.strip())
+                                if isinstance(item, list):
+                                    parsed_list.extend(item)
+                                elif isinstance(item, dict):
+                                    parsed_list.append(item)
+                            except Exception as block_e:
+                                print(f"DEBUG: Failed to parse balanced block: {block_e}")
                                 
-                        # Case 2: Find all JSON objects in the response if no arrays were found
-                        if not parsed_list:
-                            object_matches = re.findall(r'(\{.*?\})', assistant_full_content, re.DOTALL)
-                            for obj_str in object_matches:
-                                try:
-                                    item = json.loads(obj_str.strip())
-                                    if isinstance(item, dict) and (item.get('name') or item.get('function') or item.get('type') == 'function'):
-                                        parsed_list.append(item)
-                                except Exception:
-                                    pass
-                                    
-                        # Case 3: Text function call with JSON arguments: function_name { ... }
+                        # Case 3: Text function call fallback: function_name { ... }
                         if not parsed_list:
                             text_match = re.search(r'([a-zA-Z_][a-zA-Z0-9_]*)\s*(\{.*?\})', assistant_full_content, re.DOTALL)
                             if text_match:
