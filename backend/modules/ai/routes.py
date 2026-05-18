@@ -242,21 +242,53 @@ def chat():
                             tool_calls = []
                             for idx, parsed_tool in enumerate(parsed_list):
                                 func_name = parsed_tool.get('name')
-                                func_args = parsed_tool.get('arguments')
+                                func_args = None
                                 
                                 # Extract nested structure if present
                                 if parsed_tool.get('type') == 'function' or parsed_tool.get('function'):
                                     func_obj = parsed_tool.get('function', {})
                                     func_name = func_obj.get('name') or func_name
-                                    func_args = func_obj.get('arguments') or func_obj.get('parameters', {}).get('properties') or func_args
                                     
-                                # Generic parameter / properties fallbacks
+                                    # Look for arguments inside nested function object
+                                    func_args = func_obj.get('arguments')
+                                    if not func_args:
+                                        params = func_obj.get('parameters')
+                                        if isinstance(params, dict):
+                                            if 'properties' in params:
+                                                func_args = params.get('properties')
+                                            else:
+                                                func_args = params
+                                                
+                                # Generic parameter / properties fallbacks from outer object
                                 if func_args is None:
-                                    func_args = parsed_tool.get('parameters', {}).get('properties') or parsed_tool.get('properties') or parsed_tool.get('parameters', {})
+                                    func_args = parsed_tool.get('arguments')
+                                    
+                                if func_args is None:
+                                    params = parsed_tool.get('parameters')
+                                    if isinstance(params, dict):
+                                        if 'properties' in params:
+                                            func_args = params.get('properties')
+                                        else:
+                                            func_args = params
+                                            
+                                if func_args is None:
+                                    func_args = parsed_tool.get('properties')
                                     
                                 # CRITICAL FIX: Default empty arguments to {} if they are None (so parameterless tools are never discarded)
                                 if func_args is None:
                                     func_args = {}
+                                    
+                                # Clean and unwrap argument values if nested
+                                if isinstance(func_args, dict):
+                                    cleaned_args = {}
+                                    for k, v in func_args.items():
+                                        if isinstance(v, dict) and 'value' in v:
+                                            cleaned_args[k] = v['value']
+                                        elif isinstance(v, dict) and 'default' in v:
+                                            cleaned_args[k] = v['default']
+                                        else:
+                                            cleaned_args[k] = v
+                                    func_args = cleaned_args
                                     
                                 if func_name:
                                     tool_calls.append({
