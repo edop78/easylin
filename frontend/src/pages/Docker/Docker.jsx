@@ -56,7 +56,7 @@ export default function Docker() {
   const [msg, setMsg] = useState(null);
   const [confirm, setConfirm] = useState({ open: false, title: '', message: '', action: null });
   
-  const [customApp, setCustomApp] = useState({ type: 'image', image: '', name: '', ports: '' });
+  const [customApp, setCustomApp] = useState({ type: 'image', image: '', name: '', ports: '', command: '' });
   const [activeTaskLogs, setActiveTaskLogs] = useState(null);
   const [persistedLogs, setPersistedLogs] = useState([]);
   const logsEndRef = useRef(null);
@@ -126,9 +126,14 @@ export default function Docker() {
     e.preventDefault();
     setInstalling('custom');
     try {
-      const res = await api.post('/docker/containers/run', customApp);
+      let res;
+      if (customApp.type === 'command') {
+        res = await api.post('/docker/containers/run-command', { command: customApp.command });
+      } else {
+        res = await api.post('/docker/containers/run', customApp);
+      }
       setMsg({ type: 'success', text: res.message });
-      setCustomApp({ type: 'image', image: '', name: '', ports: '' });
+      setCustomApp({ type: 'image', image: '', name: '', ports: '', command: '' });
       refetchContainers();
       setTab('containers');
     } catch (err) {
@@ -456,14 +461,33 @@ export default function Docker() {
                 <div style={{ display: 'flex', backgroundColor: 'rgba(255,255,255,0.03)', padding: '4px', borderRadius: '10px', gap: '4px' }}>
                   <button className={`btn btn-sm ${customApp.type === 'image' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setCustomApp({...customApp, type: 'image'})} style={{ fontSize: '11px', padding: '6px 16px', borderRadius: '8px' }}><Globe size={14} /> Docker Hub</button>
                   <button className={`btn btn-sm ${customApp.type === 'github' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setCustomApp({...customApp, type: 'github'})} style={{ fontSize: '11px', padding: '6px 16px', borderRadius: '8px' }}><Github size={14} /> GitHub Repo</button>
+                  <button className={`btn btn-sm ${customApp.type === 'command' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setCustomApp({...customApp, type: 'command'})} style={{ fontSize: '11px', padding: '6px 16px', borderRadius: '8px' }}><ScrollText size={14} style={{ marginRight: '4px' }} /> Run Command</button>
                 </div>
               </div>
-              <form onSubmit={handleManualInstall} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-lg)', alignItems: 'end' }}>
-                <div className="form-group"><label>{customApp.type === 'github' ? 'Repository URL' : 'Image Name'}</label><input className="input" placeholder={customApp.type === 'github' ? 'https://github.com/user/repo' : 'e.g. nginx:latest'} value={customApp.image} onChange={e => setCustomApp({...customApp, image: e.target.value})} required /></div>
-                <div className="form-group"><label>Container Name (Optional)</label><input className="input" placeholder="e.g. my-app" value={customApp.name} onChange={e => setCustomApp({...customApp, name: e.target.value})} /></div>
-                <div className="form-group"><label>Ports Mapping</label><input className="input" placeholder="e.g. 8080:80" value={customApp.ports} onChange={e => setCustomApp({...customApp, ports: e.target.value})} /></div>
-                <button className="btn btn-primary" type="submit" disabled={installing === 'custom'} style={{ height: '46px', fontWeight: 600 }}>{installing === 'custom' ? <RotateCw size={18} className="spin" /> : <Download size={18} />} {customApp.type === 'github' ? 'Build & Deploy' : 'Deploy Now'}</button>
-              </form>
+              {customApp.type === 'command' ? (
+                <form onSubmit={handleManualInstall} style={{ display: 'flex', gap: 'var(--space-lg)', alignItems: 'end', width: '100%' }}>
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label>Docker Run Command</label>
+                    <input 
+                      className="input" 
+                      placeholder="e.g. docker run -d -p 8080:80 --name my-web nginx:latest" 
+                      value={customApp.command || ''} 
+                      onChange={e => setCustomApp({...customApp, command: e.target.value})} 
+                      required 
+                    />
+                  </div>
+                  <button className="btn btn-primary" type="submit" disabled={installing === 'custom'} style={{ height: '46px', fontWeight: 600, minWidth: '160px' }}>
+                    {installing === 'custom' ? <RotateCw size={18} className="spin" /> : <Download size={18} />} Deploy Command
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleManualInstall} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-lg)', alignItems: 'end' }}>
+                  <div className="form-group"><label>{customApp.type === 'github' ? 'Repository URL' : 'Image Name'}</label><input className="input" placeholder={customApp.type === 'github' ? 'https://github.com/user/repo' : 'e.g. nginx:latest'} value={customApp.image} onChange={e => setCustomApp({...customApp, image: e.target.value})} required /></div>
+                  <div className="form-group"><label>Container Name (Optional)</label><input className="input" placeholder="e.g. my-app" value={customApp.name} onChange={e => setCustomApp({...customApp, name: e.target.value})} /></div>
+                  <div className="form-group"><label>Ports Mapping</label><input className="input" placeholder="e.g. 8080:80" value={customApp.ports} onChange={e => setCustomApp({...customApp, ports: e.target.value})} /></div>
+                  <button className="btn btn-primary" type="submit" disabled={installing === 'custom'} style={{ height: '46px', fontWeight: 600 }}>{installing === 'custom' ? <RotateCw size={18} className="spin" /> : <Download size={18} />} {customApp.type === 'github' ? 'Build & Deploy' : 'Deploy Now'}</button>
+                </form>
+              )}
             </div>
 
             <div style={{ 

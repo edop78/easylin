@@ -637,3 +637,183 @@ def list_networks():
         return jsonify({"networks": result})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+def parse_docker_run(command_str):
+    import shlex
+    cmd = command_str.strip()
+    if cmd.startswith("docker "):
+        cmd = cmd[7:].strip()
+    if cmd.startswith("run "):
+        cmd = cmd[4:].strip()
+        
+    try:
+        args = shlex.split(cmd)
+    except Exception as e:
+        raise ValueError(f"Error parsing command line syntax: {str(e)}")
+        
+    options = {
+        "image": None,
+        "name": None,
+        "ports": {},
+        "volumes": {},
+        "environment": {},
+        "restart_policy": {"Name": "unless-stopped"},
+        "network_mode": None,
+        "privileged": False,
+        "command": [],
+        "detach": True
+    }
+    
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        
+        if arg.startswith("-"):
+            if arg in ["-d", "--detach"]:
+                options["detach"] = True
+                i += 1
+            elif arg == "--privileged":
+                options["privileged"] = True
+                i += 1
+            elif arg in ["-p", "--publish"]:
+                if i + 1 < len(args):
+                    val = args[i+1]
+                    if ":" in val:
+                        parts = val.split(":")
+                        host_port = parts[0]
+                        container_port = parts[1]
+                        if "/" not in container_port:
+                            container_port = f"{container_port}/tcp"
+                        try:
+                            if len(parts) == 3:
+                                ip, hport, cport = parts
+                                if "/" not in cport:
+                                    cport = f"{cport}/tcp"
+                                options["ports"][cport] = (ip, int(hport))
+                            else:
+                                options["ports"][container_port] = int(host_port)
+                        except ValueError:
+                            pass
+                    i += 2
+                else:
+                    i += 1
+            elif arg.startswith("-p="):
+                val = arg[3:]
+                if ":" in val:
+                    parts = val.split(":")
+                    host_port = parts[0]
+                    container_port = parts[1]
+                    if "/" not in container_port:
+                        container_port = f"{container_port}/tcp"
+                    try:
+                        options["ports"][container_port] = int(host_port)
+                    except ValueError:
+                        pass
+                i += 1
+            elif arg in ["-v", "--volume"]:
+                if i + 1 < len(args):
+                    val = args[i+1]
+                    if ":" in val:
+                        parts = val.split(":")
+                        host_path = parts[0]
+                        container_path = parts[1]
+                        mode = parts[2] if len(parts) > 2 else "rw"
+                        options["volumes"][host_path] = {"bind": container_path, "mode": mode}
+                    i += 2
+                else:
+                    i += 1
+            elif arg in ["-e", "--env"]:
+                if i + 1 < len(args):
+                    val = args[i+1]
+                    if "=" in val:
+                        k, v = val.split("=", 1)
+                        options["environment"][k] = v
+                    i += 2
+                else:
+                    i += 1
+            elif arg == "--name":
+                if i + 1 < len(args):
+                    options["name"] = args[i+1]
+                    i += 2
+                else:
+                    i += 1
+            elif arg.startswith("--name="):
+                options["name"] = arg[7:]
+                i += 1
+            elif arg == "--restart":
+                if i + 1 < len(args):
+                    policy = args[i+1]
+                    options["restart_policy"] = {"Name": policy}
+                    i += 2
+                else:
+                    i += 1
+            elif arg.startswith("--restart="):
+                options["restart_policy"] = {"Name": arg[10:]}
+                i += 1
+            elif arg in ["--network", "--net"]:
+                if i + 1 < len(args):
+                    options["network_mode"] = args[i+1]
+                    i += 2
+                else:
+                    i += 1
+            elif arg.startswith("--network="):
+                options["network_mode"] = arg[10:]
+                i += 1
+            elif arg.startswith("--net="):
+                options["network_mode"] = arg[6:]
+                i += 1
+            else:
+                i += 1
+        else:
+            options["image"] = arg
+            options["command"] = args[i+1:]
+            break
+            
+    if not options["image"]:
+        raise ValueError("No Docker image found in command line string.")
+        
+    return options
+
+
+@docker_bp.route("/containers/run-command", methods=["POST"])
+@jwt_required()
+def run_container_command():
+    """Run a custom container from a single docker run command line."""
+    client = get_client()
+    if not client:
+        return jsonify({"error": "Cannot connect to Docker daemon"}), 503
+
+    data = request.get_json()
+    command_str = data.get("command")
+    if not command_str:
+        return jsonify({"error": "Command line is required"}), 400
+
+    try:
+        options = parse_docker_run(command_str)
+        
+        # 1. Pull the image
+        client.images.pull(options["image"])
+        
+        # 2. Run the container
+        container = client.containers.run(
+            options["image"],
+            command=options["command"] if options["command"] else None,
+            name=options["name"],
+            ports=options["ports"] if options["ports"] else None,
+            volumes=options["volumes"] if options["volumes"] else None,
+            environment=options["environment"] if options["environment"] else None,
+            restart_policy=options["restart_policy"],
+            network_mode=options["network_mode"],
+            privileged=options["privileged"],
+            detach=True
+        )
+        
+        return jsonify({
+            "success": True,
+            "container_id": container.short_id,
+            "message": f"Container {container.name or container.short_id} started successfully"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
