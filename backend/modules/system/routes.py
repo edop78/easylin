@@ -164,6 +164,36 @@ def system_info():
     except:
         pass
 
+    # Fallback: se siamo in Docker o psutil.users() non rileva sessioni,
+    # eseguiamo il comando 'who' sull'host per intercettare gli accessi reali (SSH/locali)
+    if not sessions:
+        try:
+            res_who = run_host_command("who")
+            if res_who.get("returncode") == 0 and res_who.get("stdout"):
+                for line in res_who["stdout"].split("\n"):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    parts = line.split()
+                    if len(parts) >= 4:
+                        name = parts[0]
+                        terminal = parts[1]
+                        started_date = parts[2]
+                        started_time = parts[3]
+                        # Opzionale: l'host o IP remoto è solitamente racchiuso tra parentesi alla fine
+                        host = ""
+                        if len(parts) >= 5:
+                            host = parts[4].strip("()")
+                        
+                        sessions.append({
+                            "name": name,
+                            "terminal": terminal,
+                            "host": host or "localhost",
+                            "started": f"{started_date} {started_time}"
+                        })
+        except:
+            pass
+
     # Get Timezone
     try:
         res_tz = run_host_command("timedatectl show --property=Timezone --value")
