@@ -78,6 +78,17 @@ def chat():
         except Exception as db_e:
             print(f"Database error in chat: {db_e}")
 
+        # Intelligent context reduction for small VM CPUs: 
+        # Skip heavy tool definitions if user is just greeting or chatting simply.
+        user_query = messages[-1].get("content", "").lower().strip()
+        system_keywords = ["docker", "container", "run", "start", "stop", "restart", "file", "folder", "directory", "write", "read", "package", "install", "uninstall", "service", "system", "host", "network", "firewall", "port", "git", "user", "terminal", "command", "process", "kill", "cpu", "ram", "disk"]
+        
+        # If the user is just saying hello or asking conversational things, don't overload Ollama
+        should_send_tools = any(kw in user_query for kw in system_keywords)
+        
+        # Allow small models (like 1.5B/3B) to be fast by default, and only invoke tools on explicit request
+        print(f"DEBUG: User query: '{user_query}' | should_send_tools: {should_send_tools}")
+
         def generate():
             # Immediate heartbeat to prevent 504 Gateway Timeout
             yield f"data: {json.dumps({'status': 'AI Agent initializing...'})}\n\n"
@@ -105,17 +116,20 @@ def chat():
                         if s.connect_ex((host, port)) != 0:
                             yield f"data: {json.dumps({'error': f'Cannot reach Ollama at {OLLAMA_API}'})}\n\n"
                             return
-
+ 
                     yield f"data: {json.dumps({'status': 'Ollama reached, waiting for response...'})}\n\n"
                     import time
                     start_time = time.time()
                     
-                    res = requests.post(f"{OLLAMA_API}/chat", json={
+                    payload = {
                         "model": model,
                         "messages": current_messages,
-                        "tools": TOOLS_DEFINITION,
-                        "stream": True 
-                    }, stream=True, timeout=120)
+                        "stream": True
+                    }
+                    if should_send_tools:
+                        payload["tools"] = TOOLS_DEFINITION
+                        
+                    res = requests.post(f"{OLLAMA_API}/chat", json=payload, stream=True, timeout=120)
                     
                     tool_calls = []
                     turn_assistant_message = {"role": "assistant", "content": ""}
