@@ -151,12 +151,10 @@ export default function UpdateClean() {
                 )}
                 <h3 className="modal-title" style={{ margin: 0 }}>{result.task} {result.success ? 'Completed' : 'Failed'}</h3>
               </div>
-              {!result.success && (
-                <button className="btn btn-sm btn-ghost" onClick={() => copyToClipboard(result.stderr || result.stdout)}>
-                  {copied ? <CheckCircle size={14} /> : <Copy size={14} />}
-                  {copied ? 'Copied!' : 'Copy Error'}
-                </button>
-              )}
+              <button className="btn btn-sm btn-ghost" onClick={() => copyToClipboard((result.stdout || '') + (result.stderr ? `\n\nERRORS:\n${result.stderr}` : ''))}>
+                {copied ? <CheckCircle size={14} /> : <Copy size={14} />}
+                {copied ? 'Copied!' : result.success ? 'Copy Log' : 'Copy Error'}
+              </button>
             </div>
 
             <div style={{ marginBottom: 'var(--space-md)' }}>
