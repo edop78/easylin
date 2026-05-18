@@ -28,7 +28,9 @@ export default function AIManager() {
   const [tab, setTab] = useState('chat'); // 'chat' or 'settings'
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
-  const [selectedModel, setSelectedModel] = useState('');
+  const [selectedModel, setSelectedModel] = useState(() => {
+    return localStorage.getItem('easylin_selected_ai_model') || '';
+  });
   const [pullModel, setPullModel] = useState(SUGGESTED_MODELS[0].id);
   const [isCustomModel, setIsCustomModel] = useState(false);
   const [customModelName, setCustomModelName] = useState('');
@@ -40,10 +42,24 @@ export default function AIManager() {
   const chatEndRef = useRef(null);
 
   useEffect(() => {
-    if (modelsData?.models?.length > 0 && !selectedModel) {
-      setSelectedModel(modelsData.models[0].name);
+    if (modelsData?.models?.length > 0) {
+      const persistedModel = localStorage.getItem('easylin_selected_ai_model');
+      const modelExists = modelsData.models.some(m => m.name === persistedModel);
+      if (persistedModel && modelExists) {
+        setSelectedModel(persistedModel);
+      } else if (!selectedModel) {
+        const defaultModel = modelsData.models[0].name;
+        setSelectedModel(defaultModel);
+        localStorage.setItem('easylin_selected_ai_model', defaultModel);
+      }
     }
-  }, [modelsData]);
+  }, [modelsData, selectedModel]);
+
+  useEffect(() => {
+    if (selectedModel) {
+      localStorage.setItem('easylin_selected_ai_model', selectedModel);
+    }
+  }, [selectedModel]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
