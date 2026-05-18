@@ -16,6 +16,22 @@ except ImportError:
 
 system_bp = Blueprint("system", __name__)
 
+def get_container_id():
+    try:
+        with open("/proc/self/cgroup", "r") as f:
+            for line in f:
+                if "docker" in line or "containerd" in line:
+                    parts = line.strip().split('/')
+                    for part in parts:
+                        # Docker IDs are 64 characters
+                        for chunk in part.split('-'): # handle system.slice/docker-ID.scope
+                            clean_chunk = chunk.replace('.scope', '')
+                            if len(clean_chunk) == 64:
+                                return clean_chunk[:12]
+    except Exception:
+        pass
+    return "easylin"
+
 @system_bp.route("/version", methods=["GET"])
 @jwt_required()
 def get_version():
@@ -25,7 +41,7 @@ def get_version():
         version_file = os.path.join(root_dir, "version.json")
         
         # Default values
-        major, minor, patch, build = 1, 1, 0, 0
+        major, minor, patch, build = 1, 2, 0, 105
         label = "stable"
         
         # 1. Carica dati dal file
@@ -38,13 +54,24 @@ def get_version():
                 build = v.get('build', build)
                 label = v.get('label', label)
         
-        # 2. Tenta di usare Git per la patch (se disponibile e siamo in un repo)
-        res = run_host_command("git rev-list --count HEAD")
-        if res.get("returncode") == 0:
-            # Se siamo in locale con Git, la patch è il numero di commit
-            git_count = int(res.get("stdout", "0").strip())
-            # Usiamo il maggiore tra il build manuale e il git count per sicurezza
-            patch = max(patch, git_count)
+        # 2. Tenta di trovare la working directory di Docker Compose del container sul host
+        container_id = get_container_id()
+        cmd = f"docker inspect {container_id} --format '{{{{ index .Config.Labels \"com.docker.compose.project.working_dir\" }}}}'"
+        res = run_host_command(cmd)
+        project_dir = res.get("stdout", "").strip() if res.get("returncode") == 0 else ""
+        
+        # 3. Tenta di usare Git per la patch nella directory del progetto sul host
+        git_cmd = "git rev-list --count HEAD"
+        if project_dir:
+            git_cmd = f"git -C {shlex.quote(project_dir)} rev-list --count HEAD"
+            
+        git_res = run_host_command(git_cmd)
+        if git_res.get("returncode") == 0:
+            try:
+                git_count = int(git_res.get("stdout", "0").strip())
+                patch = git_count
+            except ValueError:
+                pass
         
         return jsonify({
             "version": f"v{major}.{minor}.{patch}",
@@ -52,7 +79,7 @@ def get_version():
             "label": label
         })
     except Exception as e:
-        return jsonify({"version": "v1.1.0", "label": "error", "error": str(e)})
+        return jsonify({"version": "v1.2.0", "label": "error", "error": str(e)})
 
 # Helper to import run_host_command safely
 def get_run_command():
