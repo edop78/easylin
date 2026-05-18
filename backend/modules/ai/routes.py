@@ -73,13 +73,39 @@ def chat():
         # Intelligent context reduction for small VM CPUs: 
         # Skip heavy tool definitions if user is just greeting or chatting simply.
         user_query = messages[-1].get("content", "").lower().strip()
-        system_keywords = ["docker", "container", "run", "start", "stop", "restart", "file", "folder", "directory", "write", "read", "package", "install", "uninstall", "service", "system", "host", "network", "firewall", "port", "git", "user", "terminal", "command", "process", "kill", "cpu", "ram", "disk"]
         
-        # If the user is just saying hello or asking conversational things, don't overload Ollama
-        should_send_tools = any(kw in user_query for kw in system_keywords)
+        # Intelligent dynamic tool selection based on query keywords to drastically cut CPU prefill time
+        active_tools = []
+        
+        if any(kw in user_query for kw in ["cpu", "ram", "disk", "stato", "risorse", "hardware", "info"]):
+            active_tools.append(TOOLS_DEFINITION[0]) # get_system_info
+            
+        if any(kw in user_query for kw in ["docker", "container", "run", "start", "stop", "restart", "remove"]):
+            active_tools.append(TOOLS_DEFINITION[1]) # list_containers
+            active_tools.append(TOOLS_DEFINITION[2]) # manage_container
+            
+        if any(kw in user_query for kw in ["terminal", "shell", "command", "bash", "sh", "exec"]):
+            active_tools.append(TOOLS_DEFINITION[3]) # execute_command
+            
+        if any(kw in user_query for kw in ["file", "folder", "directory", "read", "cat"]):
+            active_tools.append(TOOLS_DEFINITION[4]) # read_file
+            
+        if any(kw in user_query for kw in ["write", "create", "modify", "save", "edit"]):
+            active_tools.append(TOOLS_DEFINITION[5]) # write_file
+            
+        if any(kw in user_query for kw in ["service", "systemctl", "systemd", "nginx", "ufw"]):
+            active_tools.append(TOOLS_DEFINITION[6]) # manage_service
+            
+        if any(kw in user_query for kw in ["package", "install", "uninstall", "apt", "apt-get"]):
+            active_tools.append(TOOLS_DEFINITION[7]) # manage_package
+            
+        if any(kw in user_query for kw in ["process", "ps", "top", "kill", "processes"]):
+            active_tools.append(TOOLS_DEFINITION[8]) # list_processes
+
+        should_send_tools = len(active_tools) > 0
         
         # Allow small models (like 1.5B/3B) to be fast by default, and only invoke tools on explicit request
-        print(f"DEBUG: User query: '{user_query}' | should_send_tools: {should_send_tools}")
+        print(f"DEBUG: User query: '{user_query}' | should_send_tools: {should_send_tools} | active_tools_count: {len(active_tools)}")
 
         def generate():
             # Immediate heartbeat to prevent 504 Gateway Timeout
@@ -128,7 +154,7 @@ def chat():
                         "stream": True
                     }
                     if should_send_tools:
-                        payload["tools"] = TOOLS_DEFINITION
+                        payload["tools"] = active_tools
                         
                     res = requests.post(f"{OLLAMA_API}/chat", json=payload, stream=True, timeout=120)
                     
