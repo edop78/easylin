@@ -406,6 +406,10 @@ def maintenance_action_stream():
     from flask import Response
     import subprocess
     import shlex
+    try:
+        from config import Config
+    except ImportError:
+        from backend.config import Config
     
     data = request.get_json()
     command_id = data.get("command")
