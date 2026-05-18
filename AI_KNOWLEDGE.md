@@ -39,3 +39,25 @@
 2. **Use streaming** (SSE) for both Chat and Model Pull to prevent gateway timeouts (504).
 3. **Tool calls** should be preceded by a status update to the frontend (e.g., "Executing tool...").
 4. **Never hallucinate** container IDs; always run `list_containers` first.
+
+## 5. Host Interaction & Namespace Fallbacks
+- **Active Sessions Card**: Standard `psutil.users()` inside containerized environments returns empty due to PID namespace isolation. Fall back to parsing the host `who` command executed inside the host namespace:
+  `nsenter --target 1 --mount --uts --ipc --net --pid -- who`
+- **Host Execution Wrapper**: EasyLin executes administrative tasks directly in the host OS namespace using `nsenter --target 1 --mount --uts --ipc --net --pid -- /bin/bash -c "<command>"`.
+
+## 6. Long-Running System Tasks & Maintenance
+- **DO NOT USE SSE (Server-Sent Events) streaming** for system maintenance or administrative tasks (like `apt-get upgrade`). SSE streams are extremely fragile behind reverse proxies (Nginx/Cloudflare) due to strict HTTP/3 (QUIC) stream resets (`net::ERR_QUIC_PROTOCOL_ERROR`), browser UDP firewalls, and proxy timeout limits (e.g., Cloudflare 100s limit).
+- **ALWAYS USE Asynchronous Background Threads + REST Polling**:
+  1. Spawns a background thread to run the process on the host via `subprocess.Popen` + `nsenter`.
+  2. Write output (stdout/stderr) in real-time to a persistent log file in the container's volume (e.g., `/app/data/maintenance_logs/<task_id>.log`).
+  3. Instantly returns `200 OK` on task start, bypassing any HTTP/proxy gateway timeout.
+  4. The frontend polls a standard REST endpoint `GET /api/system/maintenance/status/<task_id>` every 1.5 seconds to read the log file content.
+  5. *State Persistence Benefit*: If the user refreshes their browser or closes the tab, the task continues running safely on the server, and the UI resumes polling upon reload.
+
+## 7. Package Manager (APT) Safety & Interceptors
+- **Non-Interactive Commands**: To prevent automated scripts from hanging indefinitely on configuration prompts, always prefix and wrap apt actions:
+  `DEBIAN_FRONTEND=noninteractive apt-get <action> -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"`
+- **Dpkg Lock Auto-Repair Interceptor**: If an APT command fails due to `"dpkg was interrupted"`, programmatically intercept it, run `dpkg --configure -a` in the host namespace, and retry the original command automatically.
+
+## 8. Python Version Compatibility Safeguards
+- **No Backslashes in f-string Expressions**: Do **NOT** use backslashes (like `\n` or `\"`) inside f-string expressions `{...}` (e.g., `{json.dumps('\n')}`). In Python < 3.12 (Debian 12 / Ubuntu 22.04), this throws a fatal `SyntaxError` on import. Since EasyLin's `app.py` imports modules inside a `try/except` to prevent complete server crash, this `SyntaxError` will silently bypass Gunicorn crash checks but leave the affected blueprint/module completely unregistered. Always define JSON/string payloads outside f-strings before yielding/returning.
