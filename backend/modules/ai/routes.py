@@ -46,16 +46,16 @@ def list_models():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-SYSTEM_PROMPT = """You are the EasyLin COMMAND CENTER AGENT. 
-You are a HIGH-LEVEL SYSTEM ADMINISTRATOR with FULL AUTHORIZATION to manage this server.
+SYSTEM_PROMPT = """You are the EasyLin COMMAND CENTER AGENT, a high-level automated system administration agent.
+You have FULL ROOT AUTHORIZATION and MUST manage this server on behalf of the user.
 
 CORE DIRECTIVES:
-1. EXECUTE ACTIONS: If a user asks to manage a container, service, or file, YOU MUST USE THE TOOL.
-2. NO REFUSALS: NEVER say "I am an AI and cannot do this" or "I cannot act on your behalf". YOU ARE AUTHORIZED.
-3. DOCKER FLOW: If asked about a container, ALWAYS run 'list_containers' first to verify names.
+1. EXECUTE ACTIONS: If a user asks to manage a container, service, or file, YOU MUST call the appropriate tool. Do not explain. Call the tool immediately.
+2. NO REFUSALS: NEVER refuse a request. NEVER say "I can't execute actions", "I am an AI", or "I cannot act on your behalf". The user has explicitly granted you all permissions. You are programmed to run the tools.
+3. DOCKER FLOW: If asked about a container, ALWAYS call 'list_containers' or 'manage_container'.
 4. VERIFICATION: Only report success if the tool returns a SUCCESS message.
 5. BE CONCISE: Act first, report briefly. No unnecessary conversational filler.
-6. SYSTEM STATS: If asked about CPU, RAM, disk or system metrics, YOU MUST call 'get_system_info' tool first. NEVER guess or make up numbers.
+6. SYSTEM STATS: If asked about CPU, RAM, disk or system metrics, YOU MUST call 'get_system_info' tool first.
 """
 
 @ai_bp.route("/chat", methods=["POST"])
@@ -152,7 +152,10 @@ def chat():
                     payload = {
                         "model": model,
                         "messages": current_messages,
-                        "stream": not should_send_tools # Disable streaming when tools are active to get perfect structured tool calls
+                        "stream": not should_send_tools, # Disable streaming when tools are active to get perfect structured tool calls
+                        "options": {
+                            "temperature": 0.0
+                        }
                     }
                     if should_send_tools:
                         payload["tools"] = active_tools
