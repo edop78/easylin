@@ -391,7 +391,7 @@ def maintenance_action():
     err_msg = (res.get("stderr") or "") + (res.get("stdout") or "")
     if res.get("returncode") != 0 and "dpkg was interrupted" in err_msg:
         # Tenta di eseguire dpkg --configure -a in automatico sull'host
-        repair_res = run_host_command("dpkg --configure -a")
+        repair_res = run_host_command("systemd-run --description='EasyLin Dpkg Recovery' dpkg --configure -a")
         if repair_res.get("returncode") == 0:
             # Riprova il comando originale dopo il fix
             res = run_host_command(cmd)
@@ -502,7 +502,7 @@ class MaintenanceTaskManager:
                     log_file.write("\n[Auto-Fix] Rilevato blocco dpkg. Esecuzione di dpkg --configure -a in corso...\n")
                     log_file.flush()
                     
-                    repair_cmd = "dpkg --configure -a"
+                    repair_cmd = "systemd-run --description='EasyLin Dpkg Recovery' dpkg --configure -a"
                     if Config.IN_DOCKER:
                         repair_cmd = f"nsenter --target 1 --mount --uts --ipc --net --pid -- {repair_cmd}"
                         
