@@ -63,6 +63,11 @@ check_compose() {
 check_docker
 check_compose
 
+# Protect Docker engine packages from accidental self-upgrades from inside the container
+echo -e "${GREEN}Protecting Docker engine packages from accidental self-upgrades...${NC}"
+apt-mark hold docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin || true
+
+
 # 3. Setup Environment
 if [ ! -f .env ]; then
   echo -e "${GREEN}Creating .env file...${NC}"
