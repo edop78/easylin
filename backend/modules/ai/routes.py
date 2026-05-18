@@ -161,6 +161,7 @@ def chat():
                     
                     tool_calls = []
                     turn_assistant_message = {"role": "assistant", "content": ""}
+                    turn_content = ""
                     
                     # Optimized stream reading
                     last_heartbeat = time.time()
@@ -175,7 +176,10 @@ def chat():
                                 if content:
                                     turn_assistant_message['content'] += content
                                     assistant_full_content += content
-                                    yield f"data: {json.dumps({'content': content})}\n\n"
+                                    turn_content += content
+                                    if not should_send_tools:
+                                        # Only stream directly to user if this is a standard non-tool conversation
+                                        yield f"data: {json.dumps({'content': content})}\n\n"
                                 if chunk.get('done'): break
                             except Exception as json_e:
                                 print(f"DEBUG: JSON parse error in stream: {json_e}")
@@ -233,6 +237,10 @@ def chat():
                                 print(f"DEBUG: Fallback successfully parsed tool calls: {tool_calls}")
                                 
                     if not tool_calls:
+                        # Since no tool call was made in this turn, this is a final friendly text response!
+                        # If should_send_tools is True, we didn't stream it yet, so we yield it now in one block!
+                        if should_send_tools and turn_content:
+                            yield f"data: {json.dumps({'content': turn_content})}\n\n"
                         # Database storage disabled: relying entirely on ephemeral frontend memory cache
                         return
 
