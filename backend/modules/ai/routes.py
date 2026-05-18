@@ -188,6 +188,32 @@ def chat():
                             yield ": heartbeat\n\n"
                     
                     print(f"DEBUG: Ollama thinking time: {time.time() - start_time:.2f}s")
+                    
+                    # Fallback text-based tool call parser (in case the model or Ollama outputs raw JSON/markdown instead of structured tool calls)
+                    if not tool_calls:
+                        import re
+                        # Look for json blocks: ```json ... ``` or raw json starting with {
+                        json_match = re.search(r'```json\s*(\{.*?\})\s*```', assistant_full_content, re.DOTALL)
+                        if not json_match:
+                            json_match = re.search(r'(\{.*?"name"\s*:\s*".*?"\s*,\s*"arguments"\s*:\s*\{.*?\}\s*\})', assistant_full_content, re.DOTALL)
+                            
+                        if json_match:
+                            try:
+                                parsed_tool = json.loads(json_match.group(1).strip())
+                                if parsed_tool.get('name') and parsed_tool.get('arguments') is not None:
+                                    # Translate to structured tool call format
+                                    tool_calls = [{
+                                        'id': 'call_fallback',
+                                        'type': 'function',
+                                        'function': {
+                                            'name': parsed_tool['name'],
+                                            'arguments': parsed_tool['arguments']
+                                        }
+                                    }]
+                                    print(f"DEBUG: Fallback parsed tool call: {tool_calls}")
+                            except Exception as parse_e:
+                                print(f"DEBUG: Failed to parse fallback tool call: {parse_e}")
+                                
                     if not tool_calls:
                         # Database storage disabled: relying entirely on ephemeral frontend memory cache
                         return
