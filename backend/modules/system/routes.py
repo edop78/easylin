@@ -438,7 +438,8 @@ def maintenance_action_stream():
         return jsonify({"success": False, "stderr": f"Unknown command: {command_id}"}), 400
 
     def generate():
-        yield f"data: {json.dumps({'stdout': f'Starting maintenance task: {command_id}...\n'})}\n\n"
+        start_payload = {'stdout': f'Starting maintenance task: {command_id}...\n'}
+        yield f"data: {json.dumps(start_payload)}\n\n"
         
         output_buffer = []
         full_cmd = cmd
@@ -458,7 +459,8 @@ def maintenance_action_stream():
             
             for line in iter(process.stdout.readline, ""):
                 output_buffer.append(line)
-                yield f"data: {json.dumps({'stdout': line})}\n\n"
+                payload = {'stdout': line}
+                yield f"data: {json.dumps(payload)}\n\n"
                 
             process.stdout.close()
             returncode = process.wait()
@@ -467,7 +469,8 @@ def maintenance_action_stream():
             
             # Auto-repair if dpkg was interrupted
             if returncode != 0 and "dpkg was interrupted" in full_output:
-                yield f"data: {json.dumps({'stdout': '\n[Auto-Fix] Rilevato blocco dpkg. Esecuzione di dpkg --configure -a in corso...\n'})}\n\n"
+                repair_payload = {'stdout': '\n[Auto-Fix] Rilevato blocco dpkg. Esecuzione di dpkg --configure -a in corso...\n'}
+                yield f"data: {json.dumps(repair_payload)}\n\n"
                 
                 repair_cmd = "dpkg --configure -a"
                 if Config.IN_DOCKER:
@@ -484,13 +487,15 @@ def maintenance_action_stream():
                 )
                 
                 for line in iter(repair_proc.stdout.readline, ""):
-                    yield f"data: {json.dumps({'stdout': f'[Auto-Fix] {line}'})}\n\n"
+                    payload = {'stdout': f'[Auto-Fix] {line}'}
+                    yield f"data: {json.dumps(payload)}\n\n"
                     
                 repair_proc.stdout.close()
                 repair_rc = repair_proc.wait()
                 
                 if repair_rc == 0:
-                    yield f"data: {json.dumps({'stdout': '\n[Auto-Fix] Ripristino completato con successo! Riavvio del comando originale...\n\n'})}\n\n"
+                    success_payload = {'stdout': '\n[Auto-Fix] Ripristino completato con successo! Riavvio del comando originale...\n\n'}
+                    yield f"data: {json.dumps(success_payload)}\n\n"
                     
                     # Riprova il comando originale dopo il fix
                     process2 = subprocess.Popen(
@@ -504,20 +509,27 @@ def maintenance_action_stream():
                     )
                     
                     for line in iter(process2.stdout.readline, ""):
-                        yield f"data: {json.dumps({'stdout': line})}\n\n"
+                        payload = {'stdout': line}
+                        yield f"data: {json.dumps(payload)}\n\n"
                         
                     process2.stdout.close()
                     returncode = process2.wait()
                 else:
-                    yield f"data: {json.dumps({'stdout': '\n[Auto-Fix Failed] Tentativo di ripristino automatico fallito.\n'})}\n\n"
+                    fail_payload = {'stdout': '\n[Auto-Fix Failed] Tentativo di ripristino automatico fallito.\n'}
+                    yield f"data: {json.dumps(fail_payload)}\n\n"
             
             success = (returncode == 0)
-            yield f"data: {json.dumps({'done': True, 'success': success, 'stdout': ''})}\n\n"
+            done_payload = {'done': True, 'success': success, 'stdout': ''}
+            yield f"data: {json.dumps(done_payload)}\n\n"
             
         except Exception as e:
-            yield f"data: {json.dumps({'done': True, 'success': False, 'stderr': str(e)})}\n\n"
+            err_payload = {'done': True, 'success': False, 'stderr': str(e)}
+            yield f"data: {json.dumps(err_payload)}\n\n"
 
-    return Response(generate(), mimetype='text/event-stream')
+    response = Response(generate(), mimetype='text/event-stream')
+    response.headers['X-Accel-Buffering'] = 'no'
+    response.headers['Cache-Control'] = 'no-cache'
+    return response
 
 @system_bp.route("/apt-clean", methods=["POST"])
 @jwt_required()
