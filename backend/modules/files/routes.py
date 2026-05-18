@@ -99,11 +99,18 @@ def write_file():
     if not path:
         return jsonify({"error": "Path is required"}), 400
 
-    # Use host command to write (ensures correct permissions)
-    import tempfile
-    result = run_host_command(f"cat > {path} << 'EASYLINEOF'\n{content}\nEASYLINEOF")
+    real_path = host_path(path)
 
-    return jsonify({
-        "success": result["returncode"] == 0,
-        "error": result["stderr"],
-    })
+    try:
+        # Write natively inside Python (100% secure, no shell injection)
+        with open(real_path, "w", encoding="utf-8") as f:
+            f.write(content)
+        return jsonify({
+            "success": True,
+            "error": ""
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500

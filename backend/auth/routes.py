@@ -8,20 +8,37 @@ from flask_jwt_extended import (
 )
 from auth.pam_auth import authenticate_user, user_has_sudo
 
+import time
+
 auth_bp = Blueprint("auth", __name__)
+
+# Simple IP-based in-memory rate limiter for failed login attempts
+FAILED_LOGINS = {} # ip -> list of timestamps of failed attempts
+
+def check_login_rate_limit(ip):
+    now = time.time()
+    # Clean up old timestamps (older than 60 seconds)
+    if ip in FAILED_LOGINS:
+        FAILED_LOGINS[ip] = [t for t in FAILED_LOGINS[ip] if now - t < 60]
+        if len(FAILED_LOGINS[ip]) >= 5:
+            return False
+    return True
+
+def record_failed_login(ip):
+    now = time.time()
+    if ip not in FAILED_LOGINS:
+        FAILED_LOGINS[ip] = []
+    FAILED_LOGINS[ip].append(now)
 
 
 @auth_bp.route("/login", methods=["POST"])
 def login():
-    """Authenticate user and return JWT token."""
-    # Rate limiting manuale o via decoratore se accessibile
-    if hasattr(current_app, 'limiter'):
-        @current_app.limiter.limit("5 per minute")
-        def limited_login():
-            pass
-        # Nota: il decoratore dinamico è complesso in Flask-Limiter, 
-        # meglio usare quello standard se possibile, ma i Blueprints richiedono setup specifico.
-        # Per ora usiamo un approccio semplice.
+    ip = request.remote_addr
+    if not check_login_rate_limit(ip):
+        return jsonify({
+            "error": "Rate limit exceeded",
+            "message": "Too many failed login attempts. Please try again in 1 minute."
+        }), 429
     
     data = request.get_json()
     username = data.get("username", "").strip()
@@ -31,10 +48,15 @@ def login():
         return jsonify({"error": "Username and password are required"}), 400
 
     if not authenticate_user(username, password):
+        record_failed_login(ip)
         return jsonify({"error": "Invalid credentials"}), 401
 
     if not user_has_sudo(username):
         return jsonify({"error": "User does not have administrator privileges"}), 403
+
+    # On successful login, clear the failures for this IP
+    if ip in FAILED_LOGINS:
+        del FAILED_LOGINS[ip]
 
     token = create_access_token(identity=username)
     return jsonify({

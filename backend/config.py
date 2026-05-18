@@ -9,7 +9,7 @@ class Config:
     # Security
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-change-me-at-all-costs")
     JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", SECRET_KEY)
-    JWT_ACCESS_TOKEN_EXPIRES = 86400  # 24 hours
+    JWT_ACCESS_TOKEN_EXPIRES = 28800  # 8 hours
     
     # Database
     PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
