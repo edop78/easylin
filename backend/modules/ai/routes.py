@@ -68,15 +68,7 @@ def chat():
         if not model or not messages:
             return jsonify({"error": "Model and messages required"}), 400
 
-        # Save user message
-        try:
-            user_msg = messages[-1]
-            conn = get_db()
-            conn.execute("INSERT INTO chat_messages (model, role, content) VALUES (?, ?, ?)", (model, user_msg['role'], user_msg['content']))
-            conn.commit()
-            conn.close()
-        except Exception as db_e:
-            print(f"Database error in chat: {db_e}")
+        # Database storage disabled: relying entirely on ephemeral frontend memory cache
 
         # Intelligent context reduction for small VM CPUs: 
         # Skip heavy tool definitions if user is just greeting or chatting simply.
@@ -167,11 +159,7 @@ def chat():
                     
                     print(f"DEBUG: Ollama thinking time: {time.time() - start_time:.2f}s")
                     if not tool_calls:
-                        if assistant_full_content:
-                            db_conn = get_db()
-                            db_conn.execute("INSERT INTO chat_messages (model, role, content) VALUES (?, ?, ?)", (model, 'assistant', assistant_full_content))
-                            db_conn.commit()
-                            db_conn.close()
+                        # Database storage disabled: relying entirely on ephemeral frontend memory cache
                         return
 
                     current_messages.append(turn_assistant_message)
@@ -211,15 +199,8 @@ def chat():
 @ai_bp.route("/chat/history", methods=["GET"])
 @jwt_required()
 def get_chat_history():
-    model = request.args.get("model")
-    conn = get_db()
-    if model:
-        cursor = conn.execute("SELECT role, content FROM chat_messages WHERE model = ? ORDER BY created_at ASC", (model,))
-    else:
-        cursor = conn.execute("SELECT role, content FROM chat_messages ORDER BY created_at ASC")
-    messages = [dict(row) for row in cursor.fetchall()]
-    conn.close()
-    return jsonify({"messages": messages})
+    # Database history reading disabled: relying entirely on ephemeral frontend memory cache
+    return jsonify({"messages": []})
 
 @ai_bp.route("/chat/clear", methods=["POST"])
 @jwt_required()
