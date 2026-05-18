@@ -288,7 +288,12 @@ def chat():
                     yield f"data: {json.dumps({'error': str(e)})}\n\n"
                     return
 
-        return Response(generate(), mimetype='text/event-stream')
+        headers = {
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',
+            'Connection': 'keep-alive'
+        }
+        return Response(generate(), mimetype='text/event-stream', headers=headers)
 
     except Exception as e:
         print(f"CRITICAL ERROR in chat route: {e}")
@@ -356,7 +361,12 @@ def pull_model():
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
-    return Response(generate_pull(), mimetype='text/event-stream')
+    headers = {
+        'Cache-Control': 'no-cache',
+        'X-Accel-Buffering': 'no',
+        'Connection': 'keep-alive'
+    }
+    return Response(generate_pull(), mimetype='text/event-stream', headers=headers)
 
 @ai_bp.route("/delete", methods=["DELETE"])
 @jwt_required()
