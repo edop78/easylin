@@ -31,6 +31,19 @@ Alternatively, manual installation:
 3.  **Deploy**: `sudo docker compose up -d --build`
 4.  **Access**: `http://YOUR_SERVER_IP:5050`
 
+## 🔄 Updating EasyLin
+
+To update EasyLin to the latest version and rebuild the containers with the newest changes:
+
+1. Navigate to the project directory:
+   ```bash
+   cd easylin
+   ```
+2. Pull the latest code and rebuild:
+   ```bash
+   git pull origin main && sudo docker compose up -d --build
+   ```
+
 ## 🧠 AI Integration (Ollama)
 
 EasyLin makes running local AI easier than ever. You no longer need to manually install Ollama on the host. Simply go to the **Docker App Store** section within EasyLin and click **Install** on the Ollama AI card. Once installed, the **AI Manager** will automatically activate, allowing you to download and chat with models.
