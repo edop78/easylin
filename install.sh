@@ -12,7 +12,7 @@ YELLOW='\033[1-33m'
 NC='\033[0m' # No Color
 
 echo -e "${GREEN}==========================================${NC}"
-echo -e "${GREEN}   EasyLin v1.2.0 — Linux Dashboard       ${NC}"
+echo -e "${GREEN}   EasyLin v1.3.0 — Linux Dashboard       ${NC}"
 echo -e "${GREEN}==========================================${NC}"
 
 # 1. Check if running as root
