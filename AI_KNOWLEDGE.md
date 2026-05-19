@@ -66,3 +66,10 @@
 
 ## 8. Python Version Compatibility Safeguards
 - **No Backslashes in f-string Expressions**: Do **NOT** use backslashes (like `\n` or `\"`) inside f-string expressions `{...}` (e.g., `{json.dumps('\n')}`). In Python < 3.12 (Debian 12 / Ubuntu 22.04), this throws a fatal `SyntaxError` on import. Since EasyLin's `app.py` imports modules inside a `try/except` to prevent complete server crash, this `SyntaxError` will silently bypass Gunicorn crash checks but leave the affected blueprint/module completely unregistered. Always define JSON/string payloads outside f-strings before yielding/returning.
+
+## 9. Latency & CPU Optimizations for Low-Power Hosts
+To make local LLMs usable on low-spec/CPU-only servers, the AI route implements several aggressive optimization strategies:
+- **Dynamic Tool Selection**: Instead of passing all tool definitions to the LLM (which inflates the system context and causes high prefill times), the backend inspects the user query and dynamically selects only the relevant tool schemas (e.g., only container-related tools if the query mentions "docker").
+- **Sliding Memory Window**: Restricts the context to the last 5 messages, avoiding the exponential increase in response delay as the chat history grows.
+- **Fast-Response Generation in Python**: When a tool is invoked, the backend executes the tool and immediately formats a natural-language Italian response on the fly. It streams this response to the client directly, bypassing a second slow LLM inference turn.
+- **Robust Fallback Parser**: Includes a regex and brace-matching parser to extract tool invocations even if lightweight models format the request as plain text/JSON blocks instead of using the official API tool schemas.

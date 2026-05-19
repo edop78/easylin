@@ -32,6 +32,8 @@ Alternatively, manual installation:
 
 EasyLin makes running local AI easier than ever. You no longer need to manually install Ollama on the host. Simply go to the **Docker App Store** section within EasyLin and click **Install** on the Ollama AI card. Once installed, the **AI Manager** will automatically activate, allowing you to download and chat with models.
 
+The system is optimized to run efficiently even on low-spec CPU-bound virtual machines through dynamic tool pruning, sliding memory windows, and direct tool response generation to keep latency low.
+
 ## 🛡️ Security Hardening
 
 EasyLin is built with security in mind:

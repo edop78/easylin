@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Server, AlertCircle } from 'lucide-react';
+import { Rocket, AlertCircle } from 'lucide-react';
 import '../../components/Layout/Layout.css';
 
 export default function Login() {
@@ -9,8 +9,20 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [serverName, setServerName] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    fetch('/api/auth/server-info')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.hostname) {
+          setServerName(data.hostname);
+        }
+      })
+      .catch(err => console.error("Error fetching server info", err));
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -30,12 +42,38 @@ export default function Login() {
   return (
     <div className="login-page">
       <div className="login-card fade-in">
-        <div className="login-header">
-          <div className="login-logo">
-            <Server size={28} color="#fff" />
+        <div className="login-header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div className="brand-icon" style={{ 
+            background: 'linear-gradient(135deg, var(--accent-blue) 0%, #3b82f6 100%)', 
+            color: 'white', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            borderRadius: '12px', 
+            padding: '10px',
+            boxShadow: '0 4px 16px rgba(59, 130, 246, 0.4)',
+            width: '48px',
+            height: '48px',
+            marginBottom: 'var(--space-md)'
+          }}>
+            <Rocket size={26} />
           </div>
           <h1>EasyLin</h1>
           <p>Sign in with your server credentials</p>
+          {serverName && (
+            <p style={{ 
+              fontSize: '12px', 
+              color: 'var(--accent-blue)', 
+              background: 'var(--accent-blue-dim)', 
+              padding: '4px 12px', 
+              borderRadius: '20px', 
+              marginTop: '10px',
+              fontWeight: 500,
+              display: 'inline-block'
+            }}>
+              Ti stai connettendo a: <span className="mono" style={{ fontWeight: 700 }}>{serverName}</span>
+            </p>
+          )}
         </div>
 
         {error && (

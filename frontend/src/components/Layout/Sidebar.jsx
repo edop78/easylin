@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useApi } from '../../hooks/useApi';
 import { 
   LayoutDashboard, Package, Users, Activity, Container, Network, Shield, Globe, 
-  FileText, Terminal, RefreshCw, Server, Cog, Zap, LogOut, ScrollText, Rocket, GitBranch, HardDrive, Bot
+  FileText, Terminal, RefreshCw, Server, Cog, Zap, LogOut, ScrollText, Rocket, GitBranch, HardDrive, Bot, ShieldCheck
 } from 'lucide-react';
 import './Layout.css';
 
@@ -16,7 +16,6 @@ export default function Sidebar({ isOpen, onClose }) {
   };
 
   const sections = [
-// ... (omitting sections content for brevity in instruction, but keeping it in implementation)
     {
       title: 'Main',
       links: [{ to: '/', icon: LayoutDashboard, label: 'Dashboard' }]
@@ -37,6 +36,7 @@ export default function Sidebar({ isOpen, onClose }) {
         { to: '/docker', icon: Container, label: 'Docker' },
         { to: '/network', icon: Network, label: 'Network' },
         { to: '/firewall', icon: Shield, label: 'Firewall' },
+        { to: '/security', icon: ShieldCheck, label: 'Security' },
         { to: '/proxy', icon: Globe, label: 'Reverse Proxy' },
         { to: '/git', icon: GitBranch, label: 'Git Projects' },
         { to: '/storage', icon: HardDrive, label: 'Storage Manager' }

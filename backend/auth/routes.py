@@ -9,8 +9,23 @@ from flask_jwt_extended import (
 from auth.pam_auth import authenticate_user, user_has_sudo
 
 import time
+import socket
 
 auth_bp = Blueprint("auth", __name__)
+
+
+@auth_bp.route("/server-info", methods=["GET"])
+def server_info():
+    """Return basic public info about the server for the login page."""
+    try:
+        hostname = socket.gethostname()
+    except Exception:
+        hostname = "localhost"
+        
+    return jsonify({
+        "hostname": hostname
+    })
+
 
 # Simple IP-based in-memory rate limiter for failed login attempts
 FAILED_LOGINS = {} # ip -> list of timestamps of failed attempts

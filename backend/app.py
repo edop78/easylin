@@ -67,6 +67,7 @@ def create_app():
         ("modules.git_projects.routes", "git_projects_bp", "/api/git"),
         ("modules.storage.routes", "storage_bp", "/api/storage"),
         ("modules.ai.routes", "ai_bp", "/api/ai"),
+        ("modules.security.routes", "security_bp", "/api/security"),
     ]
 
     # Caricamento moduli dinamico
