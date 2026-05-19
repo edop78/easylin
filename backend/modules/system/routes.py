@@ -32,7 +32,7 @@ def get_version():
         version_file = os.path.join(root_dir, "version.json")
         
         # Default values
-        major, minor, patch, build = 1, 3, 0, 112
+        major, minor, patch, build = 1, 4, 0, 113
         label = "stable"
         
         # 1. Carica dati dal file
@@ -48,7 +48,7 @@ def get_version():
         # 2. Tenta di trovare la directory del progetto
         project_dir = get_project_dir()
         
-        # 3. Tenta di usare Git per il conteggio dei commit (patch) con safe.directory=*
+        # 3. Tenta di usare Git per il conteggio dei commit (build number) con safe.directory=*
         git_count = None
         if project_dir:
             git_cmd = f"git -c safe.directory=* -C {shlex.quote(project_dir)} rev-list --count HEAD"
@@ -75,7 +75,7 @@ def get_version():
                 pass
                 
         if git_count is not None:
-            patch = git_count
+            build = git_count
         
         return jsonify({
             "version": f"v{major}.{minor}.{patch}",
