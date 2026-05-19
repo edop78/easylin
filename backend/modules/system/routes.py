@@ -663,3 +663,154 @@ def apt_clean():
 def docker_prune():
     res = run_host_command("docker system prune -f")
     return jsonify(res)
+
+
+def get_temp_status_path():
+    if getattr(Config, 'IN_DOCKER', False) or os.path.exists("/host/tmp"):
+        return "/host/tmp/easylin_update_status.json"
+    return "/tmp/easylin_update_status.json"
+
+@system_bp.route("/update/check", methods=["GET"])
+@jwt_required()
+def check_update():
+    try:
+        # Clean up old status file if completed/failed
+        status_path = get_temp_status_path()
+        if os.path.exists(status_path):
+            try:
+                with open(status_path, "r") as f:
+                    data = json.load(f)
+                if data.get("step") in ["completed", "failed"]:
+                    os.remove(status_path)
+            except:
+                pass
+
+        # Get project working directory on the host
+        container_id = get_container_id()
+        cmd = f"docker inspect {container_id} --format '{{{{ index .Config.Labels \"com.docker.compose.project.working_dir\" }}}}'"
+        res = run_host_command(cmd)
+        project_dir = res.get("stdout", "").strip() if res.get("returncode") == 0 else ""
+        
+        if not project_dir:
+            return jsonify({
+                "update_available": False,
+                "commits_behind": 0,
+                "changelog": [],
+                "error": "Could not determine project working directory on host"
+            })
+            
+        # 1. Fetch remote updates on the host
+        fetch_cmd = f"git -C {shlex.quote(project_dir)} fetch origin main"
+        run_host_command(fetch_cmd)
+        
+        # 2. Count commits behind
+        count_cmd = f"git -C {shlex.quote(project_dir)} rev-list --count HEAD..origin/main"
+        count_res = run_host_command(count_cmd)
+        
+        commits_behind = 0
+        if count_res.get("returncode") == 0:
+            try:
+                commits_behind = int(count_res.get("stdout", "0").strip())
+            except ValueError:
+                pass
+                
+        # 3. Retrieve changelog (latest commit messages)
+        changelog = []
+        if commits_behind > 0:
+            log_cmd = f"git -C {shlex.quote(project_dir)} log -n 5 --oneline HEAD..origin/main"
+            log_res = run_host_command(log_cmd)
+            if log_res.get("returncode") == 0:
+                changelog = [line.strip() for line in log_res.get("stdout", "").strip().split("\n") if line.strip()]
+                
+        return jsonify({
+            "update_available": commits_behind > 0,
+            "commits_behind": commits_behind,
+            "changelog": changelog
+        })
+    except Exception as e:
+        return jsonify({
+            "update_available": False,
+            "commits_behind": 0,
+            "changelog": [],
+            "error": str(e)
+        })
+
+@system_bp.route("/update/run", methods=["POST"])
+@jwt_required()
+def run_update():
+    try:
+        # Get project working directory on the host
+        container_id = get_container_id()
+        cmd = f"docker inspect {container_id} --format '{{{{ index .Config.Labels \"com.docker.compose.project.working_dir\" }}}}'"
+        res = run_host_command(cmd)
+        project_dir = res.get("stdout", "").strip() if res.get("returncode") == 0 else ""
+        
+        if not project_dir:
+            return jsonify({"success": False, "error": "Could not determine project working directory on host"}), 500
+            
+        # Clean any previous status/log file
+        try:
+            status_path = get_temp_status_path()
+            if os.path.exists(status_path):
+                os.remove(status_path)
+            
+            log_path = "/host/tmp/easylin_self_update.log" if getattr(Config, 'IN_DOCKER', False) else "/tmp/easylin_self_update.log"
+            if os.path.exists(log_path):
+                os.remove(log_path)
+        except:
+            pass
+            
+        # Prepare the bash script to execute on the host
+        # We add "sleep 2" to let Flask return the success JSON response to the client first.
+        script = f"""(
+  echo '{{\"step\": \"git_pull\", \"progress\": 20, \"status\": \"running\"}}' > /tmp/easylin_update_status.json
+  cd {shlex.quote(project_dir)}
+  if ! git pull origin main; then
+    echo '{{\"step\": \"failed\", \"progress\": 20, \"error\": \"Git pull failed\"}}' > /tmp/easylin_update_status.json
+    exit 1
+  fi
+  
+  echo '{{\"step\": \"docker_build\", \"progress\": 60, \"status\": \"running\"}}' > /tmp/easylin_update_status.json
+  if ! docker compose up -d --build; then
+    echo '{{\"step\": \"failed\", \"progress\": 60, \"error\": \"Docker compose rebuild failed\"}}' > /tmp/easylin_update_status.json
+    exit 1
+  fi
+  
+  echo '{{\"step\": \"completed\", \"progress\": 100, \"status\": \"success\"}}' > /tmp/easylin_update_status.json
+) > /tmp/easylin_self_update.log 2>&1"""
+
+        # Launch via systemd-run on host, completely detached
+        escaped_script = shlex.quote(f"sleep 2 && {script}")
+        run_cmd = f"systemd-run --unit=easylin-self-update --description='EasyLin Self-Update' /bin/bash -c {escaped_script}"
+        
+        # Stop any existing update job if running
+        run_host_command("systemctl stop easylin-self-update || true")
+        res = run_host_command(run_cmd)
+        
+        if res.get("returncode") == 0:
+            # Write initial state so frontend immediately knows it started
+            try:
+                os.makedirs(os.path.dirname(get_temp_status_path()), exist_ok=True)
+                with open(get_temp_status_path(), "w") as f:
+                    f.write('{"step": "started", "progress": 5, "status": "running"}')
+            except:
+                pass
+            return jsonify({"success": True, "message": "Update process started in background"})
+        else:
+            return jsonify({"success": False, "error": f"Failed to schedule systemd job: {res.get('stderr') or res.get('stdout')}"}), 500
+            
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@system_bp.route("/update/status", methods=["GET"])
+@jwt_required()
+def get_update_status():
+    path = get_temp_status_path()
+    if os.path.exists(path):
+        try:
+            with open(path, "r") as f:
+                data = json.load(f)
+            return jsonify(data)
+        except Exception as e:
+            return jsonify({"step": "error", "progress": 0, "error": str(e)})
+    return jsonify({"step": "idle", "progress": 0, "status": "idle"})
