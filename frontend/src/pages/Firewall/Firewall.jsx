@@ -96,60 +96,29 @@ export default function Firewall() {
         </span>
       </div>
 
-      <div className="card" style={{
-        background: 'rgba(239, 68, 68, 0.05)',
-        border: '1px dashed rgba(239, 68, 68, 0.3)',
-        borderRadius: 'var(--radius-md)',
-        padding: 'var(--space-md) var(--space-lg)',
-        marginBottom: 'var(--space-lg)',
-        display: 'flex',
-        gap: 'var(--space-md)',
-        alignItems: 'flex-start'
-      }}>
+      <div className="firewall-warning-card">
         <AlertCircle size={22} style={{ color: 'var(--accent-red)', marginTop: '2px', flexShrink: 0 }} />
         <div>
-          <h4 style={{ color: 'var(--accent-red)', fontWeight: 600, margin: '0 0 6px 0', fontSize: '14px' }}>
+          <h4 className="firewall-warning-title">
             CRITICAL WARNING
           </h4>
-          <p style={{ margin: 0, fontSize: '13px', lineHeight: '1.5', color: 'var(--text-secondary)' }}>
+          <p className="firewall-warning-text">
             To maintain connection after enabling the firewall, you <strong>MUST</strong> ensure rules are added to allow incoming traffic on:
           </p>
-          <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px', fontSize: '13px', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <li style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <ul className="firewall-warning-list">
+            <li className="firewall-warning-item">
               <span><strong>Port 5050 (TCP)</strong>: For this EasyLin Dashboard access.</span>
               <button 
-                className="btn btn-sm btn-ghost" 
-                style={{ 
-                  color: 'var(--accent-green)', 
-                  padding: '2px 8px', 
-                  fontSize: '11px',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
-                  background: 'rgba(16, 185, 129, 0.05)',
-                  borderRadius: '4px',
-                  height: '24px',
-                  lineHeight: '20px',
-                  cursor: 'pointer'
-                }} 
+                className="btn-quick-allow" 
                 onClick={() => handleQuickAllow('5050')}
               >
                 Quick Allow 5050
               </button>
             </li>
-            <li style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+            <li className="firewall-warning-item">
               <span><strong>Port 22 (TCP)</strong> (or your custom SSH port): To prevent locking yourself out of your server's CLI.</span>
               <button 
-                className="btn btn-sm btn-ghost" 
-                style={{ 
-                  color: 'var(--accent-green)', 
-                  padding: '2px 8px', 
-                  fontSize: '11px',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
-                  background: 'rgba(16, 185, 129, 0.05)',
-                  borderRadius: '4px',
-                  height: '24px',
-                  lineHeight: '20px',
-                  cursor: 'pointer'
-                }} 
+                className="btn-quick-allow" 
                 onClick={() => handleQuickAllow('22')}
               >
                 Quick Allow 22
@@ -196,7 +165,11 @@ export default function Firewall() {
           <div className="card-title"><Shield size={16} /> Firewall Rules</div>
         </div>
         {loading ? (
-          <div className="loading-container"><div className="spinner" /></div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
+            <div className="skeleton skeleton-table-row" style={{ width: '100%', height: '35px' }} />
+            <div className="skeleton skeleton-table-row" style={{ width: '100%', height: '35px' }} />
+            <div className="skeleton skeleton-table-row" style={{ width: '100%', height: '35px' }} />
+          </div>
         ) : data?.rules?.length > 0 ? (
           <table className="data-table">
             <thead><tr><th>#</th><th>Rule</th><th>Actions</th></tr></thead>

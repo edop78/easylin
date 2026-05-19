@@ -740,3 +740,99 @@ select.form-input {
   background: var(--accent-red-dim);
   color: var(--accent-red);
 }
+
+/* --- Firewall Warning Banner --- */
+.firewall-warning-card {
+  background: rgba(239, 68, 68, 0.05);
+  border: 1px dashed rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-md);
+  padding: var(--space-md) var(--space-lg);
+  margin-bottom: var(--space-lg);
+  display: flex;
+  gap: var(--space-md);
+  align-items: flex-start;
+}
+
+.firewall-warning-title {
+  color: var(--accent-red);
+  font-weight: 600;
+  margin: 0 0 6px 0;
+  font-size: 14px;
+}
+
+.firewall-warning-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.firewall-warning-list {
+  margin: 8px 0 0 0;
+  padding-left: 20px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.firewall-warning-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.btn-quick-allow {
+  color: var(--accent-green); 
+  padding: 2px 8px; 
+  font-size: 11px;
+  border: 1px solid rgba(61, 214, 140, 0.3);
+  background: rgba(61, 214, 140, 0.05);
+  border-radius: 4px;
+  height: 24px;
+  line-height: 20px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all var(--transition-fast);
+}
+
+.btn-quick-allow:hover {
+  background: rgba(61, 214, 140, 0.15);
+  border-color: var(--accent-green);
+}
+
+/* --- Skeleton Loader --- */
+@keyframes skeletonPulse {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-card-hover) 50%, var(--bg-card) 75%);
+  background-size: 200% 100%;
+  animation: skeletonPulse 1.5s infinite linear;
+  border-radius: var(--radius-sm);
+  display: block;
+}
+
+.skeleton-text {
+  height: 14px;
+  margin-bottom: var(--space-sm);
+}
+
+.skeleton-title {
+  height: 20px;
+  width: 40%;
+  margin-bottom: var(--space-md);
+}
+
+.skeleton-table-row {
+  height: 40px;
+  margin-bottom: var(--space-xs);
+  width: 100%;
+}
+

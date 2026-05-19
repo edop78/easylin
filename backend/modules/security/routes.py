@@ -10,18 +10,10 @@ except ImportError:
 
 security_bp = Blueprint("security", __name__)
 
-def get_run_command():
-    try:
-        from backend.utils.command import run_host_command
-        return run_host_command
-    except ImportError:
-        try:
-            from utils.command import run_host_command
-            return run_host_command
-        except ImportError:
-            return lambda cmd, **kwargs: {"stdout": "", "stderr": "Command utility not found", "returncode": 1}
+import logging
+from utils.command import run_host_command
 
-run_host_command = get_run_command()
+logger = logging.getLogger(__name__)
 
 @security_bp.route("/audit", methods=["GET"])
 @jwt_required()

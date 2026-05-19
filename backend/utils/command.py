@@ -2,7 +2,10 @@
 
 import subprocess
 import shlex
+import logging
 from config import Config
+
+logger = logging.getLogger("easylin.command")
 
 
 def run_host_command(command, timeout=30, shell=True):
@@ -39,12 +42,14 @@ def run_host_command(command, timeout=30, shell=True):
             "returncode": result.returncode,
         }
     except subprocess.TimeoutExpired:
+        logger.warning(f"Host command timed out after {timeout}s: {command}")
         return {
             "stdout": "",
             "stderr": "Command timed out",
             "returncode": -1,
         }
     except Exception as e:
+        logger.exception(f"Unhandled exception running host command: {command}")
         return {
             "stdout": "",
             "stderr": str(e),
