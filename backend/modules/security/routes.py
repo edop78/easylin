@@ -54,7 +54,6 @@ def run_security_audit():
                 "fix_command": "ufw enable"
             })
     else:
-        # Check if ufw is installed
         check_ufw = run_host_command("which ufw")
         if check_ufw.get("returncode") == 0:
             checks.append({
@@ -264,7 +263,6 @@ def run_security_audit():
         try:
             with open(updates_file, "r") as f:
                 content = f.read()
-                # Parse e.g. "X updates can be applied" and "Y updates are security updates."
                 m_sec = re.search(r"(\d+)\s+updates?\s+are\s+security\s+updates", content, re.IGNORECASE)
                 m_tot = re.search(r"(\d+)\s+updates?\s+can\s+be\s+applied", content, re.IGNORECASE)
                 if m_sec:
@@ -281,7 +279,6 @@ def run_security_audit():
         apt_res = run_host_command("apt-get -s upgrade")
         if apt_res.get("returncode") == 0:
             stdout = apt_res.get("stdout", "")
-            # Count lines starting with Inst or check for security keywords
             inst_lines = [l for l in stdout.split("\n") if l.startswith("Inst ")]
             tot_updates = len(inst_lines)
             sec_lines = [l for l in inst_lines if "security" in l.lower() or "vuln" in l.lower() or "patch" in l.lower()]
@@ -335,7 +332,6 @@ def run_security_audit():
     exposed_containers = []
     
     try:
-        # Check container list from Docker socket
         docker_list = subprocess.run(['curl', '-s', '--unix-socket', docker_sock, 'http://localhost/containers/json'], capture_output=True, text=True, timeout=5)
         if docker_list.returncode == 0:
             containers = json.loads(docker_list.stdout)
@@ -372,6 +368,192 @@ def run_security_audit():
             "fix_command": None
         })
 
+    # --- NEW SECURITY CHECKS ADDED ---
+
+    # 6. Passwordless Sudo Configurations
+    sudoers_res = run_host_command("grep -r -i -l \"nopasswd\" /host/etc/sudoers /host/etc/sudoers.d/ 2>/dev/null")
+    if sudoers_res.get("returncode") == 0 and sudoers_res.get("stdout"):
+        files = [os.path.basename(f.strip()) for f in sudoers_res["stdout"].split("\n") if f.strip()]
+        checks.append({
+            "id": "passwordless_sudo",
+            "name": "Passwordless Sudo Configuration",
+            "category": "Access",
+            "status": "warning",
+            "value": "NOPASSWD detected",
+            "description": f"The following sudoer configuration file(s) allow passwordless command execution: {', '.join(files)}. This represents a potential privilege escalation vector if accounts are hijacked.",
+            "fix_command": None
+        })
+    else:
+        checks.append({
+            "id": "passwordless_sudo",
+            "name": "Passwordless Sudo Configuration",
+            "category": "Access",
+            "status": "secure",
+            "value": "Disabled",
+            "description": "No NOPASSWD parameters detected in active sudoers files. Users must input passwords to elevate privileges.",
+            "fix_command": None
+        })
+
+    # 7. Fail2ban Brute-force Shield Status
+    f2b_res = run_host_command("systemctl is-active fail2ban")
+    if f2b_res.get("returncode") == 0 and f2b_res.get("stdout") == "active":
+        checks.append({
+            "id": "fail2ban_status",
+            "name": "Fail2ban Brute-Force Protection",
+            "category": "Network",
+            "status": "secure",
+            "value": "Active",
+            "description": "Fail2ban service is running and actively monitoring auth logs to block dictionary attacks.",
+            "fix_command": None
+        })
+    else:
+        # Check if installed
+        f2b_check = run_host_command("which fail2ban-client")
+        if f2b_check.get("returncode") == 0:
+            checks.append({
+                "id": "fail2ban_status",
+                "name": "Fail2ban Brute-Force Protection",
+                "category": "Network",
+                "status": "risk",
+                "value": "Inactive",
+                "description": "Fail2ban is installed but the service is currently stopped or disabled.",
+                "fix_command": "systemctl start fail2ban"
+            })
+        else:
+            checks.append({
+                "id": "fail2ban_status",
+                "name": "Fail2ban Brute-Force Protection",
+                "category": "Network",
+                "status": "warning",
+                "value": "Not Installed",
+                "description": "Fail2ban is not installed. The server lacks automated log-scanning and IP-banning defenses against SSH brute force.",
+                "fix_command": "apt-get install fail2ban -y && systemctl enable fail2ban && systemctl start fail2ban"
+            })
+
+    # 8. Insecure Shells on Default System Accounts
+    system_users = ["bin", "sys", "sync", "games", "man", "lp", "mail", "news", "uucp", "proxy", "www-data", "backup", "list", "irc", "gnats", "nobody"]
+    insecure_shells = []
+    passwd_path = "/host/etc/passwd"
+    if os.path.exists(passwd_path):
+        try:
+            with open(passwd_path, "r") as f:
+                for line in f:
+                    parts = line.strip().split(":")
+                    if len(parts) >= 7:
+                        user = parts[0]
+                        shell = parts[6]
+                        if user in system_users and shell not in ["/usr/sbin/nologin", "/bin/false", "/sbin/nologin"]:
+                            insecure_shells.append(f"{user} ({shell})")
+        except:
+            pass
+            
+    if insecure_shells:
+        checks.append({
+            "id": "system_account_shells",
+            "name": "Service Account Login Shells",
+            "category": "Access",
+            "status": "warning",
+            "value": f"{len(insecure_shells)} active",
+            "description": f"The following system service accounts have interactive login shells: {', '.join(insecure_shells)}. They should be disabled to prevent local shell execution hijacking.",
+            "fix_command": None
+        })
+    else:
+        checks.append({
+            "id": "system_account_shells",
+            "name": "Service Account Login Shells",
+            "category": "Access",
+            "status": "secure",
+            "value": "All Disabled (Secure)",
+            "description": "All default non-privileged system service accounts have login shells correctly disabled or restricted.",
+            "fix_command": None
+        })
+
+    # 9. Docker Daemon TCP API Port Exposure
+    docker_tcp = run_host_command("ss -tlnp | grep -E \"237[56]\"")
+    if docker_tcp.get("returncode") == 0 and docker_tcp.get("stdout"):
+        stdout = docker_tcp.get("stdout")
+        if "2375" in stdout:
+            checks.append({
+                "id": "docker_tcp_exposure",
+                "name": "Docker TCP Socket API",
+                "category": "Docker",
+                "status": "risk",
+                "value": "Exposed Unencrypted (2375)",
+                "description": "Docker Daemon API is listening publicly on unencrypted TCP port 2375. This allows unauthenticated remote users to gain complete root command execution.",
+                "fix_command": None
+            })
+        else:
+            checks.append({
+                "id": "docker_tcp_exposure",
+                "name": "Docker TCP Socket API",
+                "category": "Docker",
+                "status": "warning",
+                "value": "Exposed with TLS (2376)",
+                "description": "Docker Daemon API is listening on port 2376 with TLS. Ensure client certificates are kept secure.",
+                "fix_command": None
+            })
+    else:
+        checks.append({
+            "id": "docker_tcp_exposure",
+            "name": "Docker TCP Socket API",
+            "category": "Docker",
+            "status": "secure",
+            "value": "Not Exposed via TCP",
+            "description": "Docker Daemon API is restricted to the local Unix socket, which is the secure default configuration.",
+            "fix_command": None
+        })
+
+    # 10. Root SSH key file permissions
+    root_keys_path = "/host/root/.ssh/authorized_keys"
+    if os.path.exists(root_keys_path):
+        try:
+            stat_res = subprocess.run(["stat", "-c", "%a", root_keys_path], capture_output=True, text=True)
+            if stat_res.returncode == 0:
+                mode = stat_res.stdout.strip()
+                # Unsafe if group/others have read/write/execute (digits 2 and 3 should be 0)
+                if len(mode) == 3 and (mode[1] != '0' or mode[2] != '0'):
+                    checks.append({
+                        "id": "root_ssh_keys",
+                        "name": "Root SSH Key Permissions",
+                        "category": "Access",
+                        "status": "risk",
+                        "value": f"Insecure ({mode})",
+                        "description": f"The root authorized_keys file has unsafe read/write permissions ({mode}). Other local users could view or append unauthorized access keys.",
+                        "fix_command": "chmod 600 /root/.ssh/authorized_keys"
+                    })
+                else:
+                    checks.append({
+                        "id": "root_ssh_keys",
+                        "name": "Root SSH Key Permissions",
+                        "category": "Access",
+                        "status": "secure",
+                        "value": f"Secure ({mode})",
+                        "description": "The root authorized_keys file has secure, restricted permissions (600), allowing only the root owner to read/write it.",
+                        "fix_command": None
+                    })
+            else:
+                checks.append({
+                    "id": "root_ssh_keys",
+                    "name": "Root SSH Key Permissions",
+                    "category": "Access",
+                    "status": "warning",
+                    "value": "Unverifiable",
+                    "description": "Unable to verify file access permissions for root's SSH authorized keys.",
+                    "fix_command": None
+                })
+        except:
+            pass
+    else:
+        checks.append({
+            "id": "root_ssh_keys",
+            "name": "Root SSH Key Permissions",
+            "category": "Access",
+            "status": "secure",
+            "value": "No root keys file",
+            "description": "No SSH authorized keys file exists for the root user. Standard credential controls apply.",
+            "fix_command": None
+        })
+
     # Calculate global security status
     risks_count = sum(1 for c in checks if c["status"] == "risk")
     warnings_count = sum(1 for c in checks if c["status"] == "warning")
@@ -405,21 +587,24 @@ def fix_security_issue():
     if not check_id or not fix_cmd:
         return jsonify({"success": False, "error": "Missing required parameters"}), 400
         
-    # Security restriction: do not run arbitrary commands, check against allowlist
     allowed_fixes = {
         "ufw_status": "ufw enable",
         "ssh_root_login": "sed -i 's/^PermitRootLogin.*/PermitRootLogin prohibit-password/g' /etc/ssh/sshd_config && systemctl restart ssh",
         "ssh_password_auth": "sed -i 's/^PasswordAuthentication.*/PasswordAuthentication no/g' /etc/ssh/sshd_config && systemctl restart ssh",
         "docker_sock_perms": "chmod 660 /var/run/docker.sock",
-        "system_updates": "apt-get update && apt-get upgrade -y"
+        "system_updates": "apt-get update && apt-get upgrade -y",
+        "fail2ban_status": "systemctl start fail2ban" if "start" in fix_cmd else "apt-get install fail2ban -y && systemctl enable fail2ban && systemctl start fail2ban",
+        "root_ssh_keys": "chmod 600 /root/.ssh/authorized_keys"
     }
     
-    # We allow the specific command associated with this check
     expected_cmd = allowed_fixes.get(check_id)
-    if not expected_cmd or expected_cmd != fix_cmd:
+    if not expected_cmd or (expected_cmd != fix_cmd and check_id != "fail2ban_status"):
         return jsonify({"success": False, "error": "Remediation action unauthorized or unsafe."}), 403
         
-    # Execute the fix
+    # Double check dynamic command execution for fail2ban to be safe
+    if check_id == "fail2ban_status" and fix_cmd not in ["systemctl start fail2ban", "apt-get install fail2ban -y && systemctl enable fail2ban && systemctl start fail2ban"]:
+         return jsonify({"success": False, "error": "Remediation action unauthorized or unsafe."}), 403
+
     res = run_host_command(fix_cmd)
     success = (res.get("returncode") == 0)
     
