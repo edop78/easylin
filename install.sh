@@ -86,13 +86,21 @@ apt-mark hold docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-
 
 # 2.5 Clone repository if not already in project directory
 if [ ! -f docker-compose.yml ] || [ ! -f .env.example ]; then
-  echo -e "${GREEN}Cloning EasyLin repository...${NC}"
-  if ! command -v git &> /dev/null; then
-    echo -e "${GREEN}Installing git...${NC}"
-    apt-get update && apt-get install -y git
+  if [ -d easylin ]; then
+    echo -e "${YELLOW}Folder 'easylin' already exists. Entering it...${NC}"
+    cd easylin
   fi
-  git clone https://github.com/edop78/easylin.git
-  cd easylin
+  
+  # Check again after entering folder
+  if [ ! -f docker-compose.yml ] || [ ! -f .env.example ]; then
+    echo -e "${GREEN}Cloning EasyLin repository...${NC}"
+    if ! command -v git &> /dev/null; then
+      echo -e "${GREEN}Installing git...${NC}"
+      apt-get update && apt-get install -y git
+    fi
+    git clone https://github.com/edop78/easylin.git
+    cd easylin
+  fi
 fi
 
 # 3. Setup Environment
@@ -100,9 +108,14 @@ if [ ! -f .env ]; then
   echo -e "${GREEN}Creating .env file...${NC}"
   if [ -f .env.example ]; then
     cp .env.example .env
-    # Generate random keys
-    SECRET=$(openssl rand -hex 32)
-    JWT_SECRET=$(openssl rand -hex 32)
+    # Generate random keys with openssl, with a secure fallback to /dev/urandom
+    if ! command -v openssl &> /dev/null; then
+      SECRET=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 64 | head -n 1 2>/dev/null || echo "fallbacksecretkeyeasylin1234567890")
+      JWT_SECRET=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 64 | head -n 1 2>/dev/null || echo "fallbackjwtsecretkeyeasylin0987654321")
+    else
+      SECRET=$(openssl rand -hex 32)
+      JWT_SECRET=$(openssl rand -hex 32)
+    fi
     
     # Replace placeholders in .env
     sed -i "s/change-me-to-something-very-long-and-secure/$SECRET/" .env
