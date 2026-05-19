@@ -36,12 +36,10 @@ export default function UpdateClean() {
   const [updating, setUpdating] = useState(false);
   const [updateError, setUpdateError] = useState('');
 
-  // Auto check updates if tab is 'easylin'
+  // Check for updates on mount to show indicators immediately
   useEffect(() => {
-    if (tab === 'easylin') {
-      checkUpdates();
-    }
-  }, [tab]);
+    checkUpdates();
+  }, []);
 
   const checkUpdates = async () => {
     setUpdateCheckLoading(true);
@@ -189,8 +187,23 @@ export default function UpdateClean() {
         <button className={`tab ${tab === 'clean' ? 'active' : ''}`} onClick={() => setTab('clean')}>
           <Wind size={14} /> Cleaning & Space
         </button>
-        <button className={`tab ${tab === 'easylin' ? 'active' : ''}`} onClick={() => setTab('easylin')}>
-          <Rocket size={14} /> EasyLin Update
+        <button 
+          className={`tab ${tab === 'easylin' ? 'active' : ''}`} 
+          onClick={() => setTab('easylin')}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+        >
+          <Rocket size={14} /> 
+          <span>EasyLin Update</span>
+          {updateCheckData?.update_available && (
+            <span style={{
+              width: '8px',
+              height: '8px',
+              backgroundColor: 'var(--accent-yellow)',
+              borderRadius: '50%',
+              display: 'inline-block',
+              boxShadow: '0 0 8px var(--accent-yellow)'
+            }} title="Updates available" />
+          )}
         </button>
       </div>
 
