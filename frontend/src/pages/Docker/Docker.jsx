@@ -140,9 +140,14 @@ services:
     try {
       const res = await api.post('/docker/compose/projects', composeForm);
       if (res.success) {
-        setMsg({ type: 'success', text: `Stack "${composeForm.name}" deployed successfully!` });
+        setMsg({ type: 'success', text: res.message || `Stack "${composeForm.name}" deployment started!` });
+        const name = composeForm.name;
         setComposeForm({ name: '', yml: '' });
         setActiveComposeProject(null);
+        
+        // Open logs modal immediately
+        setActiveTaskLogs({ id: `compose_${name}`, name: `Deploying Stack: ${name}` });
+        
         refetchCompose();
         refetchContainers();
       } else {
@@ -159,7 +164,11 @@ services:
     try {
       const res = await api.post(`/docker/compose/projects/${projectName}/${action}`);
       if (res.success) {
-        setMsg({ type: 'success', text: `Compose action "${action}" completed successfully!` });
+        setMsg({ type: 'success', text: res.message || `Compose action "${action}" started!` });
+        
+        // Open logs modal immediately
+        setActiveTaskLogs({ id: `compose_${projectName}`, name: `Compose ${action}: ${projectName}` });
+        
         refetchCompose();
         refetchContainers();
       } else {
@@ -174,7 +183,11 @@ services:
     try {
       const res = await api.delete(`/docker/compose/projects/${projectName}`);
       if (res.success) {
-        setMsg({ type: 'success', text: `Compose stack "${projectName}" deleted successfully!` });
+        setMsg({ type: 'success', text: res.message || `Deleting stack "${projectName}"...` });
+        
+        // Open logs modal immediately
+        setActiveTaskLogs({ id: `compose_${projectName}`, name: `Deleting Stack: ${projectName}` });
+        
         if (activeComposeProject?.name === projectName) {
           setActiveComposeProject(null);
           setComposeForm({ name: '', yml: '' });
@@ -530,80 +543,133 @@ services:
               <div>
                 <h3 style={{ marginBottom: 'var(--space-md)', fontSize: '1.2rem' }}>Compose Projects</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
-                  {(composeData?.projects || []).map(project => (
-                    <div 
-                      key={project.name} 
-                      className={`card ${activeComposeProject?.name === project.name ? 'active' : ''}`}
-                      style={{ 
-                        padding: 'var(--space-md)', 
-                        border: '1px solid var(--border-color)', 
-                        cursor: 'pointer',
-                        background: activeComposeProject?.name === project.name ? 'rgba(59, 130, 246, 0.05)' : 'rgba(255,255,255,0.01)',
-                        borderColor: activeComposeProject?.name === project.name ? 'var(--accent-blue)' : 'var(--border-color)'
-                      }}
-                      onClick={() => setActiveComposeProject(project)}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '1.05rem' }}>{project.name}</span>
-                        <span className={`badge ${project.status === 'running' ? 'badge-success' : project.status === 'warning' ? 'badge-warning' : 'badge-danger'}`}>
-                          {project.status.toUpperCase()}
-                        </span>
+                  {(composeData?.projects || []).map(project => {
+                    const taskId = `compose_${project.name}`;
+                    const task = marketTasks?.tasks?.[taskId];
+                    const isOperating = task?.status === 'installing';
+                    const hasError = task?.status === 'error';
+
+                    return (
+                      <div 
+                        key={project.name} 
+                        className={`card ${activeComposeProject?.name === project.name ? 'active' : ''}`}
+                        style={{ 
+                          padding: 'var(--space-md)', 
+                          border: '1px solid var(--border-color)', 
+                          cursor: 'pointer',
+                          background: activeComposeProject?.name === project.name ? 'rgba(59, 130, 246, 0.05)' : 'rgba(255,255,255,0.01)',
+                          borderColor: activeComposeProject?.name === project.name ? 'var(--accent-blue)' : 'var(--border-color)',
+                          position: 'relative'
+                        }}
+                        onClick={() => setActiveComposeProject(project)}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {project.name}
+                            {isOperating && <RotateCw size={14} className="spin" style={{ color: 'var(--accent-purple)' }} />}
+                          </span>
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            {task && (
+                              <button 
+                                className="btn btn-sm btn-ghost" 
+                                onClick={(e) => { e.stopPropagation(); clearTask(taskId); }}
+                                style={{ padding: '2px', color: 'var(--accent-red)', minWidth: 'auto', height: 'auto' }}
+                                title="Clear Task Status"
+                              >
+                                <X size={12} />
+                              </button>
+                            )}
+                            <span className={`badge ${isOperating ? 'badge-warning' : project.status === 'running' ? 'badge-success' : project.status === 'warning' ? 'badge-warning' : 'badge-danger'}`}>
+                              {isOperating ? 'OPERATING' : project.status.toUpperCase()}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                          Path: <span className="mono" style={{ wordBreak: 'break-all' }}>{project.path}</span>
+                        </div>
+
+                        {hasError && (
+                          <div className="alert alert-danger" style={{ fontSize: '11px', padding: '6px 10px', marginBottom: '8px', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <AlertCircle size={12} /> {task.error || 'Action failed.'}
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
+                          {(isOperating || task) && (
+                            <button 
+                              className="btn btn-sm btn-primary"
+                              style={{ backgroundColor: 'var(--accent-purple)', borderColor: 'var(--accent-purple)', padding: '4px 10px', height: 'auto', minWidth: 'auto', fontSize: '11px', color: 'white' }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveTaskLogs({ id: taskId, name: `Compose Stack: ${project.name}` });
+                              }}
+                            >
+                              <ScrollText size={12} style={{ marginRight: '4px' }} /> {isOperating ? 'View Live Progress' : 'View Operation Logs'}
+                            </button>
+                          )}
+
+                          <button 
+                            className="btn btn-sm btn-ghost" 
+                            onClick={(e) => { e.stopPropagation(); runComposeAction(project.name, 'up'); }}
+                            title="Compose Up"
+                            disabled={isOperating}
+                            style={{ color: isOperating ? 'var(--text-muted)' : 'var(--accent-green)', padding: '4px 8px', height: 'auto', minWidth: 'auto' }}
+                          >
+                            <Play size={12} /> Up
+                          </button>
+                          
+                          <button 
+                            className="btn btn-sm btn-ghost" 
+                            onClick={(e) => { e.stopPropagation(); runComposeAction(project.name, 'down'); }}
+                            title="Compose Down"
+                            disabled={isOperating}
+                            style={{ color: isOperating ? 'var(--text-muted)' : 'var(--accent-red)', padding: '4px 8px', height: 'auto', minWidth: 'auto' }}
+                          >
+                            <Square size={12} /> Down
+                          </button>
+                          
+                          <button 
+                            className="btn btn-sm btn-ghost" 
+                            onClick={(e) => { e.stopPropagation(); runComposeAction(project.name, 'restart'); }}
+                            title="Compose Restart"
+                            disabled={isOperating}
+                            style={{ padding: '4px 8px', height: 'auto', minWidth: 'auto', color: isOperating ? 'var(--text-muted)' : 'inherit' }}
+                          >
+                            <RotateCw size={12} /> Restart
+                          </button>
+                          
+                          <button 
+                            className="btn btn-sm btn-ghost" 
+                            onClick={(e) => { e.stopPropagation(); runComposeAction(project.name, 'pull'); }}
+                            title="Compose Pull"
+                            disabled={isOperating}
+                            style={{ padding: '4px 8px', height: 'auto', minWidth: 'auto', color: isOperating ? 'var(--text-muted)' : 'inherit' }}
+                          >
+                            <Download size={12} /> Pull
+                          </button>
+                          
+                          <button 
+                            className="btn btn-sm btn-ghost" 
+                            onClick={(e) => { 
+                              e.stopPropagation(); 
+                              setConfirm({
+                                open: true,
+                                title: `Delete Stack: ${project.name}`,
+                                message: `Are you sure you want to stop and delete the compose stack "${project.name}"? All associated containers will be destroyed.`,
+                                action: () => deleteComposeProject(project.name)
+                              });
+                            }}
+                            disabled={isOperating}
+                            title="Delete Project"
+                            style={{ color: isOperating ? 'var(--text-muted)' : 'var(--accent-red)', marginLeft: 'auto', padding: '4px 8px', height: 'auto', minWidth: 'auto' }}
+                          >
+                            <Trash size={12} /> Delete
+                          </button>
+                        </div>
                       </div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                        Path: <span className="mono" style={{ wordBreak: 'break-all' }}>{project.path}</span>
-                      </div>
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
-                        <button 
-                          className="btn btn-sm btn-ghost" 
-                          onClick={(e) => { e.stopPropagation(); runComposeAction(project.name, 'up'); }}
-                          title="Compose Up"
-                          style={{ color: 'var(--accent-green)', padding: '4px 8px', height: 'auto', minWidth: 'auto' }}
-                        >
-                          <Play size={12} /> Up
-                        </button>
-                        <button 
-                          className="btn btn-sm btn-ghost" 
-                          onClick={(e) => { e.stopPropagation(); runComposeAction(project.name, 'down'); }}
-                          title="Compose Down"
-                          style={{ color: 'var(--accent-red)', padding: '4px 8px', height: 'auto', minWidth: 'auto' }}
-                        >
-                          <Square size={12} /> Down
-                        </button>
-                        <button 
-                          className="btn btn-sm btn-ghost" 
-                          onClick={(e) => { e.stopPropagation(); runComposeAction(project.name, 'restart'); }}
-                          title="Compose Restart"
-                          style={{ padding: '4px 8px', height: 'auto', minWidth: 'auto' }}
-                        >
-                          <RotateCw size={12} /> Restart
-                        </button>
-                        <button 
-                          className="btn btn-sm btn-ghost" 
-                          onClick={(e) => { e.stopPropagation(); runComposeAction(project.name, 'pull'); }}
-                          title="Compose Pull"
-                          style={{ padding: '4px 8px', height: 'auto', minWidth: 'auto' }}
-                        >
-                          <Download size={12} /> Pull
-                        </button>
-                        <button 
-                          className="btn btn-sm btn-ghost" 
-                          onClick={(e) => { 
-                            e.stopPropagation(); 
-                            setConfirm({
-                              open: true,
-                              title: `Delete Stack: ${project.name}`,
-                              message: `Are you sure you want to stop and delete the compose stack "${project.name}"? All associated containers will be destroyed.`,
-                              action: () => deleteComposeProject(project.name)
-                            });
-                          }}
-                          title="Delete Project"
-                          style={{ color: 'var(--accent-red)', marginLeft: 'auto', padding: '4px 8px', height: 'auto', minWidth: 'auto' }}
-                        >
-                          <Trash size={12} /> Delete
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {(composeData?.projects || []).length === 0 && (
                     <div className="card" style={{ padding: 'var(--space-xl)', textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border-color)' }}>
                       No active Docker Compose projects. Use the deployment panel on the right to deploy one.
