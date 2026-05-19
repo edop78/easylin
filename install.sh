@@ -99,6 +99,11 @@ if [ ! -f docker-compose.yml ] || [ ! -f .env.example ]; then
       apt-get update && apt-get install -y git
     fi
     git clone https://github.com/edop78/easylin.git
+    
+    if [ -n "$SUDO_USER" ]; then
+      chown -R "$SUDO_USER":"$SUDO_USER" easylin
+    fi
+    
     cd easylin
   fi
 fi
@@ -126,6 +131,11 @@ if [ ! -f .env ]; then
     echo -e "${RED}Error: .env.example not found!${NC}"
     exit 1
   fi
+fi
+
+# Ensure all files in the repository (including .git and .env) are owned by the original non-root user
+if [ -n "$SUDO_USER" ]; then
+  chown -R "$SUDO_USER":"$SUDO_USER" .
 fi
 
 # 4. Start EasyLin
