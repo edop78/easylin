@@ -84,6 +84,16 @@ check_compose
 echo -e "${GREEN}Protecting Docker engine packages from accidental self-upgrades...${NC}"
 apt-mark hold docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin || true
 
+# 2.5 Clone repository if not already in project directory
+if [ ! -f docker-compose.yml ] || [ ! -f .env.example ]; then
+  echo -e "${GREEN}Cloning EasyLin repository...${NC}"
+  if ! command -v git &> /dev/null; then
+    echo -e "${GREEN}Installing git...${NC}"
+    apt-get update && apt-get install -y git
+  fi
+  git clone https://github.com/edop78/easylin.git
+  cd easylin
+fi
 
 # 3. Setup Environment
 if [ ! -f .env ]; then
