@@ -55,8 +55,9 @@ export default function Firewall() {
       if (result.success) {
         setMessage({
           type: 'success',
-          text: `Port ${port} has been allowed. Note: The rules list will not update until you enable the firewall.`
+          text: `Port ${port} has been allowed. Note: If the firewall is inactive, the rules list will not display it until enabled.`
         });
+        refetch();
       } else {
         setMessage({ type: 'error', text: result.error || 'Failed to add rule' });
       }
@@ -116,47 +117,43 @@ export default function Firewall() {
           <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px', fontSize: '13px', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <li style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
               <span><strong>Port 5050 (TCP)</strong>: For this EasyLin Dashboard access.</span>
-              {!data?.active && (
-                <button 
-                  className="btn btn-sm btn-ghost" 
-                  style={{ 
-                    color: 'var(--accent-green)', 
-                    padding: '2px 8px', 
-                    fontSize: '11px',
-                    border: '1px solid rgba(16, 185, 129, 0.3)',
-                    background: 'rgba(16, 185, 129, 0.05)',
-                    borderRadius: '4px',
-                    height: '24px',
-                    lineHeight: '20px',
-                    cursor: 'pointer'
-                  }} 
-                  onClick={() => handleQuickAllow('5050')}
-                >
-                  Quick Allow 5050
-                </button>
-              )}
+              <button 
+                className="btn btn-sm btn-ghost" 
+                style={{ 
+                  color: 'var(--accent-green)', 
+                  padding: '2px 8px', 
+                  fontSize: '11px',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  background: 'rgba(16, 185, 129, 0.05)',
+                  borderRadius: '4px',
+                  height: '24px',
+                  lineHeight: '20px',
+                  cursor: 'pointer'
+                }} 
+                onClick={() => handleQuickAllow('5050')}
+              >
+                Quick Allow 5050
+              </button>
             </li>
             <li style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
               <span><strong>Port 22 (TCP)</strong> (or your custom SSH port): To prevent locking yourself out of your server's CLI.</span>
-              {!data?.active && (
-                <button 
-                  className="btn btn-sm btn-ghost" 
-                  style={{ 
-                    color: 'var(--accent-green)', 
-                    padding: '2px 8px', 
-                    fontSize: '11px',
-                    border: '1px solid rgba(16, 185, 129, 0.3)',
-                    background: 'rgba(16, 185, 129, 0.05)',
-                    borderRadius: '4px',
-                    height: '24px',
-                    lineHeight: '20px',
-                    cursor: 'pointer'
-                  }} 
-                  onClick={() => handleQuickAllow('22')}
-                >
-                  Quick Allow 22
-                </button>
-              )}
+              <button 
+                className="btn btn-sm btn-ghost" 
+                style={{ 
+                  color: 'var(--accent-green)', 
+                  padding: '2px 8px', 
+                  fontSize: '11px',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  background: 'rgba(16, 185, 129, 0.05)',
+                  borderRadius: '4px',
+                  height: '24px',
+                  lineHeight: '20px',
+                  cursor: 'pointer'
+                }} 
+                onClick={() => handleQuickAllow('22')}
+              >
+                Quick Allow 22
+              </button>
             </li>
           </ul>
         </div>
