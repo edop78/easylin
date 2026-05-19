@@ -18,36 +18,73 @@ system_bp = Blueprint("system", __name__)
 
 def get_container_id():
     import re
+    # 1. Try from mountinfo
+    try:
+        if os.path.exists("/proc/self/mountinfo"):
+            with open("/proc/self/mountinfo", "r") as f:
+                for line in f:
+                    m = re.search(r"/docker/containers/([0-9a-fA-F]{64})/", line)
+                    if m:
+                        return m.group(1)[:12]
+                    m = re.search(r"/containers/([0-9a-fA-F]{64})/", line)
+                    if m:
+                        return m.group(1)[:12]
+    except Exception:
+        pass
+
+    # 2. Try from cgroup
+    try:
+        if os.path.exists("/proc/self/cgroup"):
+            with open("/proc/self/cgroup", "r") as f:
+                for line in f:
+                    m = re.search(r"([0-9a-fA-F]{64})", line)
+                    if m:
+                        return m.group(1)[:12]
+    except Exception:
+        pass
+
+    # 3. Try from hostname
     try:
         hn = socket.gethostname()
         if len(hn) == 12 and re.match(r"^[0-9a-fA-F]{12}$", hn):
             return hn
     except Exception:
         pass
-    try:
-        with open("/proc/self/cgroup", "r") as f:
-            for line in f:
-                if "docker" in line or "containerd" in line:
-                    parts = line.strip().split('/')
-                    for part in parts:
-                        for chunk in part.split('-'): # handle system.slice/docker-ID.scope
-                            clean_chunk = chunk.replace('.scope', '')
-                            if len(clean_chunk) == 64:
-                                return clean_chunk[:12]
-    except Exception:
-        pass
     return "easylin"
+
+def get_project_dir():
+    # Method A: docker inspect
+    container_id = get_container_id()
+    if container_id and container_id != "easylin":
+        cmd = f"docker inspect {container_id} --format '{{{{ index .Config.Labels \"com.docker.compose.project.working_dir\" }}}}'"
+        res = run_host_command(cmd)
+        if res.get("returncode") == 0:
+            p_dir = res.get("stdout", "").strip()
+            if p_dir:
+                return p_dir
+
+    # Method B: Search `/home` and `/root` on the host if Docker inspect failed
+    find_cmd = "find /home /root -maxdepth 3 -name 'docker-compose.yml' 2>/dev/null"
+    find_res = run_host_command(find_cmd)
+    if find_res.get("returncode") == 0:
+        paths = [p.strip() for p in find_res.get("stdout", "").split("\n") if p.strip()]
+        for path in paths:
+            parent = os.path.dirname(path)
+            check_cmd = f"[ -f {shlex.quote(parent)}/.env.example ] && echo 'yes' || echo 'no'"
+            check_res = run_host_command(check_cmd)
+            if check_res.get("stdout", "").strip() == "yes":
+                return parent
+    return ""
 
 @system_bp.route("/version", methods=["GET"])
 @jwt_required()
 def get_version():
     try:
-        # Il file ora si trova in backend/version.json
         root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
         version_file = os.path.join(root_dir, "version.json")
         
         # Default values
-        major, minor, patch, build = 1, 2, 0, 105
+        major, minor, patch, build = 1, 3, 0, 112
         label = "stable"
         
         # 1. Carica dati dal file
@@ -60,24 +97,37 @@ def get_version():
                 build = v.get('build', build)
                 label = v.get('label', label)
         
-        # 2. Tenta di trovare la working directory di Docker Compose del container sul host
-        container_id = get_container_id()
-        cmd = f"docker inspect {container_id} --format '{{{{ index .Config.Labels \"com.docker.compose.project.working_dir\" }}}}'"
-        res = run_host_command(cmd)
-        project_dir = res.get("stdout", "").strip() if res.get("returncode") == 0 else ""
+        # 2. Tenta di trovare la directory del progetto
+        project_dir = get_project_dir()
         
-        # 3. Tenta di usare Git per la patch nella directory del progetto sul host
-        git_cmd = "git rev-list --count HEAD"
+        # 3. Tenta di usare Git per il conteggio dei commit (patch) con safe.directory=*
+        git_count = None
         if project_dir:
-            git_cmd = f"git -C {shlex.quote(project_dir)} rev-list --count HEAD"
-            
-        git_res = run_host_command(git_cmd)
-        if git_res.get("returncode") == 0:
+            git_cmd = f"git -c safe.directory=* -C {shlex.quote(project_dir)} rev-list --count HEAD"
+            git_res = run_host_command(git_cmd)
+            if git_res.get("returncode") == 0:
+                try:
+                    git_count = int(git_res.get("stdout", "0").strip())
+                except ValueError:
+                    pass
+
+        # Fallback locale se non rilevato
+        if git_count is None:
             try:
-                git_count = int(git_res.get("stdout", "0").strip())
-                patch = git_count
-            except ValueError:
+                res = subprocess.run(
+                    ["git", "-c", "safe.directory=*", "rev-list", "--count", "HEAD"],
+                    capture_output=True,
+                    text=True,
+                    cwd=root_dir,
+                    timeout=3
+                )
+                if res.returncode == 0:
+                    git_count = int(res.stdout.strip())
+            except Exception:
                 pass
+                
+        if git_count is not None:
+            patch = git_count
         
         return jsonify({
             "version": f"v{major}.{minor}.{patch}",
@@ -85,7 +135,7 @@ def get_version():
             "label": label
         })
     except Exception as e:
-        return jsonify({"version": "v1.2.0", "label": "error", "error": str(e)})
+        return jsonify({"version": "v1.3.0", "label": "error", "error": str(e)})
 
 # Helper to import run_host_command safely
 def get_run_command():
@@ -685,11 +735,8 @@ def check_update():
             except:
                 pass
 
-        # Get project working directory on the host
-        container_id = get_container_id()
-        cmd = f"docker inspect {container_id} --format '{{{{ index .Config.Labels \"com.docker.compose.project.working_dir\" }}}}'"
-        res = run_host_command(cmd)
-        project_dir = res.get("stdout", "").strip() if res.get("returncode") == 0 else ""
+        # Get project working directory
+        project_dir = get_project_dir()
         
         if not project_dir:
             return jsonify({
@@ -699,12 +746,12 @@ def check_update():
                 "error": "Could not determine project working directory on host"
             })
             
-        # 1. Fetch remote updates on the host
-        fetch_cmd = f"git -C {shlex.quote(project_dir)} fetch origin main"
+        # 1. Fetch remote updates on the host with safe.directory override
+        fetch_cmd = f"git -c safe.directory=* -C {shlex.quote(project_dir)} fetch origin main"
         run_host_command(fetch_cmd)
         
         # 2. Count commits behind
-        count_cmd = f"git -C {shlex.quote(project_dir)} rev-list --count HEAD..origin/main"
+        count_cmd = f"git -c safe.directory=* -C {shlex.quote(project_dir)} rev-list --count HEAD..origin/main"
         count_res = run_host_command(count_cmd)
         
         commits_behind = 0
@@ -717,7 +764,7 @@ def check_update():
         # 3. Retrieve changelog (latest commit messages)
         changelog = []
         if commits_behind > 0:
-            log_cmd = f"git -C {shlex.quote(project_dir)} log -n 5 --oneline HEAD..origin/main"
+            log_cmd = f"git -c safe.directory=* -C {shlex.quote(project_dir)} log -n 5 --oneline HEAD..origin/main"
             log_res = run_host_command(log_cmd)
             if log_res.get("returncode") == 0:
                 changelog = [line.strip() for line in log_res.get("stdout", "").strip().split("\n") if line.strip()]
@@ -739,11 +786,8 @@ def check_update():
 @jwt_required()
 def run_update():
     try:
-        # Get project working directory on the host
-        container_id = get_container_id()
-        cmd = f"docker inspect {container_id} --format '{{{{ index .Config.Labels \"com.docker.compose.project.working_dir\" }}}}'"
-        res = run_host_command(cmd)
-        project_dir = res.get("stdout", "").strip() if res.get("returncode") == 0 else ""
+        # Get project working directory
+        project_dir = get_project_dir()
         
         if not project_dir:
             return jsonify({"success": False, "error": "Could not determine project working directory on host"}), 500
@@ -765,7 +809,7 @@ def run_update():
         script = f"""(
   echo '{{\"step\": \"git_pull\", \"progress\": 20, \"status\": \"running\"}}' > /tmp/easylin_update_status.json
   cd {shlex.quote(project_dir)}
-  if ! git pull origin main; then
+  if ! git -c safe.directory=* pull origin main; then
     echo '{{\"step\": \"failed\", \"progress\": 20, \"error\": \"Git pull failed\"}}' > /tmp/easylin_update_status.json
     exit 1
   fi
