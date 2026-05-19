@@ -24,36 +24,36 @@ export default function Sidebar({ isOpen, onClose }) {
       title: 'System',
       links: [
         { to: '/system', icon: Server, label: 'System' },
-        { to: '/system/maintenance', icon: RefreshCw, label: 'Update & Clean' },
+        { to: '/storage', icon: HardDrive, label: 'Storage Manager' },
         { to: '/packages', icon: Package, label: 'Packages' },
-        { to: '/users', icon: Users, label: 'Users' },
         { to: '/services', icon: Cog, label: 'Services' },
+        { to: '/users', icon: Users, label: 'Users' },
+        { to: '/system/maintenance', icon: RefreshCw, label: 'Update & Clean' }
       ]
     },
     {
-      title: 'Management',
+      title: 'Network & Security',
       links: [
-        { to: '/docker', icon: Container, label: 'Docker' },
         { to: '/network', icon: Network, label: 'Network' },
         { to: '/firewall', icon: Shield, label: 'Firewall' },
-        { to: '/security', icon: ShieldCheck, label: 'Security' },
-        { to: '/proxy', icon: Globe, label: 'Reverse Proxy' },
-        { to: '/git', icon: GitBranch, label: 'Git Projects' },
-        { to: '/storage', icon: HardDrive, label: 'Storage Manager' }
+        { to: '/security', icon: ShieldCheck, label: 'Security' }
       ]
     },
     {
-      title: 'Tools',
+      title: 'Apps & Deploy',
       links: [
-        { to: '/files', icon: FileText, label: 'File Manager' },
-        { to: '/terminal', icon: Terminal, label: 'Terminal' },
-        { to: '/logs', icon: ScrollText, label: 'System Logs' },
+        { to: '/docker', icon: Container, label: 'Docker' },
+        { to: '/proxy', icon: Globe, label: 'Reverse Proxy' },
+        { to: '/git', icon: GitBranch, label: 'Git Projects' },
         { to: '/ai', icon: Bot, label: 'AI Manager' }
       ]
     },
     {
-      title: 'Reference',
+      title: 'Tools & Reference',
       links: [
+        { to: '/files', icon: FileText, label: 'File Manager' },
+        { to: '/terminal', icon: Terminal, label: 'Terminal' },
+        { to: '/logs', icon: ScrollText, label: 'System Logs' },
         { to: '/dictionary', icon: BookOpen, label: 'Command Dictionary' }
       ]
     }
