@@ -584,3 +584,188 @@ def fix_security_issue():
         "stderr": res.get("stderr"),
         "message": "Remediation action executed successfully!" if success else f"Error during execution: {res.get('stderr')}"
     })
+
+
+@security_bp.route("/ssh-keys", methods=["GET"])
+@jwt_required()
+def list_ssh_keys():
+    """List all authorized SSH public keys on the host for the root user."""
+    # Ensure .ssh exists
+    run_host_command("mkdir -p /root/.ssh && chmod 700 /root/.ssh && touch /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys")
+    
+    cat_res = run_host_command("cat /root/.ssh/authorized_keys")
+    if cat_res.get("returncode") != 0:
+        return jsonify({"keys": []})
+        
+    stdout = cat_res.get("stdout", "")
+    lines = [l.strip() for l in stdout.split("\n") if l.strip()]
+    
+    keys = []
+    for line in lines:
+        if line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) >= 2:
+            key_type = parts[0]
+            key_val = parts[1]
+            comment = parts[2] if len(parts) >= 3 else "N/A"
+            # Preview key (first 10 and last 10 characters)
+            preview = f"{key_val[:12]}...{key_val[-12:]}" if len(key_val) > 24 else key_val
+            keys.append({
+                "raw": line,
+                "type": key_type,
+                "preview": preview,
+                "comment": comment
+            })
+            
+    return jsonify({"keys": keys})
+
+
+@security_bp.route("/ssh-keys", methods=["POST"])
+@jwt_required()
+def add_ssh_key():
+    """Add a new authorized SSH key."""
+    data = request.get_json() or {}
+    key_string = data.get("key", "").strip()
+    
+    if not key_string:
+        return jsonify({"error": "Key is required"}), 400
+        
+    # Basic validation of SSH key
+    if not any(key_string.startswith(prefix) for prefix in ["ssh-rsa", "ssh-dss", "ecdsa-sha2-", "ssh-ed25519"]):
+        return jsonify({"error": "Invalid SSH Key format. Must start with ssh-rsa, ssh-ed25519, ecdsa, etc."}), 400
+        
+    # Prevent shell injection: base64 encode key string before appending on host
+    import base64
+    encoded_key = base64.b64encode(key_string.encode('utf-8')).decode('utf-8')
+    
+    # Ensure authorized_keys exists and append the key safely
+    append_cmd = (
+        "mkdir -p /root/.ssh && chmod 700 /root/.ssh && "
+        "touch /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys && "
+        f"echo '{encoded_key}' | base64 -d >> /root/.ssh/authorized_keys"
+    )
+    
+    res = run_host_command(append_cmd)
+    success = (res.get("returncode") == 0)
+    return jsonify({
+        "success": success,
+        "message": "SSH Key added successfully" if success else f"Error: {res.get('stderr')}"
+    })
+
+
+@security_bp.route("/ssh-keys/delete", methods=["POST"])
+@jwt_required()
+def delete_ssh_key():
+    """Delete an authorized SSH key by matching its raw string."""
+    data = request.get_json() or {}
+    raw_key = data.get("raw", "").strip()
+    
+    if not raw_key:
+        return jsonify({"error": "Raw key string matching is required"}), 400
+        
+    # Read keys
+    cat_res = run_host_command("cat /root/.ssh/authorized_keys")
+    if cat_res.get("returncode") != 0:
+        return jsonify({"error": "Could not read authorized keys file"}), 500
+        
+    stdout = cat_res.get("stdout", "")
+    lines = [l.strip() for l in stdout.split("\n") if l.strip()]
+    
+    # Filter out the matching line
+    new_lines = [l for l in lines if l != raw_key]
+    
+    if len(lines) == len(new_lines):
+        return jsonify({"error": "Key not found in authorized_keys"}), 404
+        
+    # Write back safely using base64
+    import base64
+    new_content = "\n".join(new_lines) + "\n" if new_lines else ""
+    encoded_content = base64.b64encode(new_content.encode('utf-8')).decode('utf-8')
+    
+    write_cmd = f"echo '{encoded_content}' | base64 -d > /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys"
+    res = run_host_command(write_cmd)
+    
+    success = (res.get("returncode") == 0)
+    return jsonify({
+        "success": success,
+        "message": "SSH Key deleted successfully" if success else f"Error: {res.get('stderr')}"
+    })
+
+
+@security_bp.route("/fail2ban/banned", methods=["GET"])
+@jwt_required()
+def list_fail2ban_banned():
+    """Get active Fail2ban status and banned IPs list."""
+    # Check if fail2ban service is active
+    status_res = run_host_command("systemctl is-active fail2ban")
+    is_active = (status_res.get("returncode") == 0 and status_res.get("stdout", "").strip() == "active")
+    
+    if not is_active:
+        return jsonify({
+            "active": False,
+            "jails": [],
+            "banned": []
+        })
+        
+    # Get all active jails list
+    jails_res = run_host_command("fail2ban-client status")
+    if jails_res.get("returncode") != 0:
+        return jsonify({
+            "active": True,
+            "jails": [],
+            "banned": []
+        })
+        
+    jails = []
+    match = re.search(r"Jail list:\s*(.+)", jails_res.get("stdout", ""))
+    if match:
+        jails = [j.strip() for j in match.group(1).split(",")]
+        
+    banned_list = []
+    for jail in jails:
+        if not jail:
+            continue
+        jail_status = run_host_command(f"fail2ban-client status {jail}")
+        if jail_status.get("returncode") == 0:
+            ip_match = re.search(r"Banned IP list:\s*(.*)", jail_status.get("stdout", ""))
+            if ip_match:
+                ips = ip_match.group(1).split()
+                for ip in ips:
+                    banned_list.append({
+                        "ip": ip,
+                        "jail": jail
+                    })
+                    
+    return jsonify({
+        "active": True,
+        "jails": jails,
+        "banned": banned_list
+    })
+
+
+@security_bp.route("/fail2ban/unban", methods=["POST"])
+@jwt_required()
+def unban_fail2ban_ip():
+    """Unban a specific IP in a Fail2ban jail."""
+    data = request.get_json() or {}
+    ip = data.get("ip", "").strip()
+    jail = data.get("jail", "").strip()
+    
+    if not ip or not jail:
+        return jsonify({"error": "IP and Jail name are required"}), 400
+        
+    # Sanitize input
+    jail = re.sub(r'[^a-zA-Z0-9\-_]', '', jail)
+    # Basic IP validation
+    if not re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', ip) and ":" not in ip:
+        return jsonify({"error": "Invalid IP format"}), 400
+        
+    unban_cmd = f"fail2ban-client set {jail} unbanip {ip}"
+    res = run_host_command(unban_cmd)
+    
+    success = (res.get("returncode") == 0)
+    return jsonify({
+        "success": success,
+        "message": f"IP {ip} unbanned from {jail} successfully" if success else f"Error: {res.get('stderr')}"
+    })

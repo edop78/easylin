@@ -4,7 +4,8 @@ import api from '../../api/client';
 import { 
   Container, Play, Square, RotateCw, Trash2, RefreshCw, 
   Image, HardDrive, Network, ScrollText, Cog, ShoppingCart, 
-  Download, ExternalLink, Globe, Trash, CheckCircle, AlertCircle, Copy, Plus, Github, Lock, Bot, X
+  Download, ExternalLink, Globe, Trash, CheckCircle, AlertCircle, Copy, Plus, Github, Lock, Bot, X,
+  Layers
 } from 'lucide-react';
 import ConfirmModal from '../../components/Common/ConfirmModal';
 
@@ -48,6 +49,7 @@ export default function Docker() {
   const { data: volumesData, refetch: refetchVolumes } = useApi('/docker/volumes', { interval: 10000 });
   const { data: networksData, refetch: refetchNetworks } = useApi('/docker/networks', { interval: 10000 });
   const { data: marketTasks, refetch: refetchMarket } = useApi('/docker/market/status', { interval: 3000 });
+  const { data: composeData, refetch: refetchCompose } = useApi('/docker/compose/projects', { interval: 10000 });
   
   const [tab, setTab] = useState('containers');
   const [logsModal, setLogsModal] = useState(null);
@@ -60,6 +62,25 @@ export default function Docker() {
   const [activeTaskLogs, setActiveTaskLogs] = useState(null);
   const [persistedLogs, setPersistedLogs] = useState([]);
   const logsEndRef = useRef(null);
+
+  const COMPOSE_TEMPLATE = `version: '3.8'
+services:
+  web:
+    image: nginx:alpine
+    container_name: web-nginx
+    ports:
+      - "8085:80"
+    restart: unless-stopped`;
+
+  const [composeForm, setComposeForm] = useState({ name: '', yml: '' });
+  const [activeComposeProject, setActiveComposeProject] = useState(null);
+  const [deployingCompose, setDeployingCompose] = useState(false);
+
+  useEffect(() => {
+    if (activeComposeProject) {
+      setComposeForm({ name: activeComposeProject.name, yml: activeComposeProject.yml });
+    }
+  }, [activeComposeProject]);
 
   useEffect(() => {
     let interval;
@@ -107,6 +128,65 @@ export default function Docker() {
     refetchImages();
     refetchVolumes();
     refetchNetworks();
+    refetchCompose();
+  };
+
+  const handleDeployCompose = async () => {
+    if (!composeForm.name || !composeForm.yml) {
+      setMsg({ type: 'error', text: 'Stack Name and YAML content are required' });
+      return;
+    }
+    setDeployingCompose(true);
+    try {
+      const res = await api.post('/docker/compose/projects', composeForm);
+      if (res.success) {
+        setMsg({ type: 'success', text: `Stack "${composeForm.name}" deployed successfully!` });
+        setComposeForm({ name: '', yml: '' });
+        setActiveComposeProject(null);
+        refetchCompose();
+        refetchContainers();
+      } else {
+        setMsg({ type: 'error', text: `Deployment failed: ${res.stderr || res.error || 'Check YAML syntax.'}` });
+      }
+    } catch (err) {
+      setMsg({ type: 'error', text: err.message });
+    } finally {
+      setDeployingCompose(false);
+    }
+  };
+
+  const runComposeAction = async (projectName, action) => {
+    try {
+      const res = await api.post(`/docker/compose/projects/${projectName}/${action}`);
+      if (res.success) {
+        setMsg({ type: 'success', text: `Compose action "${action}" completed successfully!` });
+        refetchCompose();
+        refetchContainers();
+      } else {
+        setMsg({ type: 'error', text: `Action failed: ${res.stderr || res.error}` });
+      }
+    } catch (err) {
+      setMsg({ type: 'error', text: err.message });
+    }
+  };
+
+  const deleteComposeProject = async (projectName) => {
+    try {
+      const res = await api.delete(`/docker/compose/projects/${projectName}`);
+      if (res.success) {
+        setMsg({ type: 'success', text: `Compose stack "${projectName}" deleted successfully!` });
+        if (activeComposeProject?.name === projectName) {
+          setActiveComposeProject(null);
+          setComposeForm({ name: '', yml: '' });
+        }
+        refetchCompose();
+        refetchContainers();
+      } else {
+        setMsg({ type: 'error', text: `Deletion failed: ${res.error}` });
+      }
+    } catch (err) {
+      setMsg({ type: 'error', text: err.message });
+    }
   };
 
   const containerAction = async (id, action) => {
@@ -368,6 +448,9 @@ export default function Docker() {
         <button className={`tab ${tab === 'networks' ? 'active' : ''}`} onClick={() => setTab('networks')}>
           Networks ({networksData?.networks?.length || 0})
         </button>
+        <button className={`tab ${tab === 'compose' ? 'active' : ''}`} onClick={() => setTab('compose')}>
+          <Layers size={14} style={{ marginRight: '6px' }} /> Compose Stacks ({composeData?.projects?.length || 0})
+        </button>
         <button className={`tab ${tab === 'market' ? 'active' : ''}`} onClick={() => setTab('market')}>
           <ShoppingCart size={14} style={{ marginRight: '6px' }} /> App Store
         </button>
@@ -440,6 +523,173 @@ export default function Docker() {
               ))}
             </tbody>
           </table>
+        ) : tab === 'compose' ? (
+          <div style={{ padding: 'var(--space-md)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-lg)', alignItems: 'start' }}>
+              {/* Projects List */}
+              <div>
+                <h3 style={{ marginBottom: 'var(--space-md)', fontSize: '1.2rem' }}>Compose Projects</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
+                  {(composeData?.projects || []).map(project => (
+                    <div 
+                      key={project.name} 
+                      className={`card ${activeComposeProject?.name === project.name ? 'active' : ''}`}
+                      style={{ 
+                        padding: 'var(--space-md)', 
+                        border: '1px solid var(--border-color)', 
+                        cursor: 'pointer',
+                        background: activeComposeProject?.name === project.name ? 'rgba(59, 130, 246, 0.05)' : 'rgba(255,255,255,0.01)',
+                        borderColor: activeComposeProject?.name === project.name ? 'var(--accent-blue)' : 'var(--border-color)'
+                      }}
+                      onClick={() => setActiveComposeProject(project)}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '1.05rem' }}>{project.name}</span>
+                        <span className={`badge ${project.status === 'running' ? 'badge-success' : project.status === 'warning' ? 'badge-warning' : 'badge-danger'}`}>
+                          {project.status.toUpperCase()}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                        Path: <span className="mono" style={{ wordBreak: 'break-all' }}>{project.path}</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
+                        <button 
+                          className="btn btn-sm btn-ghost" 
+                          onClick={(e) => { e.stopPropagation(); runComposeAction(project.name, 'up'); }}
+                          title="Compose Up"
+                          style={{ color: 'var(--accent-green)', padding: '4px 8px', height: 'auto', minWidth: 'auto' }}
+                        >
+                          <Play size={12} /> Up
+                        </button>
+                        <button 
+                          className="btn btn-sm btn-ghost" 
+                          onClick={(e) => { e.stopPropagation(); runComposeAction(project.name, 'down'); }}
+                          title="Compose Down"
+                          style={{ color: 'var(--accent-red)', padding: '4px 8px', height: 'auto', minWidth: 'auto' }}
+                        >
+                          <Square size={12} /> Down
+                        </button>
+                        <button 
+                          className="btn btn-sm btn-ghost" 
+                          onClick={(e) => { e.stopPropagation(); runComposeAction(project.name, 'restart'); }}
+                          title="Compose Restart"
+                          style={{ padding: '4px 8px', height: 'auto', minWidth: 'auto' }}
+                        >
+                          <RotateCw size={12} /> Restart
+                        </button>
+                        <button 
+                          className="btn btn-sm btn-ghost" 
+                          onClick={(e) => { e.stopPropagation(); runComposeAction(project.name, 'pull'); }}
+                          title="Compose Pull"
+                          style={{ padding: '4px 8px', height: 'auto', minWidth: 'auto' }}
+                        >
+                          <Download size={12} /> Pull
+                        </button>
+                        <button 
+                          className="btn btn-sm btn-ghost" 
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            setConfirm({
+                              open: true,
+                              title: `Delete Stack: ${project.name}`,
+                              message: `Are you sure you want to stop and delete the compose stack "${project.name}"? All associated containers will be destroyed.`,
+                              action: () => deleteComposeProject(project.name)
+                            });
+                          }}
+                          title="Delete Project"
+                          style={{ color: 'var(--accent-red)', marginLeft: 'auto', padding: '4px 8px', height: 'auto', minWidth: 'auto' }}
+                        >
+                          <Trash size={12} /> Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {(composeData?.projects || []).length === 0 && (
+                    <div className="card" style={{ padding: 'var(--space-xl)', textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border-color)' }}>
+                      No active Docker Compose projects. Use the deployment panel on the right to deploy one.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Deployment / Editor Panel */}
+              <div>
+                <h3 style={{ marginBottom: 'var(--space-md)', fontSize: '1.2rem' }}>
+                  {activeComposeProject ? `Edit Stack: ${activeComposeProject.name}` : 'Deploy New Stack'}
+                </h3>
+                <div className="card" style={{ padding: 'var(--space-lg)', border: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
+                  <div className="form-group" style={{ marginBottom: 'var(--space-md)' }}>
+                    <label>Stack / Project Name</label>
+                    <input 
+                      className="input" 
+                      placeholder="e.g. my-web-app" 
+                      value={composeForm.name} 
+                      onChange={e => setComposeForm({ ...composeForm, name: e.target.value })}
+                      disabled={!!activeComposeProject}
+                    />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 'var(--space-md)' }}>
+                    <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>docker-compose.yml</span>
+                      {!activeComposeProject && (
+                        <button 
+                          className="btn btn-sm btn-ghost" 
+                          style={{ fontSize: '10px', height: 'auto', padding: '2px 6px', color: 'var(--accent-blue)', minWidth: 'auto' }}
+                          onClick={() => setComposeForm({ ...composeForm, yml: COMPOSE_TEMPLATE })}
+                        >
+                          Insert Template
+                        </button>
+                      )}
+                    </label>
+                    <textarea 
+                      className="input mono" 
+                      style={{ height: '320px', fontFamily: 'monospace', fontSize: '12px', lineHeight: '1.5', resize: 'vertical', width: '100%', backgroundColor: 'rgba(0,0,0,0.2)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '10px' }}
+                      placeholder="Paste your docker-compose.yml here..."
+                      value={composeForm.yml}
+                      onChange={e => setComposeForm({ ...composeForm, yml: e.target.value })}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'end' }}>
+                    {activeComposeProject && (
+                      <button 
+                        className="btn btn-ghost"
+                        onClick={() => {
+                          setActiveComposeProject(null);
+                          setComposeForm({ name: '', yml: '' });
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    )}
+                    <button 
+                      className="btn btn-primary" 
+                      onClick={handleDeployCompose}
+                      disabled={deployingCompose}
+                    >
+                      {deployingCompose ? <RotateCw size={15} className="spin" /> : <Download size={15} />}
+                      {activeComposeProject ? 'Update Stack' : 'Deploy Stack'}
+                    </button>
+                  </div>
+                </div>
+
+                {activeComposeProject && activeComposeProject.containers && activeComposeProject.containers.length > 0 && (
+                  <div className="card" style={{ padding: 'var(--space-lg)', marginTop: 'var(--space-lg)', border: '1px solid var(--border-color)' }}>
+                    <h4 style={{ marginBottom: 'var(--space-sm)' }}>Containers in this Stack</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {activeComposeProject.containers.map(c => (
+                        <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border-color)' }}>
+                          <span style={{ fontWeight: 500, color: 'var(--text-primary)', fontSize: '13px' }}>{c.name}</span>
+                          <span className={`badge ${c.state === 'running' ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '10px' }}>
+                            {c.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         ) : tab === 'market' ? (
           <div style={{ padding: 'var(--space-md)' }}>
             <div className="card" style={{ 

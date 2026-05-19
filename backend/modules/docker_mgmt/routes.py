@@ -821,3 +821,172 @@ def run_container_command():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+@docker_bp.route("/compose/projects", methods=["GET"])
+@jwt_required()
+def list_compose_projects():
+    """List all docker-compose projects on the host."""
+    import re
+    # Create the compose root folder if it doesn't exist
+    run_host_command("mkdir -p /opt/easylin/compose")
+    
+    # Find all compose files under /opt/easylin/compose/
+    find_cmd = "find /opt/easylin/compose -maxdepth 2 -name 'docker-compose.ym*' 2>/dev/null"
+    res = run_host_command(find_cmd)
+    if res.get("returncode") != 0:
+        return jsonify({"projects": []})
+        
+    stdout = res.get("stdout", "")
+    paths = [p.strip() for p in stdout.split("\n") if p.strip()]
+    
+    client = get_client()
+    containers = []
+    if client:
+        try:
+            containers = client.containers.list(all=True)
+        except:
+            pass
+            
+    projects = []
+    for path in paths:
+        parts = path.split('/')
+        if len(parts) >= 5:
+            project_name = parts[-2]
+            
+            # Read content of compose file
+            cat_res = run_host_command(f"cat {path}")
+            yml_content = cat_res.get("stdout", "")
+            
+            # Find containers belonging to this project
+            project_containers = []
+            running_count = 0
+            for c in containers:
+                labels = c.attrs.get("Config", {}).get("Labels", {}) or {}
+                c_proj = labels.get("com.docker.compose.project")
+                if c_proj == project_name:
+                    project_containers.append({
+                        "id": c.short_id,
+                        "name": c.name,
+                        "status": c.status,
+                        "state": c.attrs["State"]["Status"]
+                    })
+                    if c.status == "running":
+                        running_count += 1
+                        
+            status = "stopped"
+            if project_containers:
+                if running_count == len(project_containers):
+                    status = "running"
+                elif running_count > 0:
+                    status = "warning"
+                else:
+                    status = "stopped"
+                    
+            projects.append({
+                "name": project_name,
+                "path": path,
+                "yml": yml_content,
+                "status": status,
+                "containers": project_containers
+            })
+            
+    return jsonify({"projects": projects})
+
+
+@docker_bp.route("/compose/projects", methods=["POST"])
+@jwt_required()
+def create_compose_project():
+    """Create a new docker-compose project."""
+    import re
+    import base64
+    data = request.get_json() or {}
+    name = data.get("name", "").strip()
+    yml = data.get("yml", "").strip()
+    
+    if not name or not yml:
+        return jsonify({"error": "Project name and YAML content are required"}), 400
+        
+    # Sanitize name
+    name = re.sub(r'[^a-zA-Z0-9\-_]', '', name)
+    if not name:
+        return jsonify({"error": "Invalid project name"}), 400
+        
+    # Write file using base64 to avoid quoting/shell escaping issues
+    encoded_yml = base64.b64encode(yml.encode('utf-8')).decode('utf-8')
+    
+    write_cmd = f"mkdir -p /opt/easylin/compose/{name} && echo '{encoded_yml}' | base64 -d > /opt/easylin/compose/{name}/docker-compose.yml"
+    write_res = run_host_command(write_cmd)
+    
+    if write_res.get("returncode") != 0:
+        return jsonify({"error": f"Failed to write compose file: {write_res.get('stderr')}"}), 500
+        
+    # Deploy
+    deploy_cmd = f"cd /opt/easylin/compose/{name} && docker compose up -d --remove-orphans"
+    deploy_res = run_host_command(deploy_cmd)
+    
+    success = (deploy_res.get("returncode") == 0)
+    return jsonify({
+        "success": success,
+        "stdout": deploy_res.get("stdout"),
+        "stderr": deploy_res.get("stderr"),
+        "message": "Compose project deployed successfully" if success else f"Deploy error: {deploy_res.get('stderr')}"
+    })
+
+
+@docker_bp.route("/compose/projects/<name>/<action>", methods=["POST"])
+@jwt_required()
+def compose_project_action(name, action):
+    """Execute docker compose action (up, down, restart, pull)."""
+    import re
+    name = re.sub(r'[^a-zA-Z0-9\-_]', '', name)
+    allowed_actions = ["up", "down", "restart", "pull"]
+    if action not in allowed_actions:
+        return jsonify({"error": "Invalid action"}), 400
+        
+    compose_path = f"/opt/easylin/compose/{name}/docker-compose.yml"
+    check_res = run_host_command(f"test -f {compose_path}")
+    if check_res.get("returncode") != 0:
+        return jsonify({"error": "Compose project does not exist"}), 404
+        
+    if action == "up":
+        cmd = f"cd /opt/easylin/compose/{name} && docker compose up -d --remove-orphans"
+    elif action == "down":
+        cmd = f"cd /opt/easylin/compose/{name} && docker compose down"
+    elif action == "restart":
+        cmd = f"cd /opt/easylin/compose/{name} && docker compose restart"
+    elif action == "pull":
+        cmd = f"cd /opt/easylin/compose/{name} && docker compose pull"
+        
+    res = run_host_command(cmd)
+    success = (res.get("returncode") == 0)
+    return jsonify({
+        "success": success,
+        "stdout": res.get("stdout"),
+        "stderr": res.get("stderr"),
+        "message": f"Action '{action}' executed successfully" if success else f"Action error: {res.get('stderr')}"
+    })
+
+
+@docker_bp.route("/compose/projects/<name>", methods=["DELETE"])
+@jwt_required()
+def delete_compose_project(name):
+    """Delete a docker-compose project."""
+    import re
+    name = re.sub(r'[^a-zA-Z0-9\-_]', '', name)
+    compose_path = f"/opt/easylin/compose/{name}/docker-compose.yml"
+    
+    check_res = run_host_command(f"test -d /opt/easylin/compose/{name}")
+    if check_res.get("returncode") != 0:
+        return jsonify({"error": "Project not found"}), 404
+        
+    # Clean up containers first
+    run_host_command(f"cd /opt/easylin/compose/{name} && docker compose down -v")
+    
+    # Delete folder
+    del_res = run_host_command(f"rm -rf /opt/easylin/compose/{name}")
+    success = (del_res.get("returncode") == 0)
+    return jsonify({
+        "success": success,
+        "message": "Compose project deleted successfully" if success else f"Deletion error: {del_res.get('stderr')}"
+    })
+
