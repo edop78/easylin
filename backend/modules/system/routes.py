@@ -751,7 +751,7 @@ def check_update():
         run_host_command(fetch_cmd)
         
         # 2. Count commits behind
-        count_cmd = f"git -c safe.directory=* -C {shlex.quote(project_dir)} rev-list --count HEAD..origin/main"
+        count_cmd = f"git -c safe.directory=* -C {shlex.quote(project_dir)} rev-list --count HEAD..FETCH_HEAD"
         count_res = run_host_command(count_cmd)
         
         commits_behind = 0
@@ -764,7 +764,7 @@ def check_update():
         # 3. Retrieve changelog (latest commit messages)
         changelog = []
         if commits_behind > 0:
-            log_cmd = f"git -c safe.directory=* -C {shlex.quote(project_dir)} log -n 5 --oneline HEAD..origin/main"
+            log_cmd = f"git -c safe.directory=* -C {shlex.quote(project_dir)} log -n 5 --oneline HEAD..FETCH_HEAD"
             log_res = run_host_command(log_cmd)
             if log_res.get("returncode") == 0:
                 changelog = [line.strip() for line in log_res.get("stdout", "").strip().split("\n") if line.strip()]
