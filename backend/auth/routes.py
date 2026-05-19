@@ -41,9 +41,11 @@ def server_info():
         except Exception:
             hostname = "localhost"
         
-    return jsonify({
+    response = jsonify({
         "hostname": hostname
     })
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return response
 
 
 # Simple IP-based in-memory rate limiter for failed login attempts
