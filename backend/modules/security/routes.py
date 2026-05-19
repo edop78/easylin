@@ -32,7 +32,6 @@ def run_security_audit():
     ufw_res = run_host_command("ufw status")
     if ufw_res.get("returncode") == 0:
         stdout = ufw_res.get("stdout", "").lower()
-        # "inactive" contains "active", so we must explicitly check for "inactive" not in stdout
         if "status: active" in stdout or ("active" in stdout and "inactive" not in stdout):
             checks.append({
                 "id": "ufw_status",
@@ -89,7 +88,6 @@ def run_security_audit():
                 key, val = parts[0].lower(), parts[1].strip().lower()
                 ssh_settings[key] = val
     else:
-        # Fallback to reading file directly via host command
         cat_ssh = run_host_command("cat /etc/ssh/sshd_config")
         if cat_ssh.get("returncode") == 0:
             for line in cat_ssh.get("stdout", "").split("\n"):
@@ -110,8 +108,8 @@ def run_security_audit():
                 "category": "Access",
                 "status": "warning",
                 "value": f"Port {port} (Default)",
-                "description": "SSH service is listening on the standard port (22). This exposes it to frequent automated brute-force attempts.",
-                "fix_command": "echo 'Custom port recommended in /etc/ssh/sshd_config'"
+                "description": "SSH service is listening on the standard port (22). This exposes it to frequent brute-force attempts.",
+                "fix_command": "ufw allow 2222/tcp && sed -i 's/^#\\?Port.*/Port 2222/g' /etc/ssh/sshd_config && systemctl restart ssh"
             })
         else:
             checks.append({
@@ -343,7 +341,7 @@ def run_security_audit():
             "status": "warning",
             "value": f"{len(exposed_containers)} exposed",
             "description": f"The following sensitive services in Docker containers are exposed to the public internet (0.0.0.0): {', '.join(exposed_containers)}.",
-            "fix_command": "Configure port bindings in docker-compose.yml to 127.0.0.1 instead of 0.0.0.0"
+            "fix_command": "ufw deny 3306/tcp && ufw deny 5432/tcp && ufw deny 27017/tcp && ufw deny 6379/tcp && ufw deny 9200/tcp"
         })
     else:
         checks.append({
@@ -367,7 +365,7 @@ def run_security_audit():
             "status": "warning",
             "value": "NOPASSWD detected",
             "description": f"The following sudoer configuration file(s) allow passwordless command execution: {', '.join(files)}. This represents a potential privilege escalation vector if accounts are hijacked.",
-            "fix_command": None
+            "fix_command": "sed -i 's/NOPASSWD://g' /etc/sudoers /etc/sudoers.d/*"
         })
     else:
         checks.append({
@@ -436,7 +434,7 @@ def run_security_audit():
             "status": "warning",
             "value": f"{len(insecure_shells)} active",
             "description": f"The following system service accounts have interactive login shells: {', '.join(insecure_shells)}. They should be disabled to prevent local shell execution hijacking.",
-            "fix_command": None
+            "fix_command": "for u in bin sys sync games man lp mail news uucp proxy www-data backup list irc gnats nobody; do getent passwd $u && usermod -s /usr/sbin/nologin $u; done"
         })
     else:
         checks.append({
@@ -509,7 +507,6 @@ def run_security_audit():
                 "fix_command": None
             })
     else:
-        # Check if the file actually exists
         check_file = run_host_command("test -f /root/.ssh/authorized_keys")
         if check_file.get("returncode") == 0:
             checks.append({
@@ -567,11 +564,15 @@ def fix_security_issue():
         
     allowed_fixes = {
         "ufw_status": "ufw enable",
+        "ssh_port": "ufw allow 2222/tcp && sed -i 's/^#\\?Port.*/Port 2222/g' /etc/ssh/sshd_config && systemctl restart ssh",
         "ssh_root_login": "sed -i 's/^PermitRootLogin.*/PermitRootLogin prohibit-password/g' /etc/ssh/sshd_config && systemctl restart ssh",
         "ssh_password_auth": "sed -i 's/^PasswordAuthentication.*/PasswordAuthentication no/g' /etc/ssh/sshd_config && systemctl restart ssh",
         "docker_sock_perms": "chmod 660 /var/run/docker.sock",
         "system_updates": "apt-get update && apt-get upgrade -y",
+        "passwordless_sudo": "sed -i 's/NOPASSWD://g' /etc/sudoers /etc/sudoers.d/*",
         "fail2ban_status": "systemctl start fail2ban" if "start" in fix_cmd else "apt-get install fail2ban -y && systemctl enable fail2ban && systemctl start fail2ban",
+        "system_account_shells": "for u in bin sys sync games man lp mail news uucp proxy www-data backup list irc gnats nobody; do getent passwd $u && usermod -s /usr/sbin/nologin $u; done",
+        "docker_exposed_ports": "ufw deny 3306/tcp && ufw deny 5432/tcp && ufw deny 27017/tcp && ufw deny 6379/tcp && ufw deny 9200/tcp",
         "root_ssh_keys": "chmod 600 /root/.ssh/authorized_keys"
     }
     
