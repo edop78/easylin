@@ -79,6 +79,31 @@ export default function Firewall() {
         </span>
       </div>
 
+      <div className="card" style={{
+        background: 'rgba(239, 68, 68, 0.05)',
+        border: '1px dashed rgba(239, 68, 68, 0.3)',
+        borderRadius: 'var(--radius-md)',
+        padding: 'var(--space-md) var(--space-lg)',
+        marginBottom: 'var(--space-lg)',
+        display: 'flex',
+        gap: 'var(--space-md)',
+        alignItems: 'flex-start'
+      }}>
+        <AlertCircle size={22} style={{ color: 'var(--accent-red)', marginTop: '2px', flexShrink: 0 }} />
+        <div>
+          <h4 style={{ color: 'var(--accent-red)', fontWeight: 600, margin: '0 0 6px 0', fontSize: '14px' }}>
+            CRITICAL WARNING
+          </h4>
+          <p style={{ margin: 0, fontSize: '13px', lineHeight: '1.5', color: 'var(--text-secondary)' }}>
+            To maintain connection after enabling the firewall, you <strong>MUST</strong> ensure rules are added to allow incoming traffic on:
+          </p>
+          <ul style={{ margin: '6px 0 0 0', paddingLeft: '20px', fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+            <li><strong>Port 5050 (TCP)</strong>: For this EasyLin Dashboard access.</li>
+            <li><strong>Port 22 (TCP)</strong> (or your custom SSH port): To prevent locking yourself out of your server's CLI.</li>
+          </ul>
+        </div>
+      </div>
+
       {showAdd && (
         <div className="card" style={{ marginBottom: 'var(--space-lg)' }}>
           <h3 style={{ marginBottom: 'var(--space-md)' }}>Add Rule</h3>
