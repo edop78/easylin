@@ -4,6 +4,7 @@ EasyLin is a premium, lightweight, and secure web-based dashboard designed to ma
 
 ## ✨ v1.3.0 Features
 
+-   **🔄 EasyLin Self-Update**: Update the dashboard to the latest GitHub release directly from the UI with real-time progress tracking and container recreation.
 -   **🛡️ Security Advisor**: Audits UFW status, SSH ports, root login permissions, password auth states, Docker socket permissions, exposed container database ports, passwordless sudo configurations, Fail2ban service status, insecure default login shells, and root SSH authorized keys file permissions. Features **fully automated, one-click remediation**.
 -   **📚 Command Dictionary**: A complete, searchable cheatsheet of 48 common and advanced Linux and Docker commands with category filtering and instant clipboard copy integration.
 -   **⏱️ Inactivity Auto-Logout**: Automatic 15-minute inactivity session timeout to protect local browsers from session hijacking.
@@ -33,7 +34,9 @@ Alternatively, manual installation:
 
 ## 🔄 Updating EasyLin
 
-To update EasyLin to the latest version and rebuild the containers with the newest changes:
+You can update EasyLin directly from the Web UI by navigating to the **Maintenance / Update & Clean** section under the **EasyLin Update** tab. 
+
+Alternatively, you can update manually from the host terminal:
 
 1. Navigate to the project directory:
    ```bash
