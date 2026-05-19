@@ -92,4 +92,20 @@ To make local LLMs usable on low-spec/CPU-only servers, the AI route implements 
 - **FETCH_HEAD Git Comparisons**: To reliably check for remote updates, execute a `git fetch` and then compare the current `HEAD` commit to `FETCH_HEAD` (e.g., `git rev-list HEAD..FETCH_HEAD`). Comparing against tracking branches like `origin/main` is unreliable because remote branch references are not always updated in the local filesystem index during a bare git fetch.
 - **UFW Inactive Rules Exclusion**: When the UFW firewall status is `inactive`, calling `ufw status numbered` returns empty. Rules added while UFW is inactive are registered in the firewall configurations but cannot be parsed or displayed. To prevent connection loss, a critical warning banner is always visible on the firewall page, allowing users to "Quick Allow" dashboard access (5050) and SSH (22) with real-time feedback.
 
+## 13. Modular Security & Asynchronous Docker Compose Architecture
+To sustain scalability and prevent route handler bloating, the Security and Docker modules employ a modular architecture with clean separation of HTTP routing, database logging, and low-level host execution.
+
+### Security Module Modularization:
+- **`audit.py`**: Executes auditing commands (`ufw status`, `sshd -T`, etc.) and formats results.
+- **`helpers.py`**: Handles SSH keys configuration and Fail2ban active-banned client queries.
+- **`routes.py`**: Declares blueprints and forwards HTTP payloads to `audit.py`/`helpers.py`.
+
+### Docker Module & Asynchronous Compose Architecture:
+- **`tasks.py`**: Centralizes background task updates (managing state in SQLite `task_status` and `/backend/install_log.txt`).
+- **`helpers.py`**: Houses Docker client connections and parses manual `docker run` commands into dynamic Python SDK arguments (`parse_docker_run`).
+- **`compose.py`**: Queries compose files and hosts the **asynchronous subprocess runner** (`run_async_compose_command`).
+  - *Async Execution*: When a compose action is invoked, it instantiates a Python `threading.Thread` containing `subprocess.Popen` to redirect `stdout`/`stderr` into the console logs, returning `202 Accepted` to the client instantly.
+  - *UI Handshake*: The frontend detects task statuses starting with `compose_` (such as `compose_<projectName>`), disables conflicting actions, shows an `OPERATING` state, and launches the live terminal log viewer reading `/docker/market/logs/file` in real time.
+
+
 

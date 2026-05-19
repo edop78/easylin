@@ -2,10 +2,11 @@
 
 EasyLin is a premium, lightweight, and secure web-based dashboard designed to manage Linux servers directly from a Docker container. It provides high-level control over system services, Docker resources, networking, and AI integration with a sleek, high-fidelity, and **fully responsive** interface.
 
-## ✨ v1.3.0 Features
+## ✨ v1.4.0 Features
 
+-   **🛡️ Enhanced Security advisor & Integrations**: Audits UFW status, SSH configs, Docker socket settings, exposed ports, sudo security, system accounts, etc. Includes a brand-new **SSH Key Manager** (list, add, delete authorized public keys for the root user) and **Fail2ban Integration** (monitor active jails, view banned IPs, and unban IPs in one click).
+-   **🐳 Asynchronous Docker Compose**: Deploy new stacks, pull images, up, down, or restart projects asynchronously in background threads. Watch progress in real-time using the **live terminal log viewer** directly from the UI without blocking HTTP requests.
 -   **🔄 EasyLin Self-Update**: Update the dashboard to the latest GitHub release directly from the UI with real-time progress tracking and container recreation.
--   **🛡️ Security Advisor**: Audits UFW status, SSH ports, root login permissions, password auth states, Docker socket permissions, exposed container database ports, passwordless sudo configurations, Fail2ban service status, insecure default login shells, and root SSH authorized keys file permissions. Features **fully automated, one-click remediation**.
 -   **📚 Command Dictionary**: A complete, searchable cheatsheet of 48 common and advanced Linux and Docker commands with category filtering and instant clipboard copy integration.
 -   **⏱️ Inactivity Auto-Logout**: Automatic 15-minute inactivity session timeout to protect local browsers from session hijacking.
 -   **🤖 AI Manager**: Run local AI models (Qwen, Llama, Mistral) via **Ollama** integration. Now installable with one-click from the built-in App Store.
