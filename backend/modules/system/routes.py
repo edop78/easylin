@@ -83,7 +83,7 @@ def get_version():
             "label": label
         })
     except Exception as e:
-        return jsonify({"version": "v1.3.0", "label": "error", "error": str(e)})
+        return jsonify({"version": "v1.4.0", "label": "error", "error": str(e)})
 
 @system_bp.route("/info", methods=["GET"])
 @jwt_required()
