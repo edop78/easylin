@@ -2,8 +2,11 @@
 
 EasyLin is a premium, lightweight, and secure web-based dashboard designed to manage Linux servers directly from a Docker container. It provides high-level control over system services, Docker resources, networking, and AI integration with a sleek, high-fidelity, and **fully responsive** interface.
 
-## ✨ v1.2.0 Features
+## ✨ v1.3.0 Features
 
+-   **🛡️ Security Advisor**: Audits UFW status, SSH ports, root login permissions, password auth states, Docker socket permissions, exposed container database ports, passwordless sudo configurations, Fail2ban service status, insecure default login shells, and root SSH authorized keys file permissions. Features **fully automated, one-click remediation**.
+-   **📚 Command Dictionary**: A complete, searchable cheatsheet of 48 common and advanced Linux and Docker commands with category filtering and instant clipboard copy integration.
+-   **⏱️ Inactivity Auto-Logout**: Automatic 15-minute inactivity session timeout to protect local browsers from session hijacking.
 -   **🤖 AI Manager**: Run local AI models (Qwen, Llama, Mistral) via **Ollama** integration. Now installable with one-click from the built-in App Store.
 -   **🐳 Docker App Store**: One-click deployment for popular services like Ollama and Nginx Proxy Manager, with real-time log tracking.
 -   **📂 LVM Storage Manager**: Visualize and **expand your root partition** directly from the UI. Perfect for Proxmox and virtualized environments.
@@ -37,6 +40,7 @@ The system is optimized to run efficiently even on low-spec CPU-bound virtual ma
 ## 🛡️ Security Hardening
 
 EasyLin is built with security in mind:
+-   **Inactivity Session Timeout**: Automatic 15-minute logout on keyboard/mouse inactivity.
 -   **Rate Limiting**: Protection against brute-force attacks on the login API.
 -   **Security Headers**: Built-in Talisman integration for HSTS, XSS, and CSP protection.
 -   **Host Isolation**: Uses `nsenter` for controlled host interaction.

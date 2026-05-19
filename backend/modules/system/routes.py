@@ -17,13 +17,19 @@ except ImportError:
 system_bp = Blueprint("system", __name__)
 
 def get_container_id():
+    import re
+    try:
+        hn = socket.gethostname()
+        if len(hn) == 12 and re.match(r"^[0-9a-fA-F]{12}$", hn):
+            return hn
+    except Exception:
+        pass
     try:
         with open("/proc/self/cgroup", "r") as f:
             for line in f:
                 if "docker" in line or "containerd" in line:
                     parts = line.strip().split('/')
                     for part in parts:
-                        # Docker IDs are 64 characters
                         for chunk in part.split('-'): # handle system.slice/docker-ID.scope
                             clean_chunk = chunk.replace('.scope', '')
                             if len(clean_chunk) == 64:

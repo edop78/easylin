@@ -73,3 +73,9 @@ To make local LLMs usable on low-spec/CPU-only servers, the AI route implements 
 - **Sliding Memory Window**: Restricts the context to the last 5 messages, avoiding the exponential increase in response delay as the chat history grows.
 - **Fast-Response Generation in Python**: When a tool is invoked, the backend executes the tool and immediately formats a natural-language Italian response on the fly. It streams this response to the client directly, bypassing a second slow LLM inference turn.
 - **Robust Fallback Parser**: Includes a regex and brace-matching parser to extract tool invocations even if lightweight models format the request as plain text/JSON blocks instead of using the official API tool schemas.
+
+## 10. Security Advisor, Command Dictionary & Auto-Logout Reference
+- **Security Audits & Parsing Safeguards**: When parsing commands like `ufw status` to determine firewall active states, avoid simple substring checks (e.g., checking `"active" in stdout`) as they match `"inactive"`. Explicitly verify `"status: active" in stdout or ("active" in stdout and "inactive" not in stdout)`.
+- **Systemctl Newline Stripping**: Output from `systemctl is-active` contains trailing newline characters (`\n`). Always run `.strip()` on stdout before testing equality (e.g., `stdout.strip() == "active"`).
+- **Auto-Remediation Registry**: Every security audit warning is mapped to a background host-level remediation command (UFW enablement, SSH custom ports configuration, root ssh key chmod, etc.) allowing one-click resolution.
+- **Inactivity Session Timeout**: Handles browser session hijacking by binding a `15-minute` auto-logout timer on client-side keyboard/mouse activity listeners (`mousemove`, `keydown`, `click`, `scroll`, `touchstart`). If inactivity triggers, it clears local credentials and passes a redirection reason string via `localStorage` to display on the login page.
