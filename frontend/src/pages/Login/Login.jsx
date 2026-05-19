@@ -14,6 +14,12 @@ export default function Login() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    const reason = localStorage.getItem('easylin_logout_reason');
+    if (reason) {
+      setError(reason);
+      localStorage.removeItem('easylin_logout_reason');
+    }
+
     fetch('/api/auth/server-info')
       .then(res => res.json())
       .then(data => {

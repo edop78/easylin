@@ -25,6 +25,36 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  // Auto-logout inactivity logic
+  useEffect(() => {
+    if (!user) return;
+
+    let timeoutId;
+    const INACTIVITY_LIMIT = 15 * 60 * 1000; // 15 minutes
+
+    const handleAutoLogout = () => {
+      localStorage.setItem('easylin_logout_reason', 'You have been automatically logged out due to inactivity.');
+      logout();
+    };
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(handleAutoLogout, INACTIVITY_LIMIT);
+    };
+
+    // User activity event listeners
+    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    events.forEach((event) => window.addEventListener(event, resetTimer));
+
+    // Initialize timer
+    resetTimer();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      events.forEach((event) => window.removeEventListener(event, resetTimer));
+    };
+  }, [user]);
+
   const login = async (username, password) => {
     const data = await api.post('/auth/login', { username, password });
     api.setToken(data.token);
