@@ -3,7 +3,7 @@ import { useApi } from '../../hooks/useApi';
 import api from '../../api/client';
 import { 
   Shield, ShieldAlert, ShieldCheck, AlertTriangle, CheckCircle2, 
-  XCircle, RefreshCw, Wrench, Lock, Unlock, FileWarning, AlertCircle
+  XCircle, RefreshCw, Wrench, FileWarning, AlertCircle
 } from 'lucide-react';
 import ConfirmModal from '../../components/Common/ConfirmModal';
 
@@ -19,13 +19,13 @@ export default function Security() {
     try {
       const result = await api.post('/security/fix', { id: checkId, fix_command: fixCommand });
       if (result.success) {
-        setMessage({ type: 'success', text: `Risolto con successo: ${result.message || 'La vulnerabilità è stata corretta.'}` });
+        setMessage({ type: 'success', text: `Successfully resolved: ${result.message || 'The vulnerability has been resolved.'}` });
         refetch();
       } else {
-        setMessage({ type: 'error', text: `Errore durante la correzione: ${result.error || 'Impossibile correggere automaticamente.'}` });
+        setMessage({ type: 'error', text: `Error during remediation: ${result.error || 'Unable to remediate automatically.'}` });
       }
     } catch (err) {
-      setMessage({ type: 'error', text: err.message || 'Errore di connessione al server.' });
+      setMessage({ type: 'error', text: err.message || 'Server connection error.' });
     } finally {
       setActionLoading(prev => ({ ...prev, [checkId]: false }));
     }
@@ -47,13 +47,13 @@ export default function Security() {
   const getStatusBadge = (status) => {
     switch (status) {
       case 'secure':
-        return <span className="badge badge-success">Sicuro</span>;
+        return <span className="badge badge-success">Secure</span>;
       case 'warning':
-        return <span className="badge badge-warning">Attenzione</span>;
+        return <span className="badge badge-warning">Warning</span>;
       case 'risk':
-        return <span className="badge badge-danger">A Rischio</span>;
+        return <span className="badge badge-danger">At Risk</span>;
       default:
-        return <span className="badge">Sconosciuto</span>;
+        return <span className="badge">Unknown</span>;
     }
   };
 
@@ -98,7 +98,7 @@ export default function Security() {
             <Icon size={40} />
           </div>
           <div>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '4px' }}>Stato Sicurezza</h2>
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '4px' }}>Security Status</h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>{global_message}</p>
           </div>
         </div>
@@ -106,15 +106,15 @@ export default function Security() {
         <div style={{ display: 'flex', gap: 'var(--space-lg)', flexWrap: 'wrap' }}>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--accent-red, #ef4444)' }}>{risks}</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Rischi</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Risks</div>
           </div>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--accent-yellow, #f59e0b)' }}>{warnings}</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Avvisi</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Warnings</div>
           </div>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--accent-green, #10b981)' }}>{secure_count}</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Sicuri</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Secure</div>
           </div>
         </div>
       </div>
@@ -135,7 +135,7 @@ export default function Security() {
         </div>
         <div className="page-actions">
           <button className="btn btn-ghost" onClick={refetch} disabled={loading}>
-            <RefreshCw size={15} className={loading ? 'spin' : ''} /> Aggiorna Scan
+            <RefreshCw size={15} className={loading ? 'spin' : ''} /> Refresh Scan
           </button>
         </div>
       </div>
@@ -150,7 +150,7 @@ export default function Security() {
       {loading && !data ? (
         <div className="loading-container" style={{ height: '50vh' }}>
           <div className="spinner" />
-          <span>Analisi di sicurezza in corso...</span>
+          <span>Security audit in progress...</span>
         </div>
       ) : (
         <>
@@ -168,28 +168,28 @@ export default function Security() {
               className={`btn btn-sm ${filter === 'all' ? 'btn-primary' : 'btn-ghost'}`} 
               onClick={() => setFilter('all')}
             >
-              Tutti ({data?.checks?.length || 0})
+              All ({data?.checks?.length || 0})
             </button>
             <button 
               className={`btn btn-sm ${filter === 'risk' ? 'btn-primary' : 'btn-ghost'}`} 
               style={filter === 'risk' ? { background: 'var(--accent-red, #ef4444)', borderColor: 'var(--accent-red, #ef4444)' } : {}}
               onClick={() => setFilter('risk')}
             >
-              Rischio ({data?.checks?.filter(c => c.status === 'risk').length || 0})
+              Risks ({data?.checks?.filter(c => c.status === 'risk').length || 0})
             </button>
             <button 
               className={`btn btn-sm ${filter === 'warning' ? 'btn-primary' : 'btn-ghost'}`} 
               style={filter === 'warning' ? { background: 'var(--accent-yellow, #f59e0b)', borderColor: 'var(--accent-yellow, #f59e0b)' } : {}}
               onClick={() => setFilter('warning')}
             >
-              Avvisi ({data?.checks?.filter(c => c.status === 'warning').length || 0})
+              Warnings ({data?.checks?.filter(c => c.status === 'warning').length || 0})
             </button>
             <button 
               className={`btn btn-sm ${filter === 'secure' ? 'btn-primary' : 'btn-ghost'}`} 
               style={filter === 'secure' ? { background: 'var(--accent-green, #10b981)', borderColor: 'var(--accent-green, #10b981)' } : {}}
               onClick={() => setFilter('secure')}
             >
-              Sicuri ({data?.checks?.filter(c => c.status === 'secure').length || 0})
+              Secure ({data?.checks?.filter(c => c.status === 'secure').length || 0})
             </button>
           </div>
 
@@ -218,7 +218,7 @@ export default function Security() {
                   </div>
                   
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', fontWeight: 600 }}>
-                    Categoria: {check.category}
+                    Category: {check.category}
                   </div>
 
                   <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: 'var(--space-md)', lineHeight: '1.4' }}>
@@ -235,7 +235,7 @@ export default function Security() {
                   marginTop: 'var(--space-sm)'
                 }}>
                   <div>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Valore rilevato:</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Detected value:</span>
                     <span className="mono" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>{check.value}</span>
                   </div>
 
@@ -246,13 +246,13 @@ export default function Security() {
                       disabled={actionLoading[check.id]}
                       onClick={() => setConfirm({
                         open: true,
-                        title: `Risoluzione Vulnerabilità`,
-                        message: `Vuoi eseguire l'azione correttiva automatica per "${check.name}"? Comando da eseguire: "${check.fix_command}"`,
+                        title: `Resolve Vulnerability`,
+                        message: `Do you want to run the automatic remediation for "${check.name}"? Command to execute: "${check.fix_command}"`,
                         action: () => handleFix(check.id, check.fix_command)
                       })}
                     >
                       <Wrench size={12} />
-                      {actionLoading[check.id] ? 'Correzione...' : 'Risolvi'}
+                      {actionLoading[check.id] ? 'Resolving...' : 'Resolve'}
                     </button>
                   )}
                 </div>
@@ -261,7 +261,7 @@ export default function Security() {
 
             {filteredChecks.length === 0 && (
               <div className="card" style={{ gridColumn: '1 / -1', padding: 'var(--space-xl)', textAlign: 'center' }}>
-                <p style={{ color: 'var(--text-muted)' }}>Nessun controllo di sicurezza soddisfa il filtro selezionato.</p>
+                <p style={{ color: 'var(--text-muted)' }}>No security checks match the selected filter.</p>
               </div>
             )}
           </div>

@@ -71,7 +71,7 @@ export default function Login() {
               fontWeight: 500,
               display: 'inline-block'
             }}>
-              Ti stai connettendo a: <span className="mono" style={{ fontWeight: 700 }}>{serverName}</span>
+              Connecting to: <span className="mono" style={{ fontWeight: 700 }}>{serverName}</span>
             </p>
           )}
         </div>

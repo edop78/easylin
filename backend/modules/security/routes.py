@@ -33,24 +33,24 @@ def run_security_audit():
     ufw_res = run_host_command("ufw status")
     if ufw_res.get("returncode") == 0:
         stdout = ufw_res.get("stdout", "").lower()
-        if "status: active" in stdout or "attivo" in stdout:
+        if "status: active" in stdout or "active" in stdout:
             checks.append({
                 "id": "ufw_status",
-                "name": "Stato del Firewall (UFW)",
+                "name": "Firewall Status (UFW)",
                 "category": "Network",
                 "status": "secure",
-                "value": "Attivo",
-                "description": "Il firewall UFW è attivo e protegge le porte di sistema non autorizzate.",
+                "value": "Active",
+                "description": "UFW firewall is active and protecting unauthorized system ports.",
                 "fix_command": None
             })
         else:
             checks.append({
                 "id": "ufw_status",
-                "name": "Stato del Firewall (UFW)",
+                "name": "Firewall Status (UFW)",
                 "category": "Network",
                 "status": "risk",
-                "value": "Disattivato",
-                "description": "Il firewall UFW è installato ma disattivato. Questo espone il server a connessioni esterne indesiderate.",
+                "value": "Disabled",
+                "description": "UFW firewall is installed but disabled. This exposes the server to unauthorized incoming traffic.",
                 "fix_command": "ufw enable"
             })
     else:
@@ -59,21 +59,21 @@ def run_security_audit():
         if check_ufw.get("returncode") == 0:
             checks.append({
                 "id": "ufw_status",
-                "name": "Stato del Firewall (UFW)",
+                "name": "Firewall Status (UFW)",
                 "category": "Network",
                 "status": "risk",
-                "value": "Non configurato o Inattivo",
-                "description": "Il firewall non è attivo o non risponde correttamente.",
+                "value": "Inactive / Not Configured",
+                "description": "The firewall is not active or not responding correctly.",
                 "fix_command": "ufw enable"
             })
         else:
             checks.append({
                 "id": "ufw_status",
-                "name": "Stato del Firewall (UFW)",
+                "name": "Firewall Status (UFW)",
                 "category": "Network",
                 "status": "warning",
-                "value": "UFW Non Installato",
-                "description": "UFW non è installato sul sistema. Si consiglia di installare un firewall per limitare gli accessi.",
+                "value": "UFW Not Installed",
+                "description": "UFW is not installed on the system. It is highly recommended to install a firewall to restrict access.",
                 "fix_command": "apt-get install ufw -y && ufw allow 5050/tcp && ufw enable"
             })
 
@@ -111,21 +111,21 @@ def run_security_audit():
         if port == "22":
             checks.append({
                 "id": "ssh_port",
-                "name": "Porta di Ascolto SSH",
+                "name": "SSH Port Configuration",
                 "category": "Access",
                 "status": "warning",
-                "value": f"Porta {port} (Default)",
-                "description": "Il servizio SSH è in ascolto sulla porta standard (22). Questo espone a frequenti tentativi automatizzati di brute-force.",
-                "fix_command": "echo 'Porta personalizzata consigliata in /etc/ssh/sshd_config'"
+                "value": f"Port {port} (Default)",
+                "description": "SSH service is listening on the standard port (22). This exposes it to frequent automated brute-force attempts.",
+                "fix_command": "echo 'Custom port recommended in /etc/ssh/sshd_config'"
             })
         else:
             checks.append({
                 "id": "ssh_port",
-                "name": "Porta di Ascolto SSH",
+                "name": "SSH Port Configuration",
                 "category": "Access",
                 "status": "secure",
-                "value": f"Porta {port} (Personalizzata)",
-                "description": f"Il servizio SSH utilizza una porta non standard ({port}), riducendo il rumore dei tentativi brute-force automatici.",
+                "value": f"Port {port} (Custom)",
+                "description": f"SSH service is listening on a non-standard port ({port}), which significantly reduces automated scanning noise.",
                 "fix_command": None
             })
 
@@ -135,31 +135,31 @@ def run_security_audit():
             if permit_root == "yes":
                 checks.append({
                     "id": "ssh_root_login",
-                    "name": "Accesso Root SSH",
+                    "name": "SSH Root Login Access",
                     "category": "Access",
                     "status": "risk",
-                    "value": "Abilitato",
-                    "description": "L'accesso SSH per l'utente root è abilitato con password. Rappresenta una vulnerabilità critica.",
+                    "value": "Enabled",
+                    "description": "Direct SSH login as root with a password is allowed. This is a critical security risk.",
                     "fix_command": "sed -i 's/^PermitRootLogin.*/PermitRootLogin prohibit-password/g' /etc/ssh/sshd_config && systemctl restart ssh"
                 })
             else:
                 checks.append({
                     "id": "ssh_root_login",
-                    "name": "Accesso Root SSH",
+                    "name": "SSH Root Login Access",
                     "category": "Access",
                     "status": "secure",
-                    "value": "Solo Chiavi (Sicuro)",
-                    "description": f"L'accesso root SSH è configurato come '{permit_root}' (solo chiavi crittografiche pubbliche).",
+                    "value": "Keys Only (Secure)",
+                    "description": f"SSH root login is set to '{permit_root}' (only public key authentication is allowed).",
                     "fix_command": None
                 })
         else:
             checks.append({
                 "id": "ssh_root_login",
-                "name": "Accesso Root SSH",
+                "name": "SSH Root Login Access",
                 "category": "Access",
                 "status": "secure",
-                "value": "Disabilitato",
-                "description": "L'accesso SSH diretto per l'utente root è disabilitato (opzione più sicura).",
+                "value": "Disabled",
+                "description": "Direct root SSH access is disabled (most secure configuration).",
                 "fix_command": None
             })
 
@@ -168,31 +168,31 @@ def run_security_audit():
         if pwd_auth == "yes":
             checks.append({
                 "id": "ssh_password_auth",
-                "name": "Autenticazione SSH con Password",
+                "name": "SSH Password Authentication",
                 "category": "Access",
                 "status": "warning",
-                "value": "Abilitata",
-                "description": "L'accesso SSH tramite password è abilitato. Si raccomanda di utilizzare chiavi SSH pubbliche e disattivare le password.",
+                "value": "Enabled",
+                "description": "SSH password login is enabled. It is recommended to use public keys and disable password auth.",
                 "fix_command": "sed -i 's/^PasswordAuthentication.*/PasswordAuthentication no/g' /etc/ssh/sshd_config && systemctl restart ssh"
             })
         else:
             checks.append({
                 "id": "ssh_password_auth",
-                "name": "Autenticazione SSH con Password",
+                "name": "SSH Password Authentication",
                 "category": "Access",
                 "status": "secure",
-                "value": "Disabilitata (Solo chiavi)",
-                "description": "L'autenticazione tramite password è disattivata. Si accede solo tramite chiavi pubbliche configurate.",
+                "value": "Disabled (Keys only)",
+                "description": "SSH password authentication is disabled. Authentication is limited to public keys.",
                 "fix_command": None
             })
     else:
         checks.append({
             "id": "ssh_config",
-            "name": "Configurazione Servizio SSH",
+            "name": "SSH Service Configuration",
             "category": "Access",
             "status": "warning",
-            "value": "Non rilevabile",
-            "description": "Impossibile caricare o analizzare i parametri del demone SSH sul server host.",
+            "value": "Undetectable",
+            "description": "Could not parse or read the SSH daemon configurations on the host system.",
             "fix_command": None
         })
 
@@ -214,31 +214,31 @@ def run_security_audit():
                 if mode[-1] in ["2", "3", "6", "7"]:
                     checks.append({
                         "id": "docker_sock_perms",
-                        "name": "Permessi del Socket Docker",
+                        "name": "Docker Socket Permissions",
                         "category": "Docker",
                         "status": "risk",
-                        "value": f"Insicuri ({mode})",
-                        "description": "Il socket di Docker ha permessi di scrittura pubblici. Chiunque sul server host può ottenere il controllo root.",
+                        "value": f"Insecure ({mode})",
+                        "description": "The Docker socket has public write permissions. Any non-privileged local user can gain root access on the host.",
                         "fix_command": "chmod 660 /var/run/docker.sock"
                     })
                 else:
                     checks.append({
                         "id": "docker_sock_perms",
-                        "name": "Permessi del Socket Docker",
+                        "name": "Docker Socket Permissions",
                         "category": "Docker",
                         "status": "secure",
-                        "value": f"Sicuri ({mode} - {group})",
-                        "description": "Il socket Docker ha permessi limitati agli utenti autorizzati (proprietario o gruppo docker).",
+                        "value": f"Secure ({mode} - {group})",
+                        "description": "Docker socket permissions are restricted to authorized users (owner or docker group).",
                         "fix_command": None
                     })
             else:
                 checks.append({
                     "id": "docker_sock_perms",
-                    "name": "Permessi del Socket Docker",
+                    "name": "Docker Socket Permissions",
                     "category": "Docker",
                     "status": "warning",
-                    "value": "Non verificabili",
-                    "description": "Impossibile ottenere i permessi di sicurezza del socket Docker.",
+                    "value": "Unverifiable",
+                    "description": "Unable to determine the file permissions of the Docker socket.",
                     "fix_command": None
                 })
         except:
@@ -246,11 +246,11 @@ def run_security_audit():
     else:
         checks.append({
             "id": "docker_sock_perms",
-            "name": "Permessi del Socket Docker",
+            "name": "Docker Socket Permissions",
             "category": "Docker",
             "status": "warning",
-            "value": "Socket non trovato",
-            "description": "Il socket Docker non è stato trovato nella directory standard (/var/run/docker.sock).",
+            "value": "Socket not found",
+            "description": "The Docker socket file was not found in the default path (/var/run/docker.sock).",
             "fix_command": None
         })
 
@@ -292,41 +292,41 @@ def run_security_audit():
         if sec_updates > 0:
             checks.append({
                 "id": "system_updates",
-                "name": "Aggiornamenti di Sicurezza Pendenti",
+                "name": "Pending Security Updates",
                 "category": "System",
                 "status": "risk",
-                "value": f"{sec_updates} critici ({tot_updates} totali)",
-                "description": f"Ci sono {sec_updates} aggiornamenti di sicurezza non installati sull'host. Il sistema potrebbe essere vulnerabile ad exploit noti.",
+                "value": f"{sec_updates} critical ({tot_updates} total)",
+                "description": f"There are {sec_updates} pending security updates on the host system. The OS is vulnerable to known exploits.",
                 "fix_command": "apt-get update && apt-get upgrade -y"
             })
         elif tot_updates > 0:
             checks.append({
                 "id": "system_updates",
-                "name": "Aggiornamenti di Sicurezza Pendenti",
+                "name": "Pending Security Updates",
                 "category": "System",
                 "status": "warning",
-                "value": f"{tot_updates} aggiornamenti disponibili",
-                "description": "Nessun aggiornamento di sicurezza critico in sospeso, ma ci sono pacchetti generici da aggiornare.",
+                "value": f"{tot_updates} updates available",
+                "description": "No critical security updates pending, but some general software updates are available.",
                 "fix_command": "apt-get update && apt-get upgrade -y"
             })
         else:
             checks.append({
                 "id": "system_updates",
-                "name": "Aggiornamenti di Sicurezza Pendenti",
+                "name": "Pending Security Updates",
                 "category": "System",
                 "status": "secure",
-                "value": "Sistema Aggiornato",
-                "description": "Non ci sono aggiornamenti in sospeso per il sistema operativo host.",
+                "value": "System Up to Date",
+                "description": "No pending updates for the host operating system.",
                 "fix_command": None
             })
     else:
         checks.append({
             "id": "system_updates",
-            "name": "Aggiornamenti di Sicurezza Pendenti",
+            "name": "Pending Security Updates",
             "category": "System",
             "status": "warning",
-            "value": "Non verificabile",
-            "description": "Impossibile recuperare lo stato degli aggiornamenti APT dell'host.",
+            "value": "Unverifiable",
+            "description": "Could not retrieve APT updates status from the host operating system.",
             "fix_command": None
         })
 
@@ -347,28 +347,28 @@ def run_security_audit():
                     ip = p.get('IP')
                     if public_port and ip in ['0.0.0.0', '::']:
                         if public_port in sensitive_ports:
-                            exposed_containers.append(f"{c_name} (Porta {public_port})")
+                            exposed_containers.append(f"{c_name} (Port {public_port})")
     except Exception as e:
         print(f"Docker API parse warning: {e}")
         
     if exposed_containers:
         checks.append({
             "id": "docker_exposed_ports",
-            "name": "Esposizione Porte Sensibili",
+            "name": "Exposed Sensitive Ports",
             "category": "Docker",
             "status": "warning",
-            "value": f"{len(exposed_containers)} esposte",
-            "description": f"I seguenti servizi sensibili nei container sono esposti a tutto internet (0.0.0.0): {', '.join(exposed_containers)}.",
-            "fix_command": "Configurare i binding in docker-compose su 127.0.0.1 anziché 0.0.0.0"
+            "value": f"{len(exposed_containers)} exposed",
+            "description": f"The following sensitive services in Docker containers are exposed to the public internet (0.0.0.0): {', '.join(exposed_containers)}.",
+            "fix_command": "Configure port bindings in docker-compose.yml to 127.0.0.1 instead of 0.0.0.0"
         })
     else:
         checks.append({
             "id": "docker_exposed_ports",
-            "name": "Esposizione Porte Sensibili",
+            "name": "Exposed Sensitive Ports",
             "category": "Docker",
             "status": "secure",
-            "value": "Nessuna porta esposta",
-            "description": "Nessun database o porta critica nei container Docker è esposta direttamente all'esterno.",
+            "value": "No exposed ports",
+            "description": "No database or critical ports inside Docker containers are exposed publicly.",
             "fix_command": None
         })
 
@@ -378,13 +378,13 @@ def run_security_audit():
     
     if risks_count > 0:
         global_status = "risk"
-        global_message = "Il server presenta vulnerabilità critiche che richiedono attenzione immediata!"
+        global_message = "The server has critical vulnerabilities that require immediate attention!"
     elif warnings_count > 0:
         global_status = "warning"
-        global_message = "Il server è parzialmente sicuro, ma presenta alcuni avvertimenti."
+        global_message = "The server is partially secure, but has some warnings."
     else:
         global_status = "secure"
-        global_message = "Il server è configurato secondo le principali raccomandazioni di sicurezza!"
+        global_message = "The server is configured according to key security recommendations!"
         
     return jsonify({
         "checks": checks,
@@ -403,7 +403,7 @@ def fix_security_issue():
     fix_cmd = data.get("fix_command")
     
     if not check_id or not fix_cmd:
-        return jsonify({"success": False, "error": "Parametri insufficienti"}), 400
+        return jsonify({"success": False, "error": "Missing required parameters"}), 400
         
     # Security restriction: do not run arbitrary commands, check against allowlist
     allowed_fixes = {
@@ -417,7 +417,7 @@ def fix_security_issue():
     # We allow the specific command associated with this check
     expected_cmd = allowed_fixes.get(check_id)
     if not expected_cmd or expected_cmd != fix_cmd:
-        return jsonify({"success": False, "error": "Azione correttiva non autorizzata o non sicura."}), 403
+        return jsonify({"success": False, "error": "Remediation action unauthorized or unsafe."}), 403
         
     # Execute the fix
     res = run_host_command(fix_cmd)
@@ -427,5 +427,5 @@ def fix_security_issue():
         "success": success,
         "stdout": res.get("stdout"),
         "stderr": res.get("stderr"),
-        "message": "Azione correttiva eseguita con successo!" if success else f"Errore durante l'esecuzione: {res.get('stderr')}"
+        "message": "Remediation action executed successfully!" if success else f"Error during execution: {res.get('stderr')}"
     })
