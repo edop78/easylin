@@ -3,7 +3,6 @@ from flask_jwt_extended import jwt_required
 import os
 import re
 import json
-import subprocess
 try:
     from backend.config import Config
 except ImportError:
@@ -33,7 +32,8 @@ def run_security_audit():
     ufw_res = run_host_command("ufw status")
     if ufw_res.get("returncode") == 0:
         stdout = ufw_res.get("stdout", "").lower()
-        if "status: active" in stdout or "active" in stdout:
+        # "inactive" contains "active", so we must explicitly check for "inactive" not in stdout
+        if "status: active" in stdout or ("active" in stdout and "inactive" not in stdout):
             checks.append({
                 "id": "ufw_status",
                 "name": "Firewall Status (UFW)",
@@ -89,20 +89,16 @@ def run_security_audit():
                 key, val = parts[0].lower(), parts[1].strip().lower()
                 ssh_settings[key] = val
     else:
-        # Fallback to reading file directly
-        sshd_config_path = "/host/etc/ssh/sshd_config"
-        if os.path.exists(sshd_config_path):
-            try:
-                with open(sshd_config_path, "r") as f:
-                    for line in f:
-                        line = line.strip()
-                        if not line or line.startswith("#"): continue
-                        parts = line.split(None, 1)
-                        if len(parts) == 2:
-                            key, val = parts[0].lower(), parts[1].strip().lower()
-                            ssh_settings[key] = val
-            except:
-                pass
+        # Fallback to reading file directly via host command
+        cat_ssh = run_host_command("cat /etc/ssh/sshd_config")
+        if cat_ssh.get("returncode") == 0:
+            for line in cat_ssh.get("stdout", "").split("\n"):
+                line = line.strip()
+                if not line or line.startswith("#"): continue
+                parts = line.split(None, 1)
+                if len(parts) == 2:
+                    key, val = parts[0].lower(), parts[1].strip().lower()
+                    ssh_settings[key] = val
 
     if ssh_settings:
         # SSH Port Check
@@ -196,52 +192,44 @@ def run_security_audit():
         })
 
     # 3. Docker Socket Permissions Check
-    docker_sock = "/host/var/run/docker.sock"
-    if not os.path.exists(docker_sock):
-        docker_sock = "/var/run/docker.sock"
-        
-    if os.path.exists(docker_sock):
-        try:
-            stat_res = subprocess.run(["stat", "-c", "%a %U %G", docker_sock], capture_output=True, text=True)
-            if stat_res.returncode == 0:
-                perms = stat_res.stdout.strip().split()
-                mode = perms[0]
-                owner = perms[1]
-                group = perms[2]
-                
-                # Check world-writable
-                if mode[-1] in ["2", "3", "6", "7"]:
-                    checks.append({
-                        "id": "docker_sock_perms",
-                        "name": "Docker Socket Permissions",
-                        "category": "Docker",
-                        "status": "risk",
-                        "value": f"Insecure ({mode})",
-                        "description": "The Docker socket has public write permissions. Any non-privileged local user can gain root access on the host.",
-                        "fix_command": "chmod 660 /var/run/docker.sock"
-                    })
-                else:
-                    checks.append({
-                        "id": "docker_sock_perms",
-                        "name": "Docker Socket Permissions",
-                        "category": "Docker",
-                        "status": "secure",
-                        "value": f"Secure ({mode} - {group})",
-                        "description": "Docker socket permissions are restricted to authorized users (owner or docker group).",
-                        "fix_command": None
-                    })
+    stat_sock = run_host_command("stat -c '%a %U %G' /var/run/docker.sock")
+    if stat_sock.get("returncode") == 0 and stat_sock.get("stdout"):
+        perms = stat_sock["stdout"].strip().split()
+        if len(perms) >= 3:
+            mode = perms[0]
+            owner = perms[1]
+            group = perms[2]
+            
+            if mode[-1] in ["2", "3", "6", "7"]:
+                checks.append({
+                    "id": "docker_sock_perms",
+                    "name": "Docker Socket Permissions",
+                    "category": "Docker",
+                    "status": "risk",
+                    "value": f"Insecure ({mode})",
+                    "description": "The Docker socket has public write permissions. Any non-privileged local user can gain root access on the host.",
+                    "fix_command": "chmod 660 /var/run/docker.sock"
+                })
             else:
                 checks.append({
                     "id": "docker_sock_perms",
                     "name": "Docker Socket Permissions",
                     "category": "Docker",
-                    "status": "warning",
-                    "value": "Unverifiable",
-                    "description": "Unable to determine the file permissions of the Docker socket.",
+                    "status": "secure",
+                    "value": f"Secure ({mode} - {group})",
+                    "description": "Docker socket permissions are restricted to authorized users (owner or docker group).",
                     "fix_command": None
                 })
-        except:
-            pass
+        else:
+            checks.append({
+                "id": "docker_sock_perms",
+                "name": "Docker Socket Permissions",
+                "category": "Docker",
+                "status": "warning",
+                "value": "Unverifiable",
+                "description": "Unable to determine the file permissions of the Docker socket.",
+                "fix_command": None
+            })
     else:
         checks.append({
             "id": "docker_sock_perms",
@@ -332,9 +320,9 @@ def run_security_audit():
     exposed_containers = []
     
     try:
-        docker_list = subprocess.run(['curl', '-s', '--unix-socket', docker_sock, 'http://localhost/containers/json'], capture_output=True, text=True, timeout=5)
-        if docker_list.returncode == 0:
-            containers = json.loads(docker_list.stdout)
+        docker_list = run_host_command("curl -s --unix-socket /var/run/docker.sock http://localhost/containers/json")
+        if docker_list.get("returncode") == 0 and docker_list.get("stdout"):
+            containers = json.loads(docker_list["stdout"])
             for c in containers:
                 c_name = ", ".join(c.get('Names', [])).replace("/", "")
                 ports = c.get('Ports', [])
@@ -368,10 +356,8 @@ def run_security_audit():
             "fix_command": None
         })
 
-    # --- NEW SECURITY CHECKS ADDED ---
-
     # 6. Passwordless Sudo Configurations
-    sudoers_res = run_host_command("grep -r -i -l \"nopasswd\" /host/etc/sudoers /host/etc/sudoers.d/ 2>/dev/null")
+    sudoers_res = run_host_command("grep -r -i -l \"nopasswd\" /etc/sudoers /etc/sudoers.d/ 2>/dev/null")
     if sudoers_res.get("returncode") == 0 and sudoers_res.get("stdout"):
         files = [os.path.basename(f.strip()) for f in sudoers_res["stdout"].split("\n") if f.strip()]
         checks.append({
@@ -396,7 +382,7 @@ def run_security_audit():
 
     # 7. Fail2ban Brute-force Shield Status
     f2b_res = run_host_command("systemctl is-active fail2ban")
-    if f2b_res.get("returncode") == 0 and f2b_res.get("stdout") == "active":
+    if f2b_res.get("returncode") == 0 and f2b_res.get("stdout", "").strip() == "active":
         checks.append({
             "id": "fail2ban_status",
             "name": "Fail2ban Brute-Force Protection",
@@ -407,7 +393,6 @@ def run_security_audit():
             "fix_command": None
         })
     else:
-        # Check if installed
         f2b_check = run_host_command("which fail2ban-client")
         if f2b_check.get("returncode") == 0:
             checks.append({
@@ -433,19 +418,15 @@ def run_security_audit():
     # 8. Insecure Shells on Default System Accounts
     system_users = ["bin", "sys", "sync", "games", "man", "lp", "mail", "news", "uucp", "proxy", "www-data", "backup", "list", "irc", "gnats", "nobody"]
     insecure_shells = []
-    passwd_path = "/host/etc/passwd"
-    if os.path.exists(passwd_path):
-        try:
-            with open(passwd_path, "r") as f:
-                for line in f:
-                    parts = line.strip().split(":")
-                    if len(parts) >= 7:
-                        user = parts[0]
-                        shell = parts[6]
-                        if user in system_users and shell not in ["/usr/sbin/nologin", "/bin/false", "/sbin/nologin"]:
-                            insecure_shells.append(f"{user} ({shell})")
-        except:
-            pass
+    passwd_res = run_host_command("cat /etc/passwd")
+    if passwd_res.get("returncode") == 0 and passwd_res.get("stdout"):
+        for line in passwd_res["stdout"].split("\n"):
+            parts = line.strip().split(":")
+            if len(parts) >= 7:
+                user = parts[0]
+                shell = parts[6]
+                if user in system_users and shell not in ["/usr/sbin/nologin", "/bin/false", "/sbin/nologin"]:
+                    insecure_shells.append(f"{user} ({shell})")
             
     if insecure_shells:
         checks.append({
@@ -504,55 +485,52 @@ def run_security_audit():
         })
 
     # 10. Root SSH key file permissions
-    root_keys_path = "/host/root/.ssh/authorized_keys"
-    if os.path.exists(root_keys_path):
-        try:
-            stat_res = subprocess.run(["stat", "-c", "%a", root_keys_path], capture_output=True, text=True)
-            if stat_res.returncode == 0:
-                mode = stat_res.stdout.strip()
-                # Unsafe if group/others have read/write/execute (digits 2 and 3 should be 0)
-                if len(mode) == 3 and (mode[1] != '0' or mode[2] != '0'):
-                    checks.append({
-                        "id": "root_ssh_keys",
-                        "name": "Root SSH Key Permissions",
-                        "category": "Access",
-                        "status": "risk",
-                        "value": f"Insecure ({mode})",
-                        "description": f"The root authorized_keys file has unsafe read/write permissions ({mode}). Other local users could view or append unauthorized access keys.",
-                        "fix_command": "chmod 600 /root/.ssh/authorized_keys"
-                    })
-                else:
-                    checks.append({
-                        "id": "root_ssh_keys",
-                        "name": "Root SSH Key Permissions",
-                        "category": "Access",
-                        "status": "secure",
-                        "value": f"Secure ({mode})",
-                        "description": "The root authorized_keys file has secure, restricted permissions (600), allowing only the root owner to read/write it.",
-                        "fix_command": None
-                    })
-            else:
-                checks.append({
-                    "id": "root_ssh_keys",
-                    "name": "Root SSH Key Permissions",
-                    "category": "Access",
-                    "status": "warning",
-                    "value": "Unverifiable",
-                    "description": "Unable to verify file access permissions for root's SSH authorized keys.",
-                    "fix_command": None
-                })
-        except:
-            pass
+    stat_keys = run_host_command("stat -c '%a' /root/.ssh/authorized_keys")
+    if stat_keys.get("returncode") == 0 and stat_keys.get("stdout"):
+        mode = stat_keys["stdout"].strip()
+        if len(mode) == 3 and (mode[1] != '0' or mode[2] != '0'):
+            checks.append({
+                "id": "root_ssh_keys",
+                "name": "Root SSH Key Permissions",
+                "category": "Access",
+                "status": "risk",
+                "value": f"Insecure ({mode})",
+                "description": f"The root authorized_keys file has unsafe read/write permissions ({mode}). Other local users could view or append unauthorized access keys.",
+                "fix_command": "chmod 600 /root/.ssh/authorized_keys"
+            })
+        else:
+            checks.append({
+                "id": "root_ssh_keys",
+                "name": "Root SSH Key Permissions",
+                "category": "Access",
+                "status": "secure",
+                "value": f"Secure ({mode})",
+                "description": "The root authorized_keys file has secure, restricted permissions (600), allowing only the root owner to read/write it.",
+                "fix_command": None
+            })
     else:
-        checks.append({
-            "id": "root_ssh_keys",
-            "name": "Root SSH Key Permissions",
-            "category": "Access",
-            "status": "secure",
-            "value": "No root keys file",
-            "description": "No SSH authorized keys file exists for the root user. Standard credential controls apply.",
-            "fix_command": None
-        })
+        # Check if the file actually exists
+        check_file = run_host_command("test -f /root/.ssh/authorized_keys")
+        if check_file.get("returncode") == 0:
+            checks.append({
+                "id": "root_ssh_keys",
+                "name": "Root SSH Key Permissions",
+                "category": "Access",
+                "status": "warning",
+                "value": "Unverifiable",
+                "description": "Unable to verify file access permissions for root's SSH authorized keys.",
+                "fix_command": None
+            })
+        else:
+            checks.append({
+                "id": "root_ssh_keys",
+                "name": "Root SSH Key Permissions",
+                "category": "Access",
+                "status": "secure",
+                "value": "No root keys file",
+                "description": "No SSH authorized keys file exists for the root user. Standard credential controls apply.",
+                "fix_command": None
+            })
 
     # Calculate global security status
     risks_count = sum(1 for c in checks if c["status"] == "risk")
@@ -601,7 +579,6 @@ def fix_security_issue():
     if not expected_cmd or (expected_cmd != fix_cmd and check_id != "fail2ban_status"):
         return jsonify({"success": False, "error": "Remediation action unauthorized or unsafe."}), 403
         
-    # Double check dynamic command execution for fail2ban to be safe
     if check_id == "fail2ban_status" and fix_cmd not in ["systemctl start fail2ban", "apt-get install fail2ban -y && systemctl enable fail2ban && systemctl start fail2ban"]:
          return jsonify({"success": False, "error": "Remediation action unauthorized or unsafe."}), 403
 
