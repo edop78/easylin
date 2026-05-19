@@ -17,10 +17,29 @@ auth_bp = Blueprint("auth", __name__)
 @auth_bp.route("/server-info", methods=["GET"])
 def server_info():
     """Return basic public info about the server for the login page."""
+    hostname = "localhost"
     try:
-        hostname = socket.gethostname()
+        import os
+        if os.path.exists("/host/etc/hostname"):
+            with open("/host/etc/hostname", "r") as f:
+                hostname = f.read().strip()
+        else:
+            import subprocess
+            res = subprocess.run(
+                ["nsenter", "--target", "1", "--uts", "hostname"],
+                capture_output=True,
+                text=True,
+                timeout=2
+            )
+            if res.returncode == 0:
+                hostname = res.stdout.strip()
+            else:
+                hostname = socket.gethostname()
     except Exception:
-        hostname = "localhost"
+        try:
+            hostname = socket.gethostname()
+        except Exception:
+            hostname = "localhost"
         
     return jsonify({
         "hostname": hostname
