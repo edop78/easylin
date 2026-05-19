@@ -1,80 +1,28 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
 import socket
-import platform
-import psutil
 import datetime
 import os
 import sys
 import json
 import subprocess
 import shlex
+
 try:
     from config import Config
 except ImportError:
     from backend.config import Config
 
+from .services import (
+    get_container_id,
+    get_project_dir,
+    get_temp_status_path,
+    get_system_info_data,
+    run_host_command
+)
+from .tasks import task_manager, MAINTENANCE_COMMANDS
+
 system_bp = Blueprint("system", __name__)
-
-def get_container_id():
-    import re
-    # 1. Try from mountinfo
-    try:
-        if os.path.exists("/proc/self/mountinfo"):
-            with open("/proc/self/mountinfo", "r") as f:
-                for line in f:
-                    m = re.search(r"/docker/containers/([0-9a-fA-F]{64})/", line)
-                    if m:
-                        return m.group(1)[:12]
-                    m = re.search(r"/containers/([0-9a-fA-F]{64})/", line)
-                    if m:
-                        return m.group(1)[:12]
-    except Exception:
-        pass
-
-    # 2. Try from cgroup
-    try:
-        if os.path.exists("/proc/self/cgroup"):
-            with open("/proc/self/cgroup", "r") as f:
-                for line in f:
-                    m = re.search(r"([0-9a-fA-F]{64})", line)
-                    if m:
-                        return m.group(1)[:12]
-    except Exception:
-        pass
-
-    # 3. Try from hostname
-    try:
-        hn = socket.gethostname()
-        if len(hn) == 12 and re.match(r"^[0-9a-fA-F]{12}$", hn):
-            return hn
-    except Exception:
-        pass
-    return "easylin"
-
-def get_project_dir():
-    # Method A: docker inspect
-    container_id = get_container_id()
-    if container_id and container_id != "easylin":
-        cmd = f"docker inspect {container_id} --format '{{{{ index .Config.Labels \"com.docker.compose.project.working_dir\" }}}}'"
-        res = run_host_command(cmd)
-        if res.get("returncode") == 0:
-            p_dir = res.get("stdout", "").strip()
-            if p_dir:
-                return p_dir
-
-    # Method B: Search `/home` and `/root` on the host if Docker inspect failed
-    find_cmd = "find /home /root -maxdepth 3 -name 'docker-compose.yml' 2>/dev/null"
-    find_res = run_host_command(find_cmd)
-    if find_res.get("returncode") == 0:
-        paths = [p.strip() for p in find_res.get("stdout", "").split("\n") if p.strip()]
-        for path in paths:
-            parent = os.path.dirname(path)
-            check_cmd = f"[ -f {shlex.quote(parent)}/.env.example ] && echo 'yes' || echo 'no'"
-            check_res = run_host_command(check_cmd)
-            if check_res.get("stdout", "").strip() == "yes":
-                return parent
-    return ""
 
 @system_bp.route("/version", methods=["GET"])
 @jwt_required()
@@ -137,175 +85,10 @@ def get_version():
     except Exception as e:
         return jsonify({"version": "v1.3.0", "label": "error", "error": str(e)})
 
-# Helper to import run_host_command safely
-def get_run_command():
-    try:
-        from backend.utils.command import run_host_command
-        return run_host_command
-    except ImportError:
-        try:
-            from utils.command import run_host_command
-            return run_host_command
-        except ImportError:
-            sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
-            try:
-                from backend.utils.command import run_host_command
-                return run_host_command
-            except:
-                return lambda cmd, **kwargs: {"stdout": "", "stderr": "Command utility not found", "returncode": 1}
-
-run_host_command = get_run_command()
-
 @system_bp.route("/info", methods=["GET"])
 @jwt_required()
 def system_info():
-    # Local IP
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        local_ip = s.getsockname()[0]
-        s.close()
-    except:
-        local_ip = "N/A"
-
-    # Public IP
-    try:
-        res_pub = run_host_command("curl -s --connect-timeout 2 https://api.ipify.org")
-        public_ip = res_pub.get("stdout", "").strip() if res_pub and res_pub.get("returncode") == 0 else "N/A"
-    except:
-        public_ip = "N/A"
-    
-    # Virtualization
-    try:
-        res_virt = run_host_command("systemd-detect-virt")
-        virt = res_virt.get("stdout", "physical").strip() if res_virt and res_virt.get("returncode") == 0 else "physical"
-    except:
-        virt = "physical"
-    
-    # Boot time
-    try:
-        bt = datetime.datetime.fromtimestamp(psutil.boot_time()).strftime("%Y-%m-%d %H:%M:%S")
-    except:
-        bt = "N/A"
-
-    # Uptime
-    try:
-        res_up = run_host_command("uptime -p")
-        uptime = res_up.get("stdout", "N/A").strip().replace("up ", "") if res_up and res_up.get("returncode") == 0 else "N/A"
-    except:
-        uptime = "N/A"
-
-    # OS Info
-    os_name = "Linux"
-    try:
-        if os.path.exists("/etc/os-release"):
-            with open("/etc/os-release") as f:
-                for line in f:
-                    if line.startswith("PRETTY_NAME="):
-                        os_name = line.split("=")[1].strip().replace('"', '')
-                        break
-    except:
-        os_name = platform.system()
-
-    # CPU Temperature
-    temp = None
-    try:
-        # Metodo standard Linux sysfs
-        for i in range(10):
-            path = f"/sys/class/thermal/thermal_zone{i}/type"
-            if os.path.exists(path):
-                with open(path, 'r') as f:
-                    if 'pkg_temp' in f.read() or 'cpu' in f.read().lower():
-                        with open(f"/sys/class/thermal/thermal_zone{i}/temp", 'r') as tf:
-                            temp = int(tf.read().strip()) / 1000.0
-                            break
-        if temp is None and hasattr(psutil, "sensors_temperatures"):
-            temps = psutil.sensors_temperatures()
-            if 'coretemp' in temps:
-                temp = temps['coretemp'][0].current
-    except:
-        temp = None
-
-    # NTP & Timezone
-    timezone = "UTC"
-    ntp_active = False
-    try:
-        res_time = run_host_command("timedatectl show --property=Timezone,NTP")
-        time_data = res_time.get("stdout", "")
-        for line in time_data.split("\n"):
-            if line.startswith("Timezone="):
-                timezone = line.split("=")[1]
-            if line.startswith("NTP="):
-                ntp_active = line.split("=")[1] == "yes"
-    except:
-        pass
-
-    # Active Sessions (SSH/Local)
-    sessions = []
-    try:
-        for user in psutil.users():
-            sessions.append({
-                "name": user.name,
-                "terminal": user.terminal,
-                "host": user.host,
-                "started": datetime.datetime.fromtimestamp(user.started).strftime("%Y-%m-%d %H:%M")
-            })
-    except:
-        pass
-
-    # Fallback: se siamo in Docker o psutil.users() non rileva sessioni,
-    # eseguiamo il comando 'who' sull'host per intercettare gli accessi reali (SSH/locali)
-    if not sessions:
-        try:
-            res_who = run_host_command("who")
-            if res_who.get("returncode") == 0 and res_who.get("stdout"):
-                for line in res_who["stdout"].split("\n"):
-                    line = line.strip()
-                    if not line:
-                        continue
-                    parts = line.split()
-                    if len(parts) >= 4:
-                        name = parts[0]
-                        terminal = parts[1]
-                        started_date = parts[2]
-                        started_time = parts[3]
-                        # Opzionale: l'host o IP remoto è solitamente racchiuso tra parentesi alla fine
-                        host = ""
-                        if len(parts) >= 5:
-                            host = parts[4].strip("()")
-                        
-                        sessions.append({
-                            "name": name,
-                            "terminal": terminal,
-                            "host": host or "localhost",
-                            "started": f"{started_date} {started_time}"
-                        })
-        except:
-            pass
-
-    # Get Timezone
-    try:
-        res_tz = run_host_command("timedatectl show --property=Timezone --value")
-        timezone = res_tz.get("stdout", "UTC").strip()
-    except:
-        timezone = "UTC"
-
-    return jsonify({
-        "hostname": socket.gethostname(),
-        "os": os_name,
-        "kernel": platform.release(),
-        "arch": platform.machine(),
-        "uptime": uptime,
-        "cpu_count": psutil.cpu_count(),
-        "cpu_temp": temp,
-        "local_ip": local_ip,
-        "public_ip": public_ip,
-        "virtualization": virt,
-        "boot_time": bt,
-        "timezone": timezone,
-        "ntp_active": ntp_active,
-        "active_sessions": sessions
-    })
+    return jsonify(get_system_info_data())
 
 @system_bp.route("/time/info", methods=["GET"])
 @jwt_required()
@@ -362,14 +145,12 @@ def get_power_status():
         try:
             with open(scheduled_file, 'r') as f:
                 content = f.read()
-                # Il file contiene USEC=... e ACTION=...
                 data = {}
                 for line in content.split("\n"):
                     if "=" in line:
                         k, v = line.split("=", 1)
                         data[k] = v
                 
-                # Convertiamo USEC (microsecondi da epoca) in data leggibile
                 usec = int(data.get("USEC", 0))
                 dt = datetime.datetime.fromtimestamp(usec / 1000000)
                 return jsonify({
@@ -408,12 +189,9 @@ def power_action():
         target_time = data.get("time") # HH:MM
         cmd = f"shutdown {flag} {target_time}"
     elif mode == "cron":
-        cron_expr = data.get("cron") # e.g. "0 3 * * 0" (ogni domenica alle 3)
-        # Per cron dobbiamo creare un job che esegua reboot/shutdown
+        cron_expr = data.get("cron")
         system_cmd = "reboot" if action == "reboot" else "shutdown -h now"
-        # Usiamo un commento identificativo per poterlo rimuovere in futuro se necessario
         cron_line = f"{cron_expr} root {system_cmd} # EASYLIN_POWER_JOB"
-        # Aggiungiamo al crontab di sistema o in /etc/cron.d/easylin_power
         cmd = f'echo "{cron_line}" > /etc/cron.d/easylin_power_{action}'
     else:
         return jsonify({"success": False, "error": "Invalid mode"}), 400
@@ -441,242 +219,27 @@ def shutdown():
 @system_bp.route("/maintenance", methods=["POST"])
 @jwt_required()
 def maintenance_action():
-    """Handle all tasks from the Update & Clean page."""
+    """Handle all tasks from the Update & Clean page (Synchronous)."""
     data = request.get_json()
     command_id = data.get("command")
     
-    commands = {
-        # Updates
-        "update": "DEBIAN_FRONTEND=noninteractive apt-get update",
-        "upgrade": "DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
-        "full-upgrade": "DEBIAN_FRONTEND=noninteractive apt-get full-upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
-        "dist-upgrade": "DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
-        "fix-broken": "DEBIAN_FRONTEND=noninteractive apt-get install -f -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
-        "fix-dpkg": "dpkg --configure -a",
-        "release-upgrade": "do-release-upgrade -f DistUpgradeViewNonInteractive",
-        "release-upgrade-dev": "do-release-upgrade -d -f DistUpgradeViewNonInteractive",
-        
-        # Cleaning
-        "autoremove": "DEBIAN_FRONTEND=noninteractive apt-get autoremove -y",
-        "clean": "apt-get clean",
-        "vacuum-logs": "journalctl --vacuum-time=7d",
-        "purge-configs": "dpkg -l | grep '^rc' | awk '{print $2}' | xargs -r dpkg --purge",
-        "docker-prune": "docker system prune -f",
-        "docker-volume-prune": "docker volume prune -f",
-        "docker-builder-prune": "docker builder prune -a -f"
-    }
-    
-    cmd = commands.get(command_id)
+    cmd = MAINTENANCE_COMMANDS.get(command_id)
     if not cmd:
         return jsonify({"success": False, "stderr": f"Unknown command: {command_id}"}), 400
         
     res = run_host_command(cmd)
 
-    # Auto-repair if dpkg was interrupted (common Debian/Ubuntu package manager lock/crash issue)
     err_msg = (res.get("stderr") or "") + (res.get("stdout") or "")
     if res.get("returncode") != 0 and "dpkg was interrupted" in err_msg:
-        # Tenta di eseguire dpkg --configure -a in automatico sull'host
         repair_res = run_host_command("systemd-run --description='EasyLin Dpkg Recovery' dpkg --configure -a")
         if repair_res.get("returncode") == 0:
-            # Riprova il comando originale dopo il fix
             res = run_host_command(cmd)
-            # Aggiunge una nota informativa all'output
             res["stdout"] = f"[Auto-Fix] Rilevato blocco 'dpkg was interrupted'. Risolto automaticamente con 'dpkg --configure -a'.\n\n" + (res.get("stdout") or "")
         else:
-            # Se anche il ripristino automatico fallisce, segnalalo con i dettagli per aiutare la diagnostica
             res["stderr"] = (res.get("stderr") or "") + f"\n\n[Auto-Fix Failed] Tentativo di ripristino automatico fallito:\n{repair_res.get('stderr') or repair_res.get('stdout')}"
             
-    # Ensure result has success field for frontend
     res["success"] = res.get("returncode") == 0
     return jsonify(res)
-
-import threading
-
-MAINTENANCE_COMMANDS = {
-    # Updates
-    "update": "DEBIAN_FRONTEND=noninteractive apt-get update",
-    "upgrade": "apt-mark hold docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
-    "full-upgrade": "apt-mark hold docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && DEBIAN_FRONTEND=noninteractive apt-get full-upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
-    "dist-upgrade": "apt-mark hold docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
-    "fix-broken": "apt-mark hold docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && DEBIAN_FRONTEND=noninteractive apt-get install -f -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"",
-    "fix-dpkg": "dpkg --configure -a",
-    "release-upgrade": "do-release-upgrade -f DistUpgradeViewNonInteractive",
-    "release-upgrade-dev": "do-release-upgrade -d -f DistUpgradeViewNonInteractive",
-    
-    # Cleaning
-    "autoremove": "DEBIAN_FRONTEND=noninteractive apt-get autoremove -y",
-    "clean": "apt-get clean",
-    "vacuum-logs": "journalctl --vacuum-time=7d",
-    "purge-configs": "dpkg -l | grep '^rc' | awk '{print $2}' | xargs -r dpkg --purge",
-    "docker-prune": "docker system prune -f",
-    "docker-volume-prune": "docker volume prune -f",
-    "docker-builder-prune": "docker builder prune -a -f"
-}
-
-class MaintenanceTaskManager:
-    def __init__(self):
-        self.active_task = None
-        self.lock = threading.Lock()
-        
-        # Persistent storage for task logs
-        if os.path.exists("/app/data"):
-            self.logs_dir = "/app/data/maintenance_logs"
-        else:
-            self.logs_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../maintenance_logs"))
-            
-        os.makedirs(self.logs_dir, exist_ok=True)
-
-    def get_log_path(self, task_id):
-        return os.path.join(self.logs_dir, f"{task_id}.log")
-
-    def start_task(self, task_id, cmd):
-        with self.lock:
-            # Check if there is an active running task
-            if self.active_task and self.active_task.get("status") == "running":
-                return False, "Un'altra attività di manutenzione è già in corso."
-
-            self.active_task = {
-                "task_id": task_id,
-                "status": "running",
-                "success": None,
-                "start_time": datetime.datetime.now().isoformat()
-            }
-            
-            # Clear previous log file
-            log_path = self.get_log_path(task_id)
-            with open(log_path, "w", encoding="utf-8") as f:
-                f.write(f"=== Starting maintenance task: {task_id} ===\n\n")
-
-            # Start thread
-            thread = threading.Thread(target=self._run_task, args=(task_id, cmd))
-            thread.daemon = True
-            thread.start()
-            return True, "Attività avviata."
-
-    def _run_task(self, task_id, cmd):
-        log_path = self.get_log_path(task_id)
-        
-        full_cmd = cmd
-        if Config.IN_DOCKER:
-            full_cmd = f"nsenter --target 1 --mount --uts --ipc --net --pid -- /bin/bash -c {shlex.quote(cmd)}"
-
-        try:
-            with open(log_path, "a", encoding="utf-8", buffering=1) as log_file:
-                process = subprocess.Popen(
-                    full_cmd,
-                    shell=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    bufsize=1,
-                    universal_newlines=True
-                )
-                
-                for line in iter(process.stdout.readline, ""):
-                    log_file.write(line)
-                    log_file.flush()
-                    
-                process.stdout.close()
-                returncode = process.wait()
-                
-                full_output = ""
-                if os.path.exists(log_path):
-                    with open(log_path, "r", encoding="utf-8", errors="replace") as f:
-                        full_output = f.read()
-
-                # Auto-repair if dpkg was interrupted
-                if returncode != 0 and "dpkg was interrupted" in full_output:
-                    log_file.write("\n[Auto-Fix] Rilevato blocco dpkg. Esecuzione di dpkg --configure -a in corso...\n")
-                    log_file.flush()
-                    
-                    repair_cmd = "systemd-run --description='EasyLin Dpkg Recovery' dpkg --configure -a"
-                    if Config.IN_DOCKER:
-                        repair_cmd = f"nsenter --target 1 --mount --uts --ipc --net --pid -- {repair_cmd}"
-                        
-                    repair_proc = subprocess.Popen(
-                        repair_cmd,
-                        shell=True,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        bufsize=1,
-                        universal_newlines=True
-                    )
-                    
-                    for line in iter(repair_proc.stdout.readline, ""):
-                        log_file.write(f"[Auto-Fix] {line}")
-                        log_file.flush()
-                        
-                    repair_proc.stdout.close()
-                    repair_rc = repair_proc.wait()
-                    
-                    if repair_rc == 0:
-                        log_file.write("\n[Auto-Fix] Ripristino completato con successo! Riavvio del comando originale...\n\n")
-                        log_file.flush()
-                        
-                        # Riprova il comando originale dopo il fix
-                        process2 = subprocess.Popen(
-                            full_cmd,
-                            shell=True,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT,
-                            text=True,
-                            bufsize=1,
-                            universal_newlines=True
-                        )
-                        
-                        for line in iter(process2.stdout.readline, ""):
-                            log_file.write(line)
-                            log_file.flush()
-                            
-                        process2.stdout.close()
-                        returncode = process2.wait()
-                    else:
-                        log_file.write("\n[Auto-Fix Failed] Tentativo di ripristino automatico fallito.\n")
-                        log_file.flush()
-                
-                success = (returncode == 0)
-                
-            with self.lock:
-                if self.active_task and self.active_task["task_id"] == task_id:
-                    self.active_task["status"] = "done"
-                    self.active_task["success"] = success
-                    self.active_task["end_time"] = datetime.datetime.now().isoformat()
-                    
-        except Exception as e:
-            try:
-                with open(log_path, "a", encoding="utf-8") as f:
-                    f.write(f"\nExecution error: {str(e)}\n")
-            except:
-                pass
-            with self.lock:
-                if self.active_task and self.active_task["task_id"] == task_id:
-                    self.active_task["status"] = "done"
-                    self.active_task["success"] = False
-                    self.active_task["end_time"] = datetime.datetime.now().isoformat()
-
-    def get_status(self, task_id):
-        with self.lock:
-            log_path = self.get_log_path(task_id)
-            log_content = ""
-            if os.path.exists(log_path):
-                try:
-                    with open(log_path, "r", encoding="utf-8", errors="replace") as f:
-                        log_content = f.read()
-                except Exception as e:
-                    log_content = f"Error reading log file: {str(e)}"
-            
-            is_running = (self.active_task and self.active_task["task_id"] == task_id and self.active_task["status"] == "running")
-            success = self.active_task["success"] if (self.active_task and self.active_task["task_id"] == task_id) else None
-            
-            return {
-                "task_id": task_id,
-                "running": is_running,
-                "success": success,
-                "stdout": log_content
-            }
-
-task_manager = MaintenanceTaskManager()
 
 @system_bp.route("/maintenance/start", methods=["POST"])
 @jwt_required()
@@ -713,12 +276,6 @@ def apt_clean():
 def docker_prune():
     res = run_host_command("docker system prune -f")
     return jsonify(res)
-
-
-def get_temp_status_path():
-    if getattr(Config, 'IN_DOCKER', False) or os.path.exists("/host/tmp"):
-        return "/host/tmp/easylin_update_status.json"
-    return "/tmp/easylin_update_status.json"
 
 @system_bp.route("/update/check", methods=["GET"])
 @jwt_required()
