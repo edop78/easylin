@@ -25,7 +25,7 @@ fi
 check_docker() {
   if ! command -v docker &> /dev/null; then
     echo -e "${YELLOW}Docker is not installed.${NC}"
-    read -p "Do you want to install Docker now? (y/n) " -n 1 -r
+    read -p "Do you want to install Docker now? (y/n) " -n 1 -r < /dev/tty
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
       echo -e "${GREEN}Installing Docker...${NC}"
