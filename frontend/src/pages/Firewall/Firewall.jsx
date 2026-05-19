@@ -49,6 +49,22 @@ export default function Firewall() {
     }
   };
 
+  const handleQuickAllow = async (port) => {
+    try {
+      const result = await api.post('/firewall/rules', { action: 'allow', port, protocol: 'tcp', from: '' });
+      if (result.success) {
+        setMessage({
+          type: 'success',
+          text: `Port ${port} has been allowed. Note: The rules list will not update until you enable the firewall.`
+        });
+      } else {
+        setMessage({ type: 'error', text: result.error || 'Failed to add rule' });
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message });
+    }
+  };
+
   return (
     <div className="page fade-in">
       <div className="page-header">
@@ -97,9 +113,51 @@ export default function Firewall() {
           <p style={{ margin: 0, fontSize: '13px', lineHeight: '1.5', color: 'var(--text-secondary)' }}>
             To maintain connection after enabling the firewall, you <strong>MUST</strong> ensure rules are added to allow incoming traffic on:
           </p>
-          <ul style={{ margin: '6px 0 0 0', paddingLeft: '20px', fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
-            <li><strong>Port 5050 (TCP)</strong>: For this EasyLin Dashboard access.</li>
-            <li><strong>Port 22 (TCP)</strong> (or your custom SSH port): To prevent locking yourself out of your server's CLI.</li>
+          <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px', fontSize: '13px', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <li style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+              <span><strong>Port 5050 (TCP)</strong>: For this EasyLin Dashboard access.</span>
+              {!data?.active && (
+                <button 
+                  className="btn btn-sm btn-ghost" 
+                  style={{ 
+                    color: 'var(--accent-green)', 
+                    padding: '2px 8px', 
+                    fontSize: '11px',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    background: 'rgba(16, 185, 129, 0.05)',
+                    borderRadius: '4px',
+                    height: '24px',
+                    lineHeight: '20px',
+                    cursor: 'pointer'
+                  }} 
+                  onClick={() => handleQuickAllow('5050')}
+                >
+                  Quick Allow 5050
+                </button>
+              )}
+            </li>
+            <li style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+              <span><strong>Port 22 (TCP)</strong> (or your custom SSH port): To prevent locking yourself out of your server's CLI.</span>
+              {!data?.active && (
+                <button 
+                  className="btn btn-sm btn-ghost" 
+                  style={{ 
+                    color: 'var(--accent-green)', 
+                    padding: '2px 8px', 
+                    fontSize: '11px',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    background: 'rgba(16, 185, 129, 0.05)',
+                    borderRadius: '4px',
+                    height: '24px',
+                    lineHeight: '20px',
+                    cursor: 'pointer'
+                  }} 
+                  onClick={() => handleQuickAllow('22')}
+                >
+                  Quick Allow 22
+                </button>
+              )}
+            </li>
           </ul>
         </div>
       </div>
